@@ -14,6 +14,8 @@ import androidx.navigation.compose.rememberNavController
 import com.campusswap.app.data.AppViewModel
 import com.campusswap.app.screens.auth.LoginScreen
 import com.campusswap.app.screens.cart.CartScreen
+import com.campusswap.app.screens.chat.ChatScreen
+import com.campusswap.app.screens.meeting.MeetingPointScreen
 import com.campusswap.app.screens.home.HomeScreen
 import com.campusswap.app.screens.home.NotificationsScreen
 import com.campusswap.app.screens.home.WishlistScreen
@@ -28,7 +30,12 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
-    val hideChrome = currentRoute == null || currentRoute == Routes.LOGIN || currentRoute == Routes.SELL
+    // Focused, full-screen tasks hide the bottom bar (Section 2.5 "Transient" layer).
+    val hideChrome = currentRoute == null ||
+        currentRoute == Routes.LOGIN ||
+        currentRoute == Routes.SELL ||
+        currentRoute == Routes.CHAT ||
+        currentRoute == Routes.MEETING_POINT
 
     fun navigateToTab(route: String) {
         if (route == Routes.SELL) {
@@ -130,6 +137,28 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                     productId = productId,
                     onBack = { navController.popBackStack() },
                     onRelatedClick = { id -> navController.navigate(Routes.productDetail(id)) },
+                    onChatWithSeller = { id -> navController.navigate(Routes.chat(id)) },
+                )
+            }
+
+            composable(Routes.CHAT) { entry ->
+                val productId = entry.arguments?.getString("productId").orEmpty()
+                ChatScreen(
+                    vm = appViewModel,
+                    productId = productId,
+                    onBack = { navController.popBackStack() },
+                    onViewListing = { id -> navController.navigate(Routes.productDetail(id)) },
+                    onProposeMeeting = { navController.navigate(Routes.meetingPoint(productId)) },
+                )
+            }
+
+            composable(Routes.MEETING_POINT) { entry ->
+                val productId = entry.arguments?.getString("productId").orEmpty()
+                MeetingPointScreen(
+                    vm = appViewModel,
+                    productId = productId,
+                    onBack = { navController.popBackStack() },
+                    onProposed = { navController.popBackStack() },
                 )
             }
 
