@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Button
@@ -56,6 +57,7 @@ fun ProductDetailScreen(
     productId: String,
     onBack: () -> Unit,
     onRelatedClick: (String) -> Unit,
+    onChatWithSeller: (String) -> Unit,
 ) {
     val product = remember(productId, vm.allProducts.size) { vm.allProducts.find { it.id == productId } }
 
@@ -231,11 +233,12 @@ fun ProductDetailScreen(
                     Text("Add to Cart")
                 }
                 Button(
-                    onClick = { vm.addToCart(product) },
+                    onClick = { onChatWithSeller(product.id) },
                     modifier = Modifier.weight(1f).height(50.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                 ) {
-                    Text("Buy Now")
+                    Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Text("Chat with Seller", modifier = Modifier.padding(start = 6.dp))
                 }
             }
         }

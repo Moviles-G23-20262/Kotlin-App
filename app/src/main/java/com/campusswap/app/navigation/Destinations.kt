@@ -23,8 +23,12 @@ object Routes {
     const val PRODUCT_DETAIL = "product/{productId}"
     const val NOTIFICATIONS = "notifications"
     const val WISHLIST = "wishlist"
+    const val CHAT = "chat/{productId}"
+    const val MEETING_POINT = "meeting/{productId}"
 
     fun productDetail(id: String) = "product/$id"
+    fun chat(id: String) = "chat/$id"
+    fun meetingPoint(id: String) = "meeting/$id"
 }
 
 data class BottomNavItem(
