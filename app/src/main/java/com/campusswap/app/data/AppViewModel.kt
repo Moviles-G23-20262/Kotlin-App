@@ -19,8 +19,7 @@ import java.time.format.DateTimeFormatter
  * across screens (cart badge, wishlist hearts, newly published listings, etc.).
  */
 class AppViewModel : ViewModel() {
-
-    var isDarkTheme by mutableStateOf(false)
+    var isDarkTheme by mutableStateOf(true)
         private set
 
     var isLoggedIn by mutableStateOf(false)
@@ -52,6 +51,58 @@ class AppViewModel : ViewModel() {
     fun login() {
         isLoggedIn = true
     }
+
+    fun checkCredentials(username: String, password: String): Boolean =
+        username.trim() == DEMO_USERNAME && password == DEMO_PASSWORD
+
+    val featuredSellers: List<FeaturedSeller>
+        get() = allProducts
+            .groupBy { it.seller.id }
+            .filterKeys { it != currentUser.id }
+            .map { (_, items) -> FeaturedSeller(items.first().seller, items.size) }
+            .sortedByDescending { it.seller.rating ?: 0.0 }
+
+    val serviceFee: Double get() = if (cart.isEmpty()) 0.0 else SERVICE_FEE
+
+    val orderTotal: Double get() = cartTotal + serviceFee
+
+    val orders = mutableStateListOf<Order>()
+
+
+    fun placeOrder(meetOnCampus: Boolean = true): Int {
+        val number = (1000..9999).random()
+        val order = Order(number = number, lines = cart.toList(), meetOnCampus = meetOnCampus)
+        orders.add(0, order)
+        cart.clear()
+        order.products.forEach { product ->
+            notify(
+                id = "order-${order.number}-${product.id}",
+                title = "Order #CSW-${order.number} confirmed",
+                message = "Agree on a meeting point with ${product.seller.name.substringBefore(' ')}, then close the exchange and rate them.",
+                kind = NotificationKind.EXCHANGE,
+                productId = product.id,
+            )
+        }
+        return number
+    }
+
+    val pendingExchanges: List<PendingExchange>
+        get() = orders.flatMap { order ->
+            order.products.map { product ->
+                PendingExchange(
+                    order = order,
+                    product = product,
+                    proposal = meetingProposals[product.id],
+                    rating = ratings[product.id],
+                )
+            }
+        }
+
+    fun orderFor(productId: String): Order? =
+        orders.firstOrNull { order -> order.products.any { it.id == productId } }
+
+    fun hasPendingExchange(productId: String): Boolean =
+        orderFor(productId) != null && ratings[productId] == null
 
     fun logout() {
         isLoggedIn = false
@@ -86,6 +137,110 @@ class AppViewModel : ViewModel() {
         } else {
             cart[index] = cart[index].copy(quantity = quantity)
         }
+    }
+
+    // save searches & smart matches (View 11)
+
+    val alerts = mutableStateListOf<SmartAlert>().apply { addAll(SampleData.alerts) }
+
+    private val reservedMatches = mutableStateListOf<String>()
+
+    val alertMatches: List<AlertMatch>
+        get() = alerts.filter { it.enabled }.flatMap { alert ->
+            allProducts
+                .filter { it.seller.id != currentUser.id }
+                .filter { product ->
+                    product.price <= alert.maxPrice &&
+                        product.condition.ordinal <= alert.minCondition.ordinal &&
+                        (alert.course == null || product.course?.code == alert.course.code) &&
+                        (alert.category == Category.ALL || product.category == alert.category) &&
+                        (alert.keyword.isBlank() || product.title.contains(alert.keyword, ignoreCase = true) ||
+                            product.course?.code?.contains(alert.keyword, ignoreCase = true) == true)
+                }
+                .map { product ->
+                    AlertMatch(
+                        alert = alert,
+                        product = product,
+                        postedMinutesAgo = 3 + product.imageSeed * 17,
+                        reserved = reservedMatches.contains(product.id),
+                    )
+                }
+        }.distinctBy { it.product.id }.sortedBy { it.postedMinutesAgo }
+
+    val unseenMatchCount: Int
+        get() = notifications.count { it.kind == NotificationKind.ALERT_MATCH && !it.isRead }
+
+
+    fun publishMatchNotifications() {
+        alertMatches.forEach { match ->
+            notify(
+                id = "match-${match.product.id}",
+                title = "Alert match · ${match.alert.keyword.ifBlank { match.alert.course?.code ?: match.alert.category.label }}",
+                message = "${match.product.title} — ${match.savingPercent}% below your limit.",
+                kind = NotificationKind.ALERT_MATCH,
+                productId = match.product.id,
+            )
+        }
+    }
+
+    fun addAlert(alert: SmartAlert) {
+        alerts.add(0, alert)
+        publishMatchNotifications()
+    }
+
+    fun toggleAlert(id: String) {
+        val index = alerts.indexOfFirst { it.id == id }
+        if (index >= 0) alerts[index] = alerts[index].copy(enabled = !alerts[index].enabled)
+    }
+
+    fun removeAlert(id: String) {
+        alerts.removeAll { it.id == id }
+    }
+
+    fun isReserved(productId: String) = reservedMatches.contains(productId)
+
+    fun reserveMatch(productId: String) {
+        if (!reservedMatches.contains(productId)) reservedMatches.add(productId)
+    }
+
+    // transaction completion & rating (View 12)
+
+    val ratings = mutableStateMapOf<String, TransactionRating>()
+
+    fun ratingFor(productId: String): TransactionRating? = ratings[productId]
+
+    fun submitRating(rating: TransactionRating) {
+        ratings[rating.productId] = rating
+        val product = allProducts.find { it.id == rating.productId }
+        viewModelScope.launch {
+            delay(2500)
+            ratings[rating.productId] = rating.copy(revealed = true)
+            if (product != null) {
+                notify(
+                    id = "rated-${rating.productId}",
+                    title = "${product.seller.name.substringBefore(' ')} rated you back",
+                    message = "Both ratings for \"${product.title}\" are now public.",
+                    kind = NotificationKind.PRODUCT,
+                    productId = product.id,
+                )
+            }
+        }
+    }
+    fun canCompleteExchange(productId: String) =
+        meetingProposals[productId]?.status == ProposalStatus.ACCEPTED
+
+    private fun notify(
+        id: String,
+        title: String,
+        message: String,
+        kind: NotificationKind,
+        productId: String? = null,
+    ) {
+        if (notifications.any { it.id == id }) return
+        notifications.add(
+            0,
+            AppNotification(id, title, message, isRead = false, kind = kind, productId = productId),
+        )
     }
 
     fun markNotificationsRead() {
@@ -175,9 +330,24 @@ class AppViewModel : ViewModel() {
             imageSeed = (allProducts.size + 1),
         )
         allProducts.add(0, product)
+        publishMatchNotifications()
         return product
     }
+
+    init {
+        publishMatchNotifications()
+    }
 }
+
+data class FeaturedSeller(
+    val seller: Seller,
+    val itemCount: Int,
+)
+
+const val DEMO_USERNAME = "uwu"
+const val DEMO_PASSWORD = "uwu123"
+const val SERVICE_FEE = 2000.0
+const val HOME_DELIVERY_FEE = 10000.0
 
 data class SellDraft(
     val photoCount: Int = 0,

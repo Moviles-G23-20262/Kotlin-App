@@ -57,6 +57,14 @@ import com.campusswap.app.data.Condition
 import com.campusswap.app.data.Course
 import com.campusswap.app.data.SampleData
 import com.campusswap.app.data.SellDraft
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import com.campusswap.app.components.CampusHeader
+import com.campusswap.app.components.CampusIconButton
+import com.campusswap.app.components.CampusIcons
+import com.campusswap.app.components.HeadingText
+import com.campusswap.app.ui.theme.CampusSwapTheme
+import com.campusswap.app.ui.theme.CampusType
 import com.campusswap.app.ui.theme.AccentBlue
 import com.campusswap.app.ui.theme.SecondaryBlue
 import com.campusswap.app.ui.theme.SuccessGreen
@@ -99,18 +107,30 @@ fun SellScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = { if (step == SellStep.CONFIRMATION) onExit() else requestExit() }) {
-                Icon(Icons.Filled.Close, contentDescription = "Close")
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(CampusSwapTheme.colors.bg)
+            .navigationBarsPadding()
+            .imePadding(),
+    ) {
+        CampusHeader {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CampusIconButton(
+                    icon = CampusIcons.Close,
+                    contentDescription = "Close",
+                    onClick = { if (step == SellStep.CONFIRMATION) onExit() else requestExit() },
+                    iconSize = 18.dp,
+                )
+                Icon(CampusIcons.Tag, contentDescription = null, tint = CampusSwapTheme.colors.accentHi, modifier = Modifier.size(16.dp))
+                HeadingText(
+                    text = if (step == SellStep.CONFIRMATION) "Listing published" else "List New Item",
+                    size = CampusType.sizeMd,
+                )
             }
-            Text(
-                text = if (step == SellStep.CONFIRMATION) "" else "Sell an item",
-                style = MaterialTheme.typography.titleMedium,
-            )
         }
 
         if (step != SellStep.CONFIRMATION) {

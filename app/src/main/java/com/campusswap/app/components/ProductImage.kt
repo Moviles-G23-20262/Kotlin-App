@@ -14,23 +14,21 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import com.campusswap.app.data.Category
-import com.campusswap.app.ui.theme.AccentBlue
-import com.campusswap.app.ui.theme.LightBlue
-import com.campusswap.app.ui.theme.SecondaryBlue
-
-private val placeholderTints = listOf(
-    LightBlue.copy(alpha = 0.55f),
-    SecondaryBlue.copy(alpha = 0.35f),
-    AccentBlue.copy(alpha = 0.16f),
-)
+import com.campusswap.app.ui.theme.CampusSwapTheme
 
 fun categoryIcon(category: Category): ImageVector = when (category) {
     Category.ALL -> Icons.Outlined.Apps
@@ -42,7 +40,10 @@ fun categoryIcon(category: Category): ImageVector = when (category) {
     Category.ELECTRONICS -> Icons.Outlined.DevicesOther
 }
 
-/** Fixed aspect-ratio rounded placeholder standing in for real product photography (Section 2.3). */
+/**
+ * Stand-in for product photography: an image box on `--bg-elevated` (like the prototype's
+ * `<img>` containers) with a soft accent gradient and the category glyph.
+ */
 @Composable
 fun ProductPlaceholderImage(
     category: Category,
@@ -50,17 +51,30 @@ fun ProductPlaceholderImage(
     modifier: Modifier = Modifier,
     cornerRadius: Int = 12,
 ) {
-    val tint = placeholderTints[seed.mod(placeholderTints.size)]
+    val c = CampusSwapTheme.colors
+    val alphas = listOf(0.55f, 0.35f, 0.75f)
+    val tint = c.accentLo.copy(alpha = alphas[seed.mod(alphas.size)])
+    var minSidePx by remember { mutableStateOf(0) }
+    val iconSize = with(LocalDensity.current) { (minSidePx * 0.36f).toDp() }.coerceIn(20.dp, 72.dp)
+    val shape = RoundedCornerShape(cornerRadius.dp)
     Box(
         modifier = modifier
-            .background(tint, RoundedCornerShape(cornerRadius.dp)),
+            .clip(shape)
+            .background(c.elevated)
+            .background(Brush.linearGradient(listOf(tint, c.elevated)))
+            .onSizeChanged { minSidePx = minOf(it.width, it.height) },
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = categoryIcon(category),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-            modifier = Modifier.size(48.dp),
+            tint = c.accentHi.copy(alpha = 0.85f),
+            modifier = Modifier.size(iconSize),
         )
     }
+}
+
+@Composable
+fun ProductPlaceholderFill(category: Category, seed: Int) {
+    ProductPlaceholderImage(category = category, seed = seed, modifier = Modifier.fillMaxSize(), cornerRadius = 0)
 }
