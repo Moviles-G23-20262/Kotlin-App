@@ -188,9 +188,29 @@ object SampleData {
         ),
     )
 
+    val alerts = listOf(
+        SmartAlert(
+            id = "a1",
+            keyword = "Casio FX-991",
+            course = null,
+            category = Category.CALCULATORS,
+            maxPrice = 80000.0,
+            minCondition = Condition.GOOD,
+        ),
+        SmartAlert(
+            id = "a2",
+            keyword = "",
+            course = courses[2],
+            category = Category.ALL,
+            maxPrice = 120000.0,
+            minCondition = Condition.GOOD,
+            instant = false,
+        ),
+    )
+
     val notifications = listOf(
-        AppNotification("n1", "New message", "Maria Gomez replied about the TI-Nspire calculator.", isRead = false),
-        AppNotification("n2", "Price drop", "A calculator on your wishlist dropped in price.", isRead = false),
+        AppNotification("n1", "New message", "Maria Gomez replied about the TI-Nspire calculator.", isRead = false, kind = NotificationKind.CHAT, productId = "p1"),
+        AppNotification("n2", "Price drop", "A calculator on your wishlist dropped in price.", isRead = false, kind = NotificationKind.PRODUCT, productId = "p1"),
         AppNotification("n3", "Listing published", "Your listing \"Technical Writing Style Guide\" is now live.", isRead = true),
     )
 

@@ -1,17 +1,7 @@
 package com.campusswap.app.navigation
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ShoppingCart
-import androidx.compose.material.icons.outlined.AddCircle
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.campusswap.app.components.CampusIcons
 
 object Routes {
     const val LOGIN = "login"
@@ -19,30 +9,37 @@ object Routes {
     const val SEARCH = "search"
     const val SELL = "sell"
     const val CART = "cart"
+    const val CHECKOUT = "checkout"
+    const val CONFIRMATION = "confirmation/{orderNumber}"
     const val PROFILE = "profile"
     const val PRODUCT_DETAIL = "product/{productId}"
     const val NOTIFICATIONS = "notifications"
     const val WISHLIST = "wishlist"
+    const val ALERTS = "alerts"
     const val CHAT = "chat/{productId}"
     const val MEETING_POINT = "meeting/{productId}"
+    const val COMPLETION = "complete/{productId}"
 
     fun productDetail(id: String) = "product/$id"
     fun chat(id: String) = "chat/$id"
     fun meetingPoint(id: String) = "meeting/$id"
+    fun completion(id: String) = "complete/$id"
+    fun confirmation(orderNumber: Int) = "confirmation/$orderNumber"
 }
 
 data class BottomNavItem(
     val route: String,
     val label: String,
-    val filledIcon: ImageVector,
-    val outlinedIcon: ImageVector,
+    val icon: ImageVector,
     val isCentral: Boolean = false,
+    val alsoActiveOn: Set<String> = emptySet(),
 )
 
-val bottomNavItems = listOf(
-    BottomNavItem(Routes.HOME, "Home", Icons.Filled.Home, Icons.Outlined.Home),
-    BottomNavItem(Routes.SEARCH, "Search", Icons.Filled.Search, Icons.Outlined.Search),
-    BottomNavItem(Routes.SELL, "Sell", Icons.Filled.AddCircle, Icons.Outlined.AddCircle, isCentral = true),
-    BottomNavItem(Routes.CART, "Cart", Icons.Filled.ShoppingCart, Icons.Outlined.ShoppingCart),
-    BottomNavItem(Routes.PROFILE, "Seller", Icons.Filled.Person, Icons.Outlined.Person),
-)
+val bottomNavItems: List<BottomNavItem>
+    get() = listOf(
+        BottomNavItem(Routes.HOME, "Home", CampusIcons.Home),
+        BottomNavItem(Routes.SEARCH, "Search", CampusIcons.Search),
+        BottomNavItem(Routes.SELL, "Sell", CampusIcons.Plus, isCentral = true),
+        BottomNavItem(Routes.CART, "Cart", CampusIcons.Cart, alsoActiveOn = setOf(Routes.CHECKOUT)),
+        BottomNavItem(Routes.PROFILE, "Seller", CampusIcons.User),
+    )

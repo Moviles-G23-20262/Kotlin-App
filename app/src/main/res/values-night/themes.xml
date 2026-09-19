@@ -1,6 +1,6 @@
 <resources>
     <style name="Theme.CampusSwap" parent="android:Theme.Material.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
-        <item name="android:windowBackground">@color/night_background</item>
+        <item name="android:windowBackground">@color/app_background</item>
     </style>
 </resources>

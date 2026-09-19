@@ -56,11 +56,15 @@ data class CartLine(
     val quantity: Int,
 )
 
+enum class NotificationKind { GENERIC, CHAT, PRODUCT, ALERT_MATCH, EXCHANGE }
+
 data class AppNotification(
     val id: String,
     val title: String,
     val message: String,
     val isRead: Boolean,
+    val kind: NotificationKind = NotificationKind.GENERIC,
+    val productId: String? = null,
 )
 
 // ---- In-app chat (View 09) ----
@@ -120,3 +124,77 @@ data class MeetingProposal(
     val slot: TimeSlot,
     val status: ProposalStatus,
 )
+
+// saved searches & smart matching (View 11)
+
+/** A saved search that notifies the student when a matching listing is posted. */
+data class SmartAlert(
+    val id: String,
+    val keyword: String,
+    val course: Course?,
+    val category: Category,
+    val maxPrice: Double,
+    val minCondition: Condition,
+    val instant: Boolean = true,
+    val quietDuringClasses: Boolean = true,
+    val enabled: Boolean = true,
+)
+
+/** A listing that satisfies an alert */
+data class AlertMatch(
+    val alert: SmartAlert,
+    val product: Product,
+    val postedMinutesAgo: Int,
+    val reserved: Boolean = false,
+) {
+    val savingPercent: Int
+        get() = (((alert.maxPrice - product.price) / alert.maxPrice) * 100).toInt().coerceAtLeast(0)
+}
+
+// transaction completion and rating (View 12)
+
+enum class CheckItem(val label: String) {
+    MATCHES_PHOTOS("Matches the photos"),
+    CONDITION_OK("Condition is as listed"),
+    COMPLETE("Everything included"),
+    WORKS("Works as expected"),
+}
+
+enum class FeedbackTag(val label: String) {
+    PUNCTUAL("Punctual"),
+    AS_DESCRIBED("Item as described"),
+    FRIENDLY("Friendly"),
+    GOOD_COMMS("Good communication"),
+    FAIR_PRICE("Fair price"),
+}
+
+data class TransactionRating(
+    val productId: String,
+    val stars: Int,
+    val confirmedCondition: Condition,
+    val tags: Set<FeedbackTag>,
+    val review: String,
+    /** Ratings stay hidden until the other party rates */
+    val revealed: Boolean = false,
+)
+
+
+data class Order(
+    val number: Int,
+    val lines: List<CartLine>,
+    /** True when the buyer chose to meet on campus instead of home delivery. */
+    val meetOnCampus: Boolean = true,
+) {
+    val products: List<Product> get() = lines.map { it.product }
+    val total: Double get() = lines.sumOf { it.product.price * it.quantity }
+}
+
+data class PendingExchange(
+    val order: Order,
+    val product: Product,
+    val proposal: MeetingProposal?,
+    val rating: TransactionRating?,
+) {
+    val isRated: Boolean get() = rating != null
+    val isScheduled: Boolean get() = proposal?.status == ProposalStatus.ACCEPTED
+}

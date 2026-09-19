@@ -1,31 +1,26 @@
 package com.campusswap.app.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.campusswap.app.ui.theme.AccentBlue
+import androidx.compose.ui.graphics.vector.ImageVector
 
 @Composable
 fun SectionHeader(
     title: String,
     modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
     onSeeAll: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceBetween,
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text = title, style = MaterialTheme.typography.headlineSmall)
-        if (onSeeAll != null) {
-            TextButton(onClick = onSeeAll) {
-                Text("See all", color = AccentBlue)
-            }
-        }
+        SectionTitle(title = title, icon = icon)
+        if (onSeeAll != null) SeeAllLink(onClick = onSeeAll)
     }
 }

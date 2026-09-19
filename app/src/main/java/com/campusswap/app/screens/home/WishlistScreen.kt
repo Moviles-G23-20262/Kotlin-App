@@ -1,81 +1,95 @@
 package com.campusswap.app.screens.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.campusswap.app.components.BackHeader
+import com.campusswap.app.components.CampusIconButton
+import com.campusswap.app.components.CampusIcons
 import com.campusswap.app.components.EmptyState
 import com.campusswap.app.components.ProductCard
 import com.campusswap.app.data.AppViewModel
+import com.campusswap.app.ui.theme.CampusSwapTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Saved items. The bell in the header opens the alerts screen (View 11),
+ * which is where saved searches and their matches live.
+ */
 @Composable
 fun WishlistScreen(
     vm: AppViewModel,
     onProductClick: (String) -> Unit,
+    onOpenAlerts: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val wishlisted = vm.allProducts.filter { vm.isWishlisted(it.id) }
+    val c = CampusSwapTheme.colors
+    val saved = vm.allProducts.filter { vm.isWishlisted(it.id) }
+    val matchCount = vm.alertMatches.size
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Wishlist") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        if (wishlisted.isEmpty()) {
-            Box(modifier = Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
+    Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
+        BackHeader(
+            title = "Wishlist",
+            onBack = onBack,
+            subtitle = "(${saved.size} saved)",
+        ) {
+            Box {
+                CampusIconButton(
+                    icon = CampusIcons.Bell,
+                    contentDescription = "Alerts",
+                    onClick = onOpenAlerts,
+                    iconSize = 18.dp,
+                )
+                if (matchCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 4.dp, end = 4.dp)
+                            .size(7.dp)
+                            .background(c.accentHi, CircleShape),
+                    )
+                }
+            }
+        }
+
+        if (saved.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 EmptyState(
-                    icon = Icons.Outlined.FavoriteBorder,
+                    icon = CampusIcons.Heart,
                     title = "Your wishlist is empty",
-                    message = "Tap the heart on any item to save it here.",
+                    message = "Tap the heart on any listing to save it here.",
+                    actionLabel = "Set up an alert instead",
+                    onAction = onOpenAlerts,
                 )
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.padding(padding).fillMaxSize(),
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                items(wishlisted.chunked(2)) { pair ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                        pair.forEach { product ->
-                            ProductCard(
-                                product = product,
-                                isWishlisted = true,
-                                onClick = { onProductClick(product.id) },
-                                onToggleWishlist = { vm.toggleWishlist(product.id) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                        if (pair.size == 1) {
-                            androidx.compose.foundation.layout.Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
+                items(saved, key = { it.id }) { product ->
+                    ProductCard(
+                        product = product,
+                        isWishlisted = true,
+                        onClick = { onProductClick(product.id) },
+                        onToggleWishlist = { vm.toggleWishlist(product.id) },
+                    )
                 }
             }
         }

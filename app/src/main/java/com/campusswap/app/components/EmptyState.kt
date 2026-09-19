@@ -5,17 +5,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.ui.theme.SecondaryBlue
+import com.campusswap.app.ui.theme.CampusSwapTheme
+import com.campusswap.app.ui.theme.CampusType
 
 @Composable
 fun EmptyState(
@@ -26,30 +23,29 @@ fun EmptyState(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
 ) {
+    val c = CampusSwapTheme.colors
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(32.dp),
+            .padding(40.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = SecondaryBlue,
-            modifier = Modifier.size(56.dp),
+            tint = c.borderSubtle,
+            modifier = Modifier.padding(bottom = 10.dp).size(56.dp),
         )
-        Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-        Text(
-            message,
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        HeadingText(title, size = CampusType.sizeMd, color = c.textMuted)
+        BodyText(message, color = c.textMuted)
         if (actionLabel != null && onAction != null) {
-            Button(onClick = onAction) {
-                Text(actionLabel)
-            }
+            PrimaryButton(
+                text = actionLabel,
+                onClick = onAction,
+                trailingIcon = CampusIcons.ArrowRight,
+                modifier = Modifier.padding(top = 18.dp),
+            )
         }
     }
 }

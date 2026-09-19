@@ -86,6 +86,7 @@ fun ChatScreen(
     onBack: () -> Unit,
     onViewListing: (String) -> Unit,
     onProposeMeeting: () -> Unit,
+    onCompleteExchange: () -> Unit,
 ) {
     val product = remember(productId, vm.allProducts.size) { vm.allProducts.find { it.id == productId } }
     if (product == null) {
@@ -153,6 +154,29 @@ fun ChatScreen(
         bottomBar = {
             Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface, modifier = Modifier.imePadding()) {
                 Column {
+                    // The change can be closed once a meeting is agreed (Views 9/10) or once the item was paid for at checkout and is still waiting to be finish (View 12)
+                    if (proposal?.status == ProposalStatus.ACCEPTED || vm.hasPendingExchange(product.id)) {
+                        Surface(
+                            onClick = onCompleteExchange,
+                            color = AccentBlue.copy(alpha = 0.12f),
+                            contentColor = AccentBlue,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(Icons.Outlined.Shield, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Text(
+                                    "Met already? Complete the exchange and rate each other",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text("Open", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
