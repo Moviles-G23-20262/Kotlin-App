@@ -8,6 +8,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.campusswap.app.analytics.Analytics
+import com.campusswap.app.analytics.Events
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalTime
@@ -50,6 +52,7 @@ class AppViewModel : ViewModel() {
 
     fun login() {
         isLoggedIn = true
+        Analytics.log(Events.LOGIN_SUCCESS)
     }
 
     fun checkCredentials(username: String, password: String): Boolean =
@@ -75,6 +78,14 @@ class AppViewModel : ViewModel() {
         orders.add(0, order)
         cart.clear()
         order.products.forEach { product ->
+            Analytics.log(
+                Events.PURCHASE_COMPLETED,
+                "product_id" to product.id,
+                "category" to product.category.name,
+                "price" to product.price,
+                "after_match_notification" to notifications.any { it.kind == NotificationKind.ALERT_MATCH && it.productId == product.id },
+                "was_wishlisted" to isWishlisted(product.id),
+            )
             notify(
                 id = "order-${order.number}-${product.id}",
                 title = "Order #CSW-${order.number} confirmed",
@@ -112,10 +123,13 @@ class AppViewModel : ViewModel() {
     fun isWishlisted(productId: String) = wishlist.contains(productId)
 
     fun toggleWishlist(productId: String) {
-        if (!wishlist.remove(productId)) wishlist.add(productId)
+        val added = !wishlist.remove(productId)
+        if (added) wishlist.add(productId)
+        Analytics.log(Events.WISHLIST_TOGGLED, "product_id" to productId, "added" to added)
     }
 
     fun addToCart(product: Product) {
+        Analytics.log(Events.CART_ADD, "product_id" to product.id, "category" to product.category.name)
         val index = cart.indexOfFirst { it.product.id == product.id }
         if (index >= 0) {
             val existing = cart[index]
@@ -173,18 +187,20 @@ class AppViewModel : ViewModel() {
 
     fun publishMatchNotifications() {
         alertMatches.forEach { match ->
-            notify(
+            val isNew = notify(
                 id = "match-${match.product.id}",
                 title = "Alert match · ${match.alert.keyword.ifBlank { match.alert.course?.code ?: match.alert.category.label }}",
                 message = "${match.product.title} — ${match.savingPercent}% below your limit.",
                 kind = NotificationKind.ALERT_MATCH,
                 productId = match.product.id,
             )
+            if (isNew) Analytics.log(Events.MATCH_NOTIFIED, "product_id" to match.product.id, "alert_id" to match.alert.id)
         }
     }
 
     fun addAlert(alert: SmartAlert) {
         alerts.add(0, alert)
+        Analytics.log(Events.ALERT_CREATED, "alert_id" to alert.id)
         publishMatchNotifications()
     }
 
@@ -211,6 +227,7 @@ class AppViewModel : ViewModel() {
 
     fun submitRating(rating: TransactionRating) {
         ratings[rating.productId] = rating
+        Analytics.log(Events.EXCHANGE_RATED, "product_id" to rating.productId)
         val product = allProducts.find { it.id == rating.productId }
         viewModelScope.launch {
             delay(2500)
@@ -235,12 +252,13 @@ class AppViewModel : ViewModel() {
         message: String,
         kind: NotificationKind,
         productId: String? = null,
-    ) {
-        if (notifications.any { it.id == id }) return
+    ): Boolean {
+        if (notifications.any { it.id == id }) return false
         notifications.add(
             0,
             AppNotification(id, title, message, isRead = false, kind = kind, productId = productId),
         )
+        return true
     }
 
     fun markNotificationsRead() {
@@ -255,6 +273,8 @@ class AppViewModel : ViewModel() {
 
     /** Latest meeting proposal per product thread; null until the buyer proposes one. */
     val meetingProposals = mutableStateMapOf<String, MeetingProposal>()
+
+    private val chatStartedAt = mutableMapOf<String, Long>()
 
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
@@ -271,6 +291,12 @@ class AppViewModel : ViewModel() {
         val thread = threadFor(product)
         val id = "m-${System.currentTimeMillis()}"
         thread.add(ChatMessage(id, MessageAuthor.ME, trimmed, now(), MessageStatus.SENDING))
+        chatStartedAt.getOrPut(product.id) { System.currentTimeMillis() }
+        Analytics.log(
+            Events.CHAT_MESSAGE_SENT,
+            "product_id" to product.id,
+            "my_messages" to thread.count { it.author == MessageAuthor.ME },
+        )
         viewModelScope.launch {
             delay(500); updateStatus(thread, id, MessageStatus.SENT)
             delay(700); updateStatus(thread, id, MessageStatus.DELIVERED)
@@ -293,6 +319,7 @@ class AppViewModel : ViewModel() {
         val proposal = MeetingProposal(point, slot, ProposalStatus.PENDING)
         meetingProposals[product.id] = proposal
         val thread = threadFor(product)
+        Analytics.log(Events.MEETING_PROPOSED, "product_id" to product.id, *chatStats(product.id, thread.size))
         thread.removeAll { it.proposal != null }
         thread.add(ChatMessage("proposal-${System.currentTimeMillis()}", MessageAuthor.SYSTEM, "Meeting point proposed", now(), proposal = proposal))
         viewModelScope.launch {
@@ -301,12 +328,18 @@ class AppViewModel : ViewModel() {
             if (current.status == ProposalStatus.PENDING) {
                 val accepted = current.copy(status = ProposalStatus.ACCEPTED)
                 meetingProposals[product.id] = accepted
+                Analytics.log(Events.MEETING_CONFIRMED, "product_id" to product.id, *chatStats(product.id, thread.size))
                 val index = thread.indexOfLast { it.proposal != null }
                 if (index >= 0) thread[index] = thread[index].copy(text = "Meeting confirmed", proposal = accepted)
                 thread.add(ChatMessage("confirm-${System.currentTimeMillis()}", MessageAuthor.OTHER, "Confirmed! See you at ${current.point.name} at ${current.slot.label.substringBefore(' ')}.", now()))
             }
         }
     }
+
+    private fun chatStats(productId: String, messages: Int): Array<Pair<String, Any?>> = arrayOf(
+        "messages_in_thread" to messages,
+        "elapsed_ms" to chatStartedAt[productId]?.let { System.currentTimeMillis() - it },
+    )
 
     private fun updateStatus(thread: SnapshotStateList<ChatMessage>, id: String, status: MessageStatus) {
         val index = thread.indexOfFirst { it.id == id }
@@ -330,6 +363,15 @@ class AppViewModel : ViewModel() {
             imageSeed = (allProducts.size + 1),
         )
         allProducts.add(0, product)
+        Analytics.log(
+            Events.LISTING_PUBLISHED,
+            "category" to draft.category.name,
+            "price" to product.price,
+            "photo_count" to draft.photoCount,
+            "course_empty" to (draft.course == null),
+            "condition_empty" to (draft.condition == null),
+            "description_length" to draft.description.length,
+        )
         publishMatchNotifications()
         return product
     }

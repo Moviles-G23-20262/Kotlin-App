@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -14,6 +15,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.campusswap.app.analytics.Analytics
+import com.campusswap.app.analytics.Events
 import com.campusswap.app.data.AppViewModel
 import com.campusswap.app.screens.auth.LoginScreen
 import com.campusswap.app.screens.cart.CartScreen
@@ -37,6 +40,16 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    LaunchedEffect(backStackEntry) {
+        val route = currentRoute ?: return@LaunchedEffect
+        Analytics.screen(route)
+        if (route == Routes.PRODUCT_DETAIL) {
+            val id = backStackEntry?.arguments?.getString("productId")
+            val product = appViewModel.allProducts.find { it.id == id }
+            Analytics.log(Events.LISTING_OPENED, "product_id" to id, "category" to product?.category?.name)
+        }
+    }
 
     // As in the prototype, the bottom bar is hidden on Login and on the order confirmation,
     // plus the focused full-screen tasks (Sell flow, Chat, Meeting point).

@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -26,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.campusswap.app.analytics.Analytics
+import com.campusswap.app.analytics.Events
 import com.campusswap.app.components.BodyText
 import com.campusswap.app.components.CampusHeader
 import com.campusswap.app.components.CampusIconButton
@@ -79,6 +82,13 @@ fun SearchScreen(
                     SortOption.RATING -> list.sortedByDescending { it.rating ?: 0.0 }
                 }
             }
+    }
+
+    LaunchedEffect(query) {
+        if (query.isNotBlank()) {
+            kotlinx.coroutines.delay(800)
+            Analytics.log(Events.SEARCH_PERFORMED, "query_length" to query.length, "results" to results.size, "category" to selectedCategory.name)
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
