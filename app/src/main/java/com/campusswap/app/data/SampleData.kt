@@ -223,6 +223,9 @@ object SampleData {
     private val marioLasernaLocation: GeoPoint? = GeoPoint(4.602725, -74.064696)
     private val plazoletaLlerasLocation: GeoPoint? = GeoPoint(4.601859, -74.065176)
 
+    // Stand-in for the other party's position until the backend shares it: OSM node "Auditorio SD" (Santo Domingo).
+    val simulatedCounterpartLocation = GeoPoint(4.604180, -74.065956)
+
     // Pre-mapped, public, monitored campus zones used by the Campus Guardian CAS (PAS 6 / PAS 10).
     // Walk times are relative to the two parties' last known campus micro-location.
     val meetingPoints = listOf(
