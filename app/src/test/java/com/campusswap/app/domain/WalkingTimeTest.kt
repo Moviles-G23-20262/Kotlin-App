@@ -11,9 +11,7 @@ class WalkingTimeTest {
     }
 
     @Test fun includesDetourAndRoundsUp() {
-        // 100 m * 1.3 detour / 75 m per min = 1.73 -> 2
         assertEquals(2, WalkingTime.minutes(origin, north(origin, 100.0)))
-        // 1 km * 1.3 / 75 = 17.3 -> 18
         assertEquals(18, WalkingTime.minutes(origin, north(origin, 1000.0)))
     }
 }

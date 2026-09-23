@@ -2,7 +2,6 @@ package com.campusswap.app.domain
 
 import java.time.LocalTime
 
-/** Picks the ranking rule for the current context. */
 fun interface RankingStrategySelector {
     fun strategyFor(now: LocalTime): MeetingPointRankingStrategy
 }
@@ -17,7 +16,6 @@ class TimeOfDayStrategySelector(
     private fun isNight(now: LocalTime) = !now.isBefore(NIGHT_START) || now.isBefore(NIGHT_END)
 
     companion object {
-        // Bogotá sits near the equator, so it gets dark around 18:00 all year round.
         val NIGHT_START: LocalTime = LocalTime.of(18, 0)
         val NIGHT_END: LocalTime = LocalTime.of(6, 0)
     }
