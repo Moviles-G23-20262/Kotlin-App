@@ -1,5 +1,7 @@
 package com.campusswap.app.data
 
+import com.campusswap.app.domain.GeoPoint
+
 enum class Condition(val label: String) {
     LIKE_NEW("Like New"),
     GOOD("Good"),
@@ -103,6 +105,8 @@ data class MeetingPoint(
     /** Normalised 0..1 position on the stylised campus map. */
     val mapX: Float,
     val mapY: Float,
+    /** Real-world position used for GPS check-in; null until surveyed. */
+    val location: GeoPoint? = null,
 )
 
 data class TimeSlot(
