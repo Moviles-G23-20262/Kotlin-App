@@ -27,6 +27,5 @@ class AppContainer(context: Context) {
 
     val rankingStrategySelector: RankingStrategySelector = TimeOfDayStrategySelector()
 
-    // Injected so tests can pin the time of day; on a device it follows the system clock.
     val clock: Clock = Clock.systemDefaultZone()
 }

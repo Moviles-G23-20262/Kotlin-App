@@ -87,8 +87,8 @@ import com.campusswap.app.ui.theme.WarningAmber
 
 /**
  * View 10 — Dynamic Safe Meeting Point (Campus Guardian CAS).
- * Ranks campus zones from both parties' locations and the time of day (see [MeetingPointViewModel])
- * and lets the buyer accept the suggestion or pick an alternative from a bottom sheet.
+ * Suggests an equidistant, monitored campus zone during a shared free hour and lets the
+ * buyer accept it or pick an alternative from a bottom sheet.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -263,7 +263,7 @@ fun MeetingPointScreen(
     }
 }
 
-/** Stylised campus map: walkways, building blocks, both parties and every allowed safe zone at its real relative position. */
+/** Stylised campus map: walkways, building blocks, both parties and every pre-mapped safe zone. */
 @Composable
 private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherName: String, onPointTap: (RankedPoint) -> Unit) {
     BoxWithConstraints(
@@ -386,7 +386,7 @@ private fun SmallZoneMarker(ranked: RankedPoint, modifier: Modifier, onClick: ()
     }
 }
 
-/** Context card explaining why Campus Guardian picked this spot: time of day, both locations and the shared break. */
+/** Context card explaining what the CAS detected (shared break + micro-location). */
 @Composable
 private fun GuardianContextCard(state: MeetingPointUiState, slot: TimeSlot, otherName: String, onUseMyLocation: () -> Unit) {
     Surface(
@@ -568,7 +568,6 @@ private fun zoneIcon(type: MeetingZoneType): ImageVector = when (type) {
 
 private fun MapPosition.toOffset() = Offset(x, y)
 
-/** One sentence per signal the CAS used, so the user can see why this spot was chosen. */
 private fun guardianReasons(state: MeetingPointUiState, slot: TimeSlot, otherName: String): List<String> {
     val time = state.time?.toString().orEmpty()
     val context = when (state.mode) {

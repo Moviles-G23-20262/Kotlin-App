@@ -28,7 +28,6 @@ import java.time.temporal.ChronoUnit
 
 enum class MyLocationStatus { LOCATING, FOUND, PERMISSION_NEEDED, OFF_CAMPUS, UNAVAILABLE }
 
-/** A meeting point with the walk times and map position computed for this request. */
 data class RankedPoint(
     val point: MeetingPoint,
     val walkMinutesMe: Int?,
@@ -40,7 +39,6 @@ data class MeetingPointUiState(
     val isLoading: Boolean = true,
     val mode: RankingMode = RankingMode.DAYTIME,
     val time: LocalTime? = null,
-    /** Best first; at night only monitored zones are in the list. */
     val ranked: List<RankedPoint> = emptyList(),
     val myLocation: MyLocationStatus = MyLocationStatus.LOCATING,
     val myMapPosition: MapPosition? = null,
@@ -50,7 +48,6 @@ data class MeetingPointUiState(
     val recommended: RankedPoint? get() = ranked.firstOrNull()
 }
 
-/** Campus Guardian: ranks meeting points from both people's locations and the time of day. */
 class MeetingPointViewModel(
     private val productId: String,
     private val meetingPoints: MeetingPointRepository,
@@ -68,7 +65,6 @@ class MeetingPointViewModel(
         refresh()
     }
 
-    /** Re-reads the clock, the points and both locations; call again after location permission is granted. */
     fun refresh() {
         refreshJob?.cancel()
         refreshJob = viewModelScope.launch {
@@ -77,7 +73,6 @@ class MeetingPointViewModel(
             val points = meetingPoints.load()
             val other = counterpart.locationOf(productId)
 
-            // Show a suggestion right away from the other person's position; the GPS fix can take seconds.
             publish(points, strategy, now, me = null, other = other, status = MyLocationStatus.LOCATING)
 
             val (me, status) = locateMe(points)
@@ -94,7 +89,6 @@ class MeetingPointViewModel(
             LocationResult.ProviderDisabled, LocationResult.Unavailable -> null to MyLocationStatus.UNAVAILABLE
         }
 
-    // Someone across town would skew every walk time, so their position is ignored until they reach campus.
     private fun isOnCampus(me: GeoPoint, points: List<MeetingPoint>): Boolean =
         points.mapNotNull { it.location }.any { Proximity.distanceMeters(me, it) <= ON_CAMPUS_RADIUS_METERS }
 

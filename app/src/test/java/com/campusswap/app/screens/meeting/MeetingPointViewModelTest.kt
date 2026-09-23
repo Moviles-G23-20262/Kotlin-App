@@ -30,7 +30,6 @@ import java.time.ZoneOffset
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MeetingPointViewModelTest {
-    // Same geometry as the strategy tests: me at the origin, the seller 600 m north.
     private val me = GeoPoint(0.0, 0.0)
     private val seller = north(me, 600.0)
     private val remote = FakeMeetingPointRemoteDataSource(

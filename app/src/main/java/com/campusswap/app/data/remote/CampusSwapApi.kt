@@ -27,7 +27,6 @@ data class CreateExchangeRequest(
 
 data class ExchangeResponse(val id: String)
 
-/** Mirrors the MeetingPoint model in back-end; zoneType is kept as text so an unknown value can't crash parsing. */
 data class MeetingPointDto(
     val id: String,
     val name: String,

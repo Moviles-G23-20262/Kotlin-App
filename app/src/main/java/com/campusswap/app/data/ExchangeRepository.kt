@@ -40,7 +40,6 @@ class ExchangeRepository(private val remote: ExchangeRemoteDataSource) {
             buyerId = SeedIds.user(target.buyerId) ?: return null,
             sellerId = SeedIds.user(target.sellerId) ?: return null,
             price = String.format(Locale.US, "%.2f", target.price),
-            // Points loaded from the API already carry their UUID; only bundled SampleData ids need mapping.
             meetingPointId = target.meetingPointId?.let { SeedIds.meetingPoint(it) ?: it },
             lat = location?.lat,
             lng = location?.lng,
