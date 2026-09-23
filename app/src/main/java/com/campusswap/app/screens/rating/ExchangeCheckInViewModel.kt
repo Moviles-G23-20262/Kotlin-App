@@ -26,15 +26,12 @@ sealed interface CheckInState {
     data object Idle : CheckInState
     data object Locating : CheckInState
     data class TooFar(val distanceMeters: Int) : CheckInState
-    /** GPS can't be used; the user may still confirm by hand. */
     data class Manual(val reason: ManualReason) : CheckInState
     data object Sending : CheckInState
-    /** [verifiedByGps] is null when the confirmation happened earlier in the session. */
     data class Confirmed(val verifiedByGps: Boolean?) : CheckInState
     data class Failed(val reason: FailReason) : CheckInState
 }
 
-/** Confirms an exchange by checking the buyer is within [Proximity.CONFIRMATION_RADIUS_METERS] of the meeting point. */
 class ExchangeCheckInViewModel(
     private val target: ExchangeTarget,
     private val location: LocationDataSource,
@@ -43,10 +40,8 @@ class ExchangeCheckInViewModel(
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<CheckInState> = _state.asStateFlow()
 
-    // Kept so a retry after a network failure resends the same fix instead of asking for a new one.
     private var lastLocation: GeoPoint? = null
 
-    /** Call only once precise location permission is granted. */
     fun checkIn() {
         val point = target.meetingPoint ?: return
         if (_state.value == CheckInState.Locating || _state.value == CheckInState.Sending) return

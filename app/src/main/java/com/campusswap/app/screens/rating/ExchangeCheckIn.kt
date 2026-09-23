@@ -43,7 +43,6 @@ import com.campusswap.app.domain.Proximity
 import com.campusswap.app.ui.theme.CampusSwapTheme
 import com.campusswap.app.ui.theme.CampusType
 
-// Android 12+ requires coarse to be requested together with fine.
 private val LOCATION_PERMISSIONS = arrayOf(
     Manifest.permission.ACCESS_FINE_LOCATION,
     Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -51,7 +50,6 @@ private val LOCATION_PERMISSIONS = arrayOf(
 
 private val RADIUS_METERS = Proximity.CONFIRMATION_RADIUS_METERS.toInt()
 
-/** Step content for View 12: GPS check-in at the meeting point, with a manual fallback. */
 @Composable
 fun ExchangeCheckIn(viewModel: ExchangeCheckInViewModel, pointName: String?) {
     val state by viewModel.state.collectAsState()
@@ -63,8 +61,6 @@ fun ExchangeCheckIn(viewModel: ExchangeCheckInViewModel, pointName: String?) {
         if (grants[Manifest.permission.ACCESS_FINE_LOCATION] == true) viewModel.checkIn() else viewModel.onPermissionDenied()
     }
 
-    // The rationale is only shown after a first denial, as Android recommends; the card copy already
-    // explains the purpose up front. A permanent denial makes the launcher return "denied" immediately.
     val requestCheckIn = {
         when {
             hasPreciseLocation(context) -> viewModel.checkIn()

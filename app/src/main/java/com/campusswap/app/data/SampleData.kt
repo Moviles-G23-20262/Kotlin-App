@@ -217,13 +217,11 @@ object SampleData {
     )
 
 
-    // Same values as back-end/prisma/seed.ts, taken from OpenStreetMap (Sep 2026). A null point can't be
-    // verified by GPS and View 12 falls back to manual confirmation.
     // TODO(carla): verificar en Google Maps que cada punto cae en la entrada correcta.
-    private val centralLibraryLocation: GeoPoint? = GeoPoint(4.602948, -74.064829) // OSM library node "Ramon de Zubiria"
+    private val centralLibraryLocation: GeoPoint? = GeoPoint(4.602948, -74.064829)
     private val studentCenterLocation: GeoPoint? = null // TODO(carla): coordenadas — Centro Cívico is not mapped in OSM yet
-    private val marioLasernaLocation: GeoPoint? = GeoPoint(4.602725, -74.064696) // OSM address point, Cra 1 Este #19A-40
-    private val plazoletaLlerasLocation: GeoPoint? = GeoPoint(4.601859, -74.065176) // OSM square "Plazoleta Lleras", centroid
+    private val marioLasernaLocation: GeoPoint? = GeoPoint(4.602725, -74.064696)
+    private val plazoletaLlerasLocation: GeoPoint? = GeoPoint(4.601859, -74.065176)
 
     // Pre-mapped, public, monitored campus zones used by the Campus Guardian CAS (PAS 6 / PAS 10).
     // Walk times are relative to the two parties' last known campus micro-location.

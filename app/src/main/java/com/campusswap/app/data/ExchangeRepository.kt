@@ -11,19 +11,15 @@ import java.util.Locale
 sealed interface ConfirmResult {
     data object Success : ConfirmResult
     data object Offline : ConfirmResult
-    /** The listing only exists on this device (published locally), so the backend has no row for it. */
     data object NotSynced : ConfirmResult
     data class Rejected(val httpCode: Int) : ConfirmResult
 }
 
 class ExchangeRepository(private val remote: ExchangeRemoteDataSource) {
-    // Exchange.materialId is unique in the backend; remembering confirmations avoids a duplicate POST
-    // when the user leaves View 12 and comes back during the same session.
     private val confirmedProductIds = mutableSetOf<String>()
 
     fun isConfirmed(productId: String): Boolean = productId in confirmedProductIds
 
-    /** [location] is null for a manual check-in; the meeting point is still recorded. */
     suspend fun confirm(target: ExchangeTarget, location: GeoPoint?): ConfirmResult {
         if (isConfirmed(target.productId)) return ConfirmResult.Success
         val request = toRequest(target, location) ?: return ConfirmResult.NotSynced
@@ -43,7 +39,6 @@ class ExchangeRepository(private val remote: ExchangeRemoteDataSource) {
             materialId = SeedIds.material(target.productId) ?: return null,
             buyerId = SeedIds.user(target.buyerId) ?: return null,
             sellerId = SeedIds.user(target.sellerId) ?: return null,
-            // Backend validates ^\d+(\.\d{1,2})?$, so never let the device locale insert a comma.
             price = String.format(Locale.US, "%.2f", target.price),
             meetingPointId = target.meetingPointId?.let(SeedIds::meetingPoint),
             lat = location?.lat,

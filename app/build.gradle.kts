@@ -14,7 +14,6 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // 10.0.2.2 is the emulator's alias for the host machine running the NestJS backend.
         buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:3000/\"")
     }
 

@@ -33,5 +33,4 @@ class ProximityTest {
     }
 }
 
-/** Moves [meters] due north; one degree of latitude is ~111,195 m on a 6,371 km sphere. */
 fun north(from: GeoPoint, meters: Double) = GeoPoint(from.lat + meters / 111_194.93, from.lng)

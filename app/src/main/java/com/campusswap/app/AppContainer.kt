@@ -7,7 +7,6 @@ import com.campusswap.app.data.location.LocationDataSource
 import com.campusswap.app.data.remote.ApiClient
 import com.campusswap.app.data.remote.RetrofitExchangeRemoteDataSource
 
-/** Manual dependency injection: one app-wide instance of each data source, built once in [CampusSwapApplication]. */
 class AppContainer(context: Context) {
     private val api = ApiClient.create()
 

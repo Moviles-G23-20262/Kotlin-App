@@ -178,7 +178,6 @@ fun CompletionScreen(
                 }
             }
 
-            // Step 1 — GPS check-in at the meeting point
             StepCard(number = 1, title = "Confirm you're at the meeting point") {
                 ExchangeCheckIn(viewModel = checkIn, pointName = proposal?.point?.name)
             }

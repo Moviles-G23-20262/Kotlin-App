@@ -11,7 +11,6 @@ interface CampusSwapApi {
     suspend fun createExchange(@Body body: CreateExchangeRequest): ExchangeResponse
 }
 
-/** Mirrors CreateExchangeDto in back-end. Gson omits nulls, so a manual check-in sends no lat/lng at all. */
 data class CreateExchangeRequest(
     val materialId: String,
     val buyerId: String,
