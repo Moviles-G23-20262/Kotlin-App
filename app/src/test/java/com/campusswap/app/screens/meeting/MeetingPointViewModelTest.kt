@@ -1,11 +1,15 @@
 package com.campusswap.app.screens.meeting
 
 import com.campusswap.app.data.FakeMeetingPointRemoteDataSource
+import com.campusswap.app.data.FakePopularityRemoteDataSource
+import com.campusswap.app.data.MeetingPointPopularityRepository
 import com.campusswap.app.data.MeetingPointRepository
 import com.campusswap.app.data.location.CounterpartLocationSource
 import com.campusswap.app.data.location.LocationDataSource
 import com.campusswap.app.data.location.LocationResult
 import com.campusswap.app.data.remote.MeetingPointDto
+import com.campusswap.app.data.remote.MeetingPointUsageDto
+import com.campusswap.app.data.remote.MeetingPointUsageResponse
 import com.campusswap.app.domain.GeoPoint
 import com.campusswap.app.domain.RankingMode
 import com.campusswap.app.domain.TimeOfDayStrategySelector
@@ -40,6 +44,9 @@ class MeetingPointViewModelTest {
         ),
     )
     private val location = FakeLocation(LocationResult.Fix(me, accuracyMeters = 5f))
+    private val popularityRemote = FakePopularityRemoteDataSource(
+        MeetingPointUsageResponse(true, listOf(MeetingPointUsageDto("near-seller", 6), MeetingPointUsageDto("near-me", 2))),
+    )
 
     private class FakeLocation(var result: LocationResult) : LocationDataSource {
         override suspend fun currentLocation() = result
@@ -61,6 +68,7 @@ class MeetingPointViewModelTest {
         },
         strategies = TimeOfDayStrategySelector(),
         clock = clockAt(hour),
+        popularity = MeetingPointPopularityRepository(popularityRemote),
     )
 
     @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -124,5 +132,22 @@ class MeetingPointViewModelTest {
 
         assertFalse(state.isLive)
         assertTrue(state.ranked.isNotEmpty())
+    }
+
+    @Test fun marksPointsThatArePopularAtTheCurrentHour() {
+        val state = viewModel(hour = 13).state.value
+
+        assertEquals(listOf(13), popularityRemote.requestedHours)
+        assertEquals(setOf("near-seller", "near-me"), state.ranked.filter { it.isPopular }.map { it.point.id }.toSet())
+        assertFalse(state.ranked.first { it.point.id == "middle-plaza" }.isPopular)
+    }
+
+    @Test fun analyticsFailureHidesBadgesWithoutAffectingTheSuggestion() {
+        popularityRemote.failure = IOException("analytics down")
+
+        val state = viewModel(hour = 14).state.value
+
+        assertTrue(state.ranked.none { it.isPopular })
+        assertEquals("middle-plaza", state.recommended?.point?.id)
     }
 }

@@ -6,8 +6,10 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.campusswap.app.AppContainer
 import com.campusswap.app.data.MeetingPoint
+import com.campusswap.app.data.MeetingPointPopularityRepository
 import com.campusswap.app.data.MeetingPointRepository
 import com.campusswap.app.data.MeetingPoints
+import com.campusswap.app.data.SeedIds
 import com.campusswap.app.data.location.CounterpartLocationSource
 import com.campusswap.app.data.location.LocationDataSource
 import com.campusswap.app.data.location.LocationResult
@@ -21,6 +23,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Clock
 import java.time.LocalTime
@@ -33,6 +36,7 @@ data class RankedPoint(
     val walkMinutesMe: Int?,
     val walkMinutesOther: Int,
     val map: MapPosition,
+    val isPopular: Boolean = false,
 )
 
 data class MeetingPointUiState(
@@ -55,11 +59,13 @@ class MeetingPointViewModel(
     private val counterpart: CounterpartLocationSource,
     private val strategies: RankingStrategySelector,
     private val clock: Clock,
+    private val popularity: MeetingPointPopularityRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(MeetingPointUiState())
     val state: StateFlow<MeetingPointUiState> = _state.asStateFlow()
 
     private var refreshJob: Job? = null
+    private var popularIds: Set<String> = emptySet()
 
     init {
         refresh()
@@ -73,12 +79,22 @@ class MeetingPointViewModel(
             val points = meetingPoints.load()
             val other = counterpart.locationOf(productId)
 
+            launch { markPopular(popularity.popularAt(now.hour)) }
+
             publish(points, strategy, now, me = null, other = other, status = MyLocationStatus.LOCATING)
 
             val (me, status) = locateMe(points)
             publish(points, strategy, now, me, other, status)
         }
     }
+
+    private fun markPopular(ids: Set<String>) {
+        popularIds = ids
+        _state.update { state -> state.copy(ranked = state.ranked.map { it.copy(isPopular = isPopular(it.point)) }) }
+    }
+
+    private fun isPopular(point: MeetingPoint): Boolean =
+        point.id in popularIds || SeedIds.meetingPoint(point.id) in popularIds
 
     private suspend fun locateMe(points: MeetingPoints): Pair<GeoPoint?, MyLocationStatus> =
         when (val result = myLocation.currentLocation()) {
@@ -110,7 +126,8 @@ class MeetingPointViewModel(
             mode = strategy.mode,
             time = now,
             ranked = ranked.map {
-                RankedPoint(byId.getValue(it.zone.id), it.walkMinutesMe, it.walkMinutesOther, projection.project(it.zone.location))
+                val point = byId.getValue(it.zone.id)
+                RankedPoint(point, it.walkMinutesMe, it.walkMinutesOther, projection.project(it.zone.location), isPopular(point))
             },
             myLocation = status,
             myMapPosition = me?.let(projection::project),
@@ -131,6 +148,7 @@ class MeetingPointViewModel(
                     counterpart = container.counterpartLocationSource,
                     strategies = container.rankingStrategySelector,
                     clock = container.clock,
+                    popularity = container.popularityRepository,
                 )
             }
         }

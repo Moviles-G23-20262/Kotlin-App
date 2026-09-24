@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.outlined.Apartment
@@ -447,10 +448,13 @@ private fun ProposalDetailCard(ranked: RankedPoint, isRecommended: Boolean, othe
                     Text(point.name, style = MaterialTheme.typography.headlineSmall)
                     Text(point.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (isRecommended) {
-                    Surface(shape = RoundedCornerShape(6.dp), color = SuccessGreen.copy(alpha = 0.14f), contentColor = SuccessGreen) {
-                        Text("Best match", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (isRecommended) {
+                        Surface(shape = RoundedCornerShape(6.dp), color = SuccessGreen.copy(alpha = 0.14f), contentColor = SuccessGreen) {
+                            Text("Best match", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                        }
                     }
+                    if (ranked.isPopular) PopularNowBadge()
                 }
             }
 
@@ -539,6 +543,7 @@ private fun AlternativeRow(ranked: RankedPoint, selected: Boolean, isRecommended
                     if (isRecommended) {
                         Text("Best match", style = MaterialTheme.typography.labelMedium, color = SuccessGreen)
                     }
+                    if (ranked.isPopular) PopularNowBadge()
                 }
                 Text(
                     "You ${ranked.walkMinutesMe?.let { "$it min" } ?: "—"} · $otherName ${ranked.walkMinutesOther} min",
@@ -564,6 +569,20 @@ private fun zoneIcon(type: MeetingZoneType): ImageVector = when (type) {
     MeetingZoneType.STUDENT_CENTER -> Icons.Outlined.Storefront
     MeetingZoneType.BUILDING_LOBBY -> Icons.Outlined.Apartment
     MeetingZoneType.PLAZA -> Icons.Outlined.Park
+}
+
+@Composable
+private fun PopularNowBadge() {
+    Surface(shape = RoundedCornerShape(6.dp), color = AccentBlue.copy(alpha = 0.14f), contentColor = AccentBlue) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.TrendingUp, contentDescription = null, modifier = Modifier.size(13.dp))
+            Text("Popular now", style = MaterialTheme.typography.labelMedium)
+        }
+    }
 }
 
 private fun MapPosition.toOffset() = Offset(x, y)
