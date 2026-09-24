@@ -307,12 +307,6 @@ class AppViewModel : ViewModel() {
         }
     }
 
-    /** Recommended point = lowest combined walk time that is a monitored zone, preferring the equidistant one. */
-    fun recommendedMeetingPoint(): MeetingPoint =
-        SampleData.meetingPoints
-            .filter { it.isMonitored }
-            .minBy { (it.walkMinutesMe + it.walkMinutesOther) * 10 + kotlin.math.abs(it.walkMinutesMe - it.walkMinutesOther) }
-
     fun recommendedTimeSlot(): TimeSlot = SampleData.timeSlots.first { it.isSharedBreak }
 
     fun proposeMeeting(product: Product, point: MeetingPoint, slot: TimeSlot) {

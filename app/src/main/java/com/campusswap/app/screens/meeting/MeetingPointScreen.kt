@@ -1,8 +1,12 @@
 package com.campusswap.app.screens.meeting
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
+import androidx.compose.material.icons.automirrored.outlined.TrendingUp
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.outlined.Apartment
@@ -37,6 +42,7 @@ import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -49,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,24 +67,24 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.campusswap.app.CampusSwapApplication
 import com.campusswap.app.components.EmptyState
 import com.campusswap.app.data.AppViewModel
-import com.campusswap.app.data.MeetingPoint
 import com.campusswap.app.data.MeetingZoneType
 import com.campusswap.app.data.SampleData
 import com.campusswap.app.data.TimeSlot
+import com.campusswap.app.domain.RankingMode
+import com.campusswap.app.domain.TimeOfDayStrategySelector
 import com.campusswap.app.ui.theme.AccentBlue
 import com.campusswap.app.ui.theme.JetBrainsMonoFamily
 import com.campusswap.app.ui.theme.PrimaryBlue
 import com.campusswap.app.ui.theme.SecondaryBlue
 import com.campusswap.app.ui.theme.SuccessGreen
 import com.campusswap.app.ui.theme.WarningAmber
-
-// Approximate positions of both parties on the stylised map (normalised 0..1).
-private val mePosition = Offset(0.13f, 0.17f)
-private val otherPosition = Offset(0.84f, 0.72f)
 
 /**
  * View 10 — Dynamic Safe Meeting Point (Campus Guardian CAS).
@@ -104,9 +111,16 @@ fun MeetingPointScreen(
         return
     }
 
-    val recommended = remember { vm.recommendedMeetingPoint() }
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    val guardian: MeetingPointViewModel = viewModel(factory = MeetingPointViewModel.factory(container, product.id))
+    val state by guardian.state.collectAsState()
     val existing = vm.meetingProposals[product.id]
-    var selectedPoint by remember { mutableStateOf(existing?.point ?: recommended) }
+    var selectedId by remember { mutableStateOf(existing?.point?.id) }
+    val recommended = state.recommended
+    val selected = state.ranked.firstOrNull { it.point.id == selectedId } ?: recommended
+    val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        guardian.refresh()
+    }
     var selectedSlot by remember { mutableStateOf(existing?.slot ?: vm.recommendedTimeSlot()) }
     var showAlternatives by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -131,13 +145,15 @@ fun MeetingPointScreen(
                 ) {
                     OutlinedButton(
                         onClick = { showAlternatives = true },
+                        enabled = state.ranked.size > 1,
                         modifier = Modifier.weight(1f).height(50.dp),
                     ) { Text("Change") }
                     Button(
                         onClick = {
-                            vm.proposeMeeting(product, selectedPoint, selectedSlot)
+                            selected?.let { vm.proposeMeeting(product, it.point, selectedSlot) }
                             onProposed()
                         },
+                        enabled = selected != null,
                         modifier = Modifier.weight(1f).height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                     ) {
@@ -152,21 +168,37 @@ fun MeetingPointScreen(
         Column(
             modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()),
         ) {
-            CampusMap(
-                selected = selectedPoint,
-                otherName = otherName,
-                onPointTap = { selectedPoint = it },
-            )
+            if (state.isLoading) {
+                Box(Modifier.fillMaxWidth().aspectRatio(1.25f), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AccentBlue)
+                }
+            } else {
+                CampusMap(
+                    state = state,
+                    selected = selected,
+                    otherName = otherName,
+                    onPointTap = { selectedId = it.point.id },
+                )
+            }
 
             Column(modifier = Modifier.padding(16.dp)) {
-                GuardianContextCard(slot = selectedSlot, otherName = otherName)
-
-                Spacer(Modifier.height(14.dp))
-                ProposalDetailCard(
-                    point = selectedPoint,
-                    isRecommended = selectedPoint.id == recommended.id,
+                GuardianContextCard(
+                    state = state,
+                    slot = selectedSlot,
                     otherName = otherName,
+                    onUseMyLocation = {
+                        locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+                    },
                 )
+
+                if (selected != null) {
+                    Spacer(Modifier.height(14.dp))
+                    ProposalDetailCard(
+                        ranked = selected,
+                        isRecommended = selected.point.id == recommended?.point?.id,
+                        otherName = otherName,
+                    )
+                }
 
                 Text(
                     "Shared free hour",
@@ -205,26 +237,28 @@ fun MeetingPointScreen(
             Column(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 28.dp)) {
                 Text("Other safe zones nearby", style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    "Ranked by combined walking time for you and $otherName.",
+                    if (state.mode == RankingMode.NIGHT_SAFETY) {
+                        "After dark only monitored zones are listed, ranked so neither of you walks too far."
+                    } else {
+                        "Ranked so the longer walk, yours or $otherName's, is as short as possible."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
                 )
-                SampleData.meetingPoints
-                    .sortedBy { it.walkMinutesMe + it.walkMinutesOther }
-                    .forEach { point ->
-                        AlternativeRow(
-                            point = point,
-                            selected = point.id == selectedPoint.id,
-                            isRecommended = point.id == recommended.id,
-                            otherName = otherName,
-                            onClick = {
-                                selectedPoint = point
-                                showAlternatives = false
-                            },
-                        )
-                        Spacer(Modifier.height(8.dp))
-                    }
+                state.ranked.forEach { ranked ->
+                    AlternativeRow(
+                        ranked = ranked,
+                        selected = ranked.point.id == selected?.point?.id,
+                        isRecommended = ranked.point.id == recommended?.point?.id,
+                        otherName = otherName,
+                        onClick = {
+                            selectedId = ranked.point.id
+                            showAlternatives = false
+                        },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
             }
         }
     }
@@ -232,7 +266,7 @@ fun MeetingPointScreen(
 
 /** Stylised campus map: walkways, building blocks, both parties and every pre-mapped safe zone. */
 @Composable
-private fun CampusMap(selected: MeetingPoint, otherName: String, onPointTap: (MeetingPoint) -> Unit) {
+private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherName: String, onPointTap: (RankedPoint) -> Unit) {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
@@ -241,7 +275,8 @@ private fun CampusMap(selected: MeetingPoint, otherName: String, onPointTap: (Me
     ) {
         val w = maxWidth
         val h = maxHeight
-        val selectedOffset = Offset(selected.mapX, selected.mapY)
+        val mePosition = state.myMapPosition?.toOffset()
+        val otherPosition = state.otherMapPosition?.toOffset()
 
         Canvas(modifier = Modifier.fillMaxSize()) {
             val block = PrimaryBlue.copy(alpha = 0.12f)
@@ -258,30 +293,33 @@ private fun CampusMap(selected: MeetingPoint, otherName: String, onPointTap: (Me
             drawRoundRect(block, Offset(size.width * 0.06f, size.height * 0.56f), androidx.compose.ui.geometry.Size(size.width * 0.20f, size.height * 0.30f), androidx.compose.ui.geometry.CornerRadius(18f))
             // Green space
             drawCircle(SuccessGreen.copy(alpha = 0.16f), radius = size.width * 0.09f, center = Offset(size.width * 0.40f, size.height * 0.78f))
-            // Routes from each party to the selected point
-            val dash = PathEffect.dashPathEffect(floatArrayOf(14f, 12f))
-            val target = Offset(size.width * selectedOffset.x, size.height * selectedOffset.y)
-            drawLine(AccentBlue, Offset(size.width * mePosition.x, size.height * mePosition.y), target, strokeWidth = 5f, pathEffect = dash, cap = StrokeCap.Round)
-            drawLine(AccentBlue, Offset(size.width * otherPosition.x, size.height * otherPosition.y), target, strokeWidth = 5f, pathEffect = dash, cap = StrokeCap.Round)
-            // Highlight ring on the selected safe zone
-            drawCircle(AccentBlue.copy(alpha = 0.18f), radius = size.width * 0.11f, center = target)
+            if (selected != null) {
+                // Routes from each party to the selected point
+                val dash = PathEffect.dashPathEffect(floatArrayOf(14f, 12f))
+                val target = Offset(size.width * selected.map.x, size.height * selected.map.y)
+                listOfNotNull(mePosition, otherPosition).forEach { from ->
+                    drawLine(AccentBlue, Offset(size.width * from.x, size.height * from.y), target, strokeWidth = 5f, pathEffect = dash, cap = StrokeCap.Round)
+                }
+                // Highlight ring on the selected safe zone
+                drawCircle(AccentBlue.copy(alpha = 0.18f), radius = size.width * 0.11f, center = target)
+            }
         }
 
         // Other safe zones (small markers)
-        SampleData.meetingPoints.filter { it.id != selected.id }.forEach { point ->
+        state.ranked.filter { it.point.id != selected?.point?.id }.forEach { ranked ->
             SmallZoneMarker(
-                point = point,
+                ranked = ranked,
                 modifier = Modifier
-                    .offset(x = w * point.mapX - 14.dp, y = h * point.mapY - 14.dp)
+                    .offset(x = w * ranked.map.x - 14.dp, y = h * ranked.map.y - 14.dp)
                     .size(28.dp),
-                onClick = { onPointTap(point) },
+                onClick = { onPointTap(ranked) },
             )
         }
 
         // Selected zone (large pin with label)
-        Column(
+        if (selected != null) Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.offset(x = w * selected.mapX - 90.dp, y = h * selected.mapY - 46.dp).width(180.dp),
+            modifier = Modifier.offset(x = w * selected.map.x - 90.dp, y = h * selected.map.y - 46.dp).width(180.dp),
         ) {
             Surface(
                 shape = RoundedCornerShape(8.dp),
@@ -290,7 +328,7 @@ private fun CampusMap(selected: MeetingPoint, otherName: String, onPointTap: (Me
                 tonalElevation = 4.dp,
             ) {
                 Text(
-                    selected.name,
+                    selected.point.name,
                     style = MaterialTheme.typography.labelMedium,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     maxLines = 1,
@@ -299,8 +337,8 @@ private fun CampusMap(selected: MeetingPoint, otherName: String, onPointTap: (Me
             Icon(Icons.Filled.Place, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(34.dp))
         }
 
-        PersonMarker("You", mePosition, w, h, AccentBlue)
-        PersonMarker(otherName, otherPosition, w, h, PrimaryBlue)
+        mePosition?.let { PersonMarker("You", it, w, h, AccentBlue) }
+        otherPosition?.let { PersonMarker(otherName, it, w, h, PrimaryBlue) }
 
         Surface(
             shape = RoundedCornerShape(8.dp),
@@ -334,7 +372,8 @@ private fun PersonMarker(label: String, position: Offset, w: androidx.compose.ui
 }
 
 @Composable
-private fun SmallZoneMarker(point: MeetingPoint, modifier: Modifier, onClick: () -> Unit) {
+private fun SmallZoneMarker(ranked: RankedPoint, modifier: Modifier, onClick: () -> Unit) {
+    val point = ranked.point
     Surface(
         onClick = onClick,
         shape = CircleShape,
@@ -350,7 +389,7 @@ private fun SmallZoneMarker(point: MeetingPoint, modifier: Modifier, onClick: ()
 
 /** Context card explaining what the CAS detected (shared break + micro-location). */
 @Composable
-private fun GuardianContextCard(slot: TimeSlot, otherName: String) {
+private fun GuardianContextCard(state: MeetingPointUiState, slot: TimeSlot, otherName: String, onUseMyLocation: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = AccentBlue.copy(alpha = 0.10f),
@@ -365,19 +404,31 @@ private fun GuardianContextCard(slot: TimeSlot, otherName: String) {
             }
             Column(modifier = Modifier.padding(start = 12.dp)) {
                 Text("Campus Guardian suggestion", style = MaterialTheme.typography.titleSmall, color = AccentBlue)
-                Text(
-                    "You and $otherName are both free ${slot.day}, ${slot.label}. This spot is halfway between you and monitored by campus security.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 3.dp),
-                )
+                guardianReasons(state, slot, otherName).forEach { line ->
+                    Text(
+                        line,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
+                if (state.myLocation == MyLocationStatus.PERMISSION_NEEDED) {
+                    Text(
+                        "Use my location",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AccentBlue,
+                        modifier = Modifier.padding(top = 6.dp).clickable(onClick = onUseMyLocation),
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ProposalDetailCard(point: MeetingPoint, isRecommended: Boolean, otherName: String) {
+private fun ProposalDetailCard(ranked: RankedPoint, isRecommended: Boolean, otherName: String) {
+    val point = ranked.point
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
@@ -397,16 +448,19 @@ private fun ProposalDetailCard(point: MeetingPoint, isRecommended: Boolean, othe
                     Text(point.name, style = MaterialTheme.typography.headlineSmall)
                     Text(point.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                if (isRecommended) {
-                    Surface(shape = RoundedCornerShape(6.dp), color = SuccessGreen.copy(alpha = 0.14f), contentColor = SuccessGreen) {
-                        Text("Best match", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (isRecommended) {
+                        Surface(shape = RoundedCornerShape(6.dp), color = SuccessGreen.copy(alpha = 0.14f), contentColor = SuccessGreen) {
+                            Text("Best match", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp))
+                        }
                     }
+                    if (ranked.isPopular) PopularNowBadge()
                 }
             }
 
             Row(modifier = Modifier.fillMaxWidth().padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                WalkStat("You", point.walkMinutesMe, Modifier.weight(1f))
-                WalkStat(otherName, point.walkMinutesOther, Modifier.weight(1f))
+                WalkStat("You", ranked.walkMinutesMe, Modifier.weight(1f))
+                WalkStat(otherName, ranked.walkMinutesOther, Modifier.weight(1f))
             }
 
             Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -429,13 +483,13 @@ private fun ProposalDetailCard(point: MeetingPoint, isRecommended: Boolean, othe
 }
 
 @Composable
-private fun WalkStat(who: String, minutes: Int, modifier: Modifier = Modifier) {
+private fun WalkStat(who: String, minutes: Int?, modifier: Modifier = Modifier) {
     Surface(shape = RoundedCornerShape(10.dp), color = MaterialTheme.colorScheme.surfaceVariant, modifier = modifier) {
         Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.AutoMirrored.Outlined.DirectionsWalk, contentDescription = null, tint = AccentBlue, modifier = Modifier.size(20.dp))
             Column(modifier = Modifier.padding(start = 8.dp)) {
                 Text(
-                    "$minutes min",
+                    minutes?.let { "$it min" } ?: "— min",
                     fontFamily = JetBrainsMonoFamily,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium,
@@ -472,7 +526,8 @@ private fun SlotChip(slot: TimeSlot, selected: Boolean, modifier: Modifier = Mod
 }
 
 @Composable
-private fun AlternativeRow(point: MeetingPoint, selected: Boolean, isRecommended: Boolean, otherName: String, onClick: () -> Unit) {
+private fun AlternativeRow(ranked: RankedPoint, selected: Boolean, isRecommended: Boolean, otherName: String, onClick: () -> Unit) {
+    val point = ranked.point
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(12.dp),
@@ -488,9 +543,10 @@ private fun AlternativeRow(point: MeetingPoint, selected: Boolean, isRecommended
                     if (isRecommended) {
                         Text("Best match", style = MaterialTheme.typography.labelMedium, color = SuccessGreen)
                     }
+                    if (ranked.isPopular) PopularNowBadge()
                 }
                 Text(
-                    "You ${point.walkMinutesMe} min · $otherName ${point.walkMinutesOther} min",
+                    "You ${ranked.walkMinutesMe?.let { "$it min" } ?: "—"} · $otherName ${ranked.walkMinutesOther} min",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -513,4 +569,47 @@ private fun zoneIcon(type: MeetingZoneType): ImageVector = when (type) {
     MeetingZoneType.STUDENT_CENTER -> Icons.Outlined.Storefront
     MeetingZoneType.BUILDING_LOBBY -> Icons.Outlined.Apartment
     MeetingZoneType.PLAZA -> Icons.Outlined.Park
+}
+
+@Composable
+private fun PopularNowBadge() {
+    Surface(shape = RoundedCornerShape(6.dp), color = AccentBlue.copy(alpha = 0.14f), contentColor = AccentBlue) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.TrendingUp, contentDescription = null, modifier = Modifier.size(13.dp))
+            Text("Popular now", style = MaterialTheme.typography.labelMedium)
+        }
+    }
+}
+
+private fun MapPosition.toOffset() = Offset(x, y)
+
+private fun guardianReasons(state: MeetingPointUiState, slot: TimeSlot, otherName: String): List<String> {
+    val time = state.time?.toString().orEmpty()
+    val context = when (state.mode) {
+        RankingMode.NIGHT_SAFETY ->
+            "It's $time, after dark (from ${TimeOfDayStrategySelector.NIGHT_START}), so only zones monitored by campus security are suggested."
+        RankingMode.DAYTIME -> "It's $time and still daylight, so every public zone is considered."
+    }
+    val best = state.recommended
+    val choice = when {
+        best == null -> "No monitored zone is available right now. Try again in daylight or pick a time slot tomorrow."
+        best.walkMinutesMe != null ->
+            "${best.point.name} keeps the longer walk to ${maxOf(best.walkMinutesMe, best.walkMinutesOther)} min: " +
+                "you ${best.walkMinutesMe} min, $otherName ${best.walkMinutesOther} min."
+        else -> "${best.point.name} is ${best.walkMinutesOther} min from $otherName. ${locationHint(state.myLocation)}"
+    }
+    val offline = if (state.isLive) null else "Offline: showing the campus zones saved on this phone."
+    return listOfNotNull(context, choice, "You're both free ${slot.day}, ${slot.label}.", offline)
+}
+
+private fun locationHint(status: MyLocationStatus): String = when (status) {
+    MyLocationStatus.LOCATING -> "Finding your location to include your walk…"
+    MyLocationStatus.PERMISSION_NEEDED -> "Share your location to include your own walk."
+    MyLocationStatus.OFF_CAMPUS -> "You don't seem to be on campus, so only their walk is counted."
+    MyLocationStatus.UNAVAILABLE -> "Your location isn't available, so only their walk is counted."
+    MyLocationStatus.FOUND -> ""
 }
