@@ -15,6 +15,7 @@ android {
         versionName = "1.0"
 
         buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:3000/\"")
+        buildConfigField("String", "ANALYTICS_BASE_URL", "\"http://10.0.2.2:8000/\"")
     }
 
     buildTypes {

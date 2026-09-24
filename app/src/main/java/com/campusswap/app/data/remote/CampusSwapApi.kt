@@ -1,6 +1,5 @@
 package com.campusswap.app.data.remote
 
-import com.campusswap.app.BuildConfig
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
@@ -38,10 +37,10 @@ data class MeetingPointDto(
 )
 
 object ApiClient {
-    fun create(baseUrl: String = BuildConfig.BASE_URL): CampusSwapApi =
+    inline fun <reified T> create(baseUrl: String): T =
         Retrofit.Builder()
             .baseUrl(baseUrl)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-            .create(CampusSwapApi::class.java)
+            .create(T::class.java)
 }
