@@ -52,6 +52,14 @@ class ExchangeRepositoryTest {
         assertEquals("c0000000-0000-4000-8000-000000000001", request.meetingPointId)
     }
 
+    @Test fun meetingPointLoadedFromTheApiKeepsItsUuid() = runBlocking {
+        val uuid = "c0000000-0000-4000-8000-000000000003"
+
+        repository.confirm(target.copy(meetingPointId = uuid), null)
+
+        assertEquals(uuid, remote.requests.single().meetingPointId)
+    }
+
     @Test fun locallyPublishedListingIsNotSent() = runBlocking {
         val result = repository.confirm(target.copy(productId = "local-13"), null)
 

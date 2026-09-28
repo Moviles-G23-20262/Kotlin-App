@@ -7,12 +7,10 @@ import kotlin.math.sin
 import kotlin.math.sqrt
 
 object Proximity {
-    /** Roughly a building entrance plus typical phone GPS error outdoors. */
     const val CONFIRMATION_RADIUS_METERS = 50.0
 
     private const val EARTH_RADIUS_METERS = 6_371_000.0
 
-    /** Great-circle (haversine) distance. Flat-earth math would be fine at campus scale too, but this is exact and just as cheap. */
     fun distanceMeters(a: GeoPoint, b: GeoPoint): Double {
         val dLat = Math.toRadians(b.lat - a.lat)
         val dLng = Math.toRadians(b.lng - a.lng)
