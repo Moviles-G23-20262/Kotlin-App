@@ -294,7 +294,7 @@ fun CompletionScreen(
             )
         }
 
-        val confirmed = checkInState is CheckInState.Confirmed
+        val confirmed = checkInState is CheckInState.Confirmed || checkInState is CheckInState.Failed
         val ready = confirmed && checks.size == CheckItem.entries.size && stars > 0
         Box(
             modifier = Modifier
