@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,8 +30,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.campusswap.app.CampusSwapApplication
 import com.campusswap.app.components.Badge
 import com.campusswap.app.components.BodyText
 import com.campusswap.app.components.CampusHeader
@@ -54,6 +58,7 @@ import com.campusswap.app.data.Condition
 import com.campusswap.app.data.FeedbackTag
 import com.campusswap.app.data.Product
 import com.campusswap.app.data.TransactionRating
+import com.campusswap.app.domain.ExchangeTarget
 import com.campusswap.app.ui.theme.CampusSwapTheme
 import com.campusswap.app.ui.theme.CampusType
 
@@ -96,6 +101,18 @@ fun CompletionScreen(
     var stars by remember { mutableIntStateOf(0) }
     var tags by remember { mutableStateOf(setOf<FeedbackTag>()) }
     var review by remember { mutableStateOf("") }
+
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    val target = ExchangeTarget(
+        productId = product.id,
+        buyerId = vm.currentUser.id,
+        sellerId = product.seller.id,
+        price = product.price,
+        meetingPointId = proposal?.point?.id,
+        meetingPoint = proposal?.point?.location,
+    )
+    val checkIn: ExchangeCheckInViewModel = viewModel(factory = ExchangeCheckInViewModel.factory(container, target))
+    val checkInState by checkIn.state.collectAsState()
 
     Column(
         modifier = Modifier
@@ -161,8 +178,12 @@ fun CompletionScreen(
                 }
             }
 
-            // Step 1 — condition checklist
-            StepCard(number = 1, title = "Check the item before you pay") {
+            StepCard(number = 1, title = "Confirm you're at the meeting point") {
+                ExchangeCheckIn(viewModel = checkIn, pointName = proposal?.point?.name)
+            }
+
+            // Step 2 — condition checklist
+            StepCard(number = 2, title = "Check the item before you pay") {
                 CheckItem.entries.forEach { item ->
                     CheckRow(
                         label = if (item == CheckItem.CONDITION_OK) {
@@ -216,8 +237,8 @@ fun CompletionScreen(
                 }
             }
 
-            // Step 2 — rating
-            StepCard(number = 2, title = "Rate ${product.seller.name.substringBefore(' ')}") {
+            // Step 3 — rating
+            StepCard(number = 3, title = "Rate ${product.seller.name.substringBefore(' ')}") {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     (1..5).forEach { index ->
                         Icon(
@@ -273,7 +294,8 @@ fun CompletionScreen(
             )
         }
 
-        val ready = checks.size == CheckItem.entries.size && stars > 0
+        val confirmed = checkInState is CheckInState.Confirmed
+        val ready = confirmed && checks.size == CheckItem.entries.size && stars > 0
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -281,7 +303,11 @@ fun CompletionScreen(
                 .padding(16.dp),
         ) {
             PrimaryButton(
-                text = if (ready) "Send rating" else "Check the item to continue",
+                text = when {
+                    ready -> "Send rating"
+                    !confirmed -> "Confirm the exchange to continue"
+                    else -> "Check the item to continue"
+                },
                 enabled = ready,
                 onClick = {
                     vm.submitRating(

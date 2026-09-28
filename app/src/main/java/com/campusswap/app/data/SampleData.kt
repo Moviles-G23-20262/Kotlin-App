@@ -1,5 +1,7 @@
 package com.campusswap.app.data
 
+import com.campusswap.app.domain.GeoPoint
+
 object SampleData {
 
     val currentSeller = Seller(
@@ -215,13 +217,21 @@ object SampleData {
     )
 
 
+    // TODO(carla): verificar en Google Maps que cada punto cae en la entrada correcta.
+    private val centralLibraryLocation: GeoPoint? = GeoPoint(4.602948, -74.064829)
+    private val studentCenterLocation: GeoPoint? = null // TODO(carla): coordenadas — Centro Cívico is not mapped in OSM yet
+    private val marioLasernaLocation: GeoPoint? = GeoPoint(4.602725, -74.064696)
+    private val plazoletaLlerasLocation: GeoPoint? = GeoPoint(4.601859, -74.065176)
+
+    val simulatedCounterpartLocation = GeoPoint(4.604180, -74.065956)
+
     // Pre-mapped, public, monitored campus zones used by the Campus Guardian CAS (PAS 6 / PAS 10).
     // Walk times are relative to the two parties' last known campus micro-location.
     val meetingPoints = listOf(
-        MeetingPoint("mp1", "Central Library lobby", "Main entrance, next to the security desk", MeetingZoneType.LIBRARY, isMonitored = true, walkMinutesMe = 4, walkMinutesOther = 5, mapX = 0.50f, mapY = 0.42f),
-        MeetingPoint("mp2", "Student Center plaza", "Open plaza by the food court", MeetingZoneType.STUDENT_CENTER, isMonitored = true, walkMinutesMe = 7, walkMinutesOther = 3, mapX = 0.74f, mapY = 0.68f),
-        MeetingPoint("mp3", "Mario Laserna lobby", "Ground floor, engineering building", MeetingZoneType.BUILDING_LOBBY, isMonitored = true, walkMinutesMe = 2, walkMinutesOther = 9, mapX = 0.33f, mapY = 0.27f),
-        MeetingPoint("mp4", "Plazoleta Lleras", "Open area in front of Lleras building", MeetingZoneType.PLAZA, isMonitored = false, walkMinutesMe = 6, walkMinutesOther = 6, mapX = 0.40f, mapY = 0.78f),
+        MeetingPoint("mp1", "Central Library lobby", "Main entrance, next to the security desk", MeetingZoneType.LIBRARY, isMonitored = true, walkMinutesMe = 4, walkMinutesOther = 5, mapX = 0.50f, mapY = 0.42f, location = centralLibraryLocation),
+        MeetingPoint("mp2", "Student Center plaza", "Open plaza by the food court", MeetingZoneType.STUDENT_CENTER, isMonitored = true, walkMinutesMe = 7, walkMinutesOther = 3, mapX = 0.74f, mapY = 0.68f, location = studentCenterLocation),
+        MeetingPoint("mp3", "Mario Laserna lobby", "Ground floor, engineering building", MeetingZoneType.BUILDING_LOBBY, isMonitored = true, walkMinutesMe = 2, walkMinutesOther = 9, mapX = 0.33f, mapY = 0.27f, location = marioLasernaLocation),
+        MeetingPoint("mp4", "Plazoleta Lleras", "Open area in front of Lleras building", MeetingZoneType.PLAZA, isMonitored = false, walkMinutesMe = 6, walkMinutesOther = 6, mapX = 0.40f, mapY = 0.78f, location = plazoletaLlerasLocation),
     )
 
     // Shared free hours are computed from both parties' class schedules; other slots are plain suggestions.
