@@ -95,8 +95,8 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                 // login screen keeps the  original design
                 Box(Modifier.systemBarsPadding()) {
                 LoginScreen(
-                    onLoginSuccess = {
-                        appViewModel.login()
+                    onLoginSuccess = { userId ->
+                        appViewModel.login(userId)
                         navController.navigate(Routes.HOME) {
                             popUpTo(Routes.LOGIN) { inclusive = true }
                         }

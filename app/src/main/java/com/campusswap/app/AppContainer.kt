@@ -17,11 +17,21 @@ import com.campusswap.app.data.remote.RetrofitPopularityRemoteDataSource
 import com.campusswap.app.domain.RankingStrategySelector
 import com.campusswap.app.domain.TimeOfDayStrategySelector
 import java.time.Clock
+import com.campusswap.app.data.notifications.NotificationRepository
+import com.campusswap.app.data.notifications.NotificationsApi
+import com.campusswap.app.data.notifications.RetrofitNotificationRemoteDataSource
+import com.campusswap.app.data.users.RetrofitUserRemoteDataSource
+import com.campusswap.app.data.users.UserRepository
+import com.campusswap.app.data.users.UsersApi
 
 class AppContainer(context: Context) {
     private val api = ApiClient.create<CampusSwapApi>(BuildConfig.BASE_URL)
 
     private val analyticsApi = ApiClient.create<AnalyticsApi>(BuildConfig.ANALYTICS_BASE_URL)
+
+    private val notificationsApi = ApiClient.create<NotificationsApi>(BuildConfig.BASE_URL)
+
+    private val usersApi = ApiClient.create<UsersApi>(BuildConfig.BASE_URL)
 
     val locationDataSource: LocationDataSource = FusedLocationDataSource(context)
 
@@ -36,4 +46,8 @@ class AppContainer(context: Context) {
     val rankingStrategySelector: RankingStrategySelector = TimeOfDayStrategySelector()
 
     val clock: Clock = Clock.systemDefaultZone()
+
+    val notificationRepository = NotificationRepository(RetrofitNotificationRemoteDataSource(notificationsApi))
+
+    val userRepository = UserRepository(RetrofitUserRemoteDataSource(usersApi))
 }

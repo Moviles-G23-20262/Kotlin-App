@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import com.campusswap.app.data.notifications.NotificationRepository
 
 /**
  * Single in-memory state holder for the whole prototype. There is no backend:
@@ -27,6 +28,9 @@ class AppViewModel : ViewModel() {
     var isLoggedIn by mutableStateOf(false)
         private set
 
+    var currentUserId by mutableStateOf<String?>(null)
+        private set    
+
     val currentUser = SampleData.currentSeller
 
     val allProducts = mutableStateListOf<Product>().apply { addAll(SampleData.products) }
@@ -35,7 +39,7 @@ class AppViewModel : ViewModel() {
 
     val wishlist = mutableStateListOf<String>()
 
-    val notifications = mutableStateListOf<AppNotification>().apply { addAll(SampleData.notifications) }
+    val notifications = mutableStateListOf<AppNotification>()
 
     /** Set by Home's "See all" before navigating to Search, then consumed once. */
     var pendingSearchCategory: Category? = null
@@ -50,7 +54,8 @@ class AppViewModel : ViewModel() {
         isDarkTheme = !isDarkTheme
     }
 
-    fun login() {
+    fun login(userId: String? = null) {
+        currentUserId = userId
         isLoggedIn = true
         Analytics.log(Events.LOGIN_SUCCESS)
     }
@@ -118,6 +123,8 @@ class AppViewModel : ViewModel() {
     fun logout() {
         isLoggedIn = false
         cart.clear()
+        currentUserId = null
+        notifications.clear()
     }
 
     fun isWishlisted(productId: String) = wishlist.contains(productId)
@@ -261,9 +268,35 @@ class AppViewModel : ViewModel() {
         return true
     }
 
+    // No guarda si es demo y recuerda cuales vinieron del backend
+    private var notificationRepository: NotificationRepository? = null
+    private var loadedNotificationIds: Set<String> = emptySet()
+
+    var notificationsLive by mutableStateOf(true)
+        private set
+
+    fun loadNotifications(repository: NotificationRepository) {
+        notificationRepository = repository
+        val userId = currentUserId ?: return
+        viewModelScope.launch {
+            val feed = repository.load(userId)
+            notificationsLive = feed.isLive
+            notifications.removeAll { it.id in loadedNotificationIds }
+            notifications.addAll(0, feed.items)
+            loadedNotificationIds = feed.items.map { it.id }.toSet()
+            markNotificationsRead()
+        }
+    }
+
     fun markNotificationsRead() {
+        val unreadFromBackend = notifications.filter { !it.isRead && it.id in loadedNotificationIds }
         for (i in notifications.indices) {
             notifications[i] = notifications[i].copy(isRead = true)
+        }
+        val repository = notificationRepository ?: return
+        if (!notificationsLive) return
+        viewModelScope.launch {
+            unreadFromBackend.forEach { repository.markOpened(it.id) }
         }
     }
 
