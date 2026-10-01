@@ -16,6 +16,8 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import com.campusswap.app.data.notifications.NotificationRepository
 import com.campusswap.app.data.materials.MaterialRepository
+import com.campusswap.app.data.ratings.RatingRepository
+import com.campusswap.app.data.ratings.RatingResult
 
 /**
  * Single in-memory state holder for the whole prototype. There is no backend:
@@ -251,6 +253,23 @@ class AppViewModel : ViewModel() {
             }
         }
     }
+
+    val ratingSync = mutableStateMapOf<String, RatingResult>()
+
+    fun sendRating(repository: RatingRepository, ratedUserId: String, rating: TransactionRating) {
+        val raterId = currentUserId ?: return
+        viewModelScope.launch {
+            ratingSync[rating.productId] = repository.submit(
+                productId = rating.productId,
+                raterId = raterId,
+                ratedId = ratedUserId,
+                stars = rating.stars,
+                tags = rating.tags.map { it.label },
+                review = rating.review.ifBlank { null },
+            )
+        }
+    }
+    
     fun canCompleteExchange(productId: String) =
         meetingProposals[productId]?.status == ProposalStatus.ACCEPTED
 

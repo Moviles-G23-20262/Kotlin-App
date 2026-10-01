@@ -26,6 +26,9 @@ import com.campusswap.app.data.users.UsersApi
 import com.campusswap.app.data.materials.MaterialRepository
 import com.campusswap.app.data.materials.MaterialsApi
 import com.campusswap.app.data.materials.RetrofitMaterialRemoteDataSource
+import com.campusswap.app.data.ratings.RatingRepository
+import com.campusswap.app.data.ratings.RatingsApi
+import com.campusswap.app.data.ratings.RetrofitRatingRemoteDataSource
 
 class AppContainer(context: Context) {
     private val api = ApiClient.create<CampusSwapApi>(BuildConfig.BASE_URL)
@@ -37,6 +40,8 @@ class AppContainer(context: Context) {
     private val usersApi = ApiClient.create<UsersApi>(BuildConfig.BASE_URL)
 
     private val materialsApi = ApiClient.create<MaterialsApi>(BuildConfig.BASE_URL)
+
+    private val ratingsApi = ApiClient.create<RatingsApi>(BuildConfig.BASE_URL)
 
     val locationDataSource: LocationDataSource = FusedLocationDataSource(context)
 
@@ -57,4 +62,6 @@ class AppContainer(context: Context) {
     val userRepository = UserRepository(RetrofitUserRemoteDataSource(usersApi))
 
     val materialRepository = MaterialRepository(RetrofitMaterialRemoteDataSource(materialsApi))
+
+    val ratingRepository = RatingRepository(RetrofitRatingRemoteDataSource(ratingsApi))
 }

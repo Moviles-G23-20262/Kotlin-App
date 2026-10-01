@@ -36,9 +36,9 @@ class ExchangeRepository(private val remote: ExchangeRemoteDataSource) {
 
     private fun toRequest(target: ExchangeTarget, location: GeoPoint?): CreateExchangeRequest? {
         return CreateExchangeRequest(
-            materialId = SeedIds.material(target.productId) ?: return null,
-            buyerId = SeedIds.user(target.buyerId) ?: return null,
-            sellerId = SeedIds.user(target.sellerId) ?: return null,
+            materialId = SeedIds.material(target.productId) ?: target.productId.takeIf(::isBackendId) ?: return null,
+            buyerId = SeedIds.user(target.buyerId) ?: target.buyerId.takeIf(::isBackendId) ?: return null,
+            sellerId = SeedIds.user(target.sellerId) ?: target.sellerId.takeIf(::isBackendId) ?: return null,
             price = String.format(Locale.US, "%.2f", target.price),
             meetingPointId = target.meetingPointId?.let { SeedIds.meetingPoint(it) ?: it },
             lat = location?.lat,
@@ -46,3 +46,7 @@ class ExchangeRepository(private val remote: ExchangeRemoteDataSource) {
         )
     }
 }
+
+// Detecta si un ID es un UUID valido (formato backend) para evitar enviar IDs de semillas al backend
+private fun isBackendId(id: String) =
+    Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$").matches(id)
