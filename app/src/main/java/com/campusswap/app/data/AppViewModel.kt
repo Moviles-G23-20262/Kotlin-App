@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import com.campusswap.app.data.notifications.NotificationRepository
+import com.campusswap.app.data.materials.MaterialRepository
 
 /**
  * Single in-memory state holder for the whole prototype. There is no backend:
@@ -299,6 +300,19 @@ class AppViewModel : ViewModel() {
             unreadFromBackend.forEach { repository.markOpened(it.id) }
         }
     }
+
+    private var loadedMaterialIds: Set<String> = emptySet()
+
+    fun loadMaterials(repository: MaterialRepository) {
+        viewModelScope.launch {
+            val feed = repository.load()
+            allProducts.removeAll { it.id in loadedMaterialIds }
+            allProducts.addAll(0, feed.products)
+            loadedMaterialIds = feed.products.map { it.id }.toSet()
+        }
+    }
+
+    fun isRemoteNotification(id: String) = id in loadedNotificationIds
 
     // ---- In-app chat & meeting coordination (Views 09 / 10) ----
 

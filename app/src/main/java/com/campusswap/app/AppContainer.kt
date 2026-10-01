@@ -23,6 +23,9 @@ import com.campusswap.app.data.notifications.RetrofitNotificationRemoteDataSourc
 import com.campusswap.app.data.users.RetrofitUserRemoteDataSource
 import com.campusswap.app.data.users.UserRepository
 import com.campusswap.app.data.users.UsersApi
+import com.campusswap.app.data.materials.MaterialRepository
+import com.campusswap.app.data.materials.MaterialsApi
+import com.campusswap.app.data.materials.RetrofitMaterialRemoteDataSource
 
 class AppContainer(context: Context) {
     private val api = ApiClient.create<CampusSwapApi>(BuildConfig.BASE_URL)
@@ -32,6 +35,8 @@ class AppContainer(context: Context) {
     private val notificationsApi = ApiClient.create<NotificationsApi>(BuildConfig.BASE_URL)
 
     private val usersApi = ApiClient.create<UsersApi>(BuildConfig.BASE_URL)
+
+    private val materialsApi = ApiClient.create<MaterialsApi>(BuildConfig.BASE_URL)
 
     val locationDataSource: LocationDataSource = FusedLocationDataSource(context)
 
@@ -50,4 +55,6 @@ class AppContainer(context: Context) {
     val notificationRepository = NotificationRepository(RetrofitNotificationRemoteDataSource(notificationsApi))
 
     val userRepository = UserRepository(RetrofitUserRemoteDataSource(usersApi))
+
+    val materialRepository = MaterialRepository(RetrofitMaterialRemoteDataSource(materialsApi))
 }

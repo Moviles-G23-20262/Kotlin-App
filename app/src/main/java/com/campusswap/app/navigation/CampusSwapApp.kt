@@ -34,12 +34,19 @@ import com.campusswap.app.screens.rating.CompletionScreen
 import com.campusswap.app.screens.search.SearchScreen
 import com.campusswap.app.screens.sell.SellScreen
 import com.campusswap.app.ui.theme.CampusSwapTheme
+import androidx.compose.ui.platform.LocalContext
+import com.campusswap.app.CampusSwapApplication
 
 @Composable
 fun CampusSwapApp(appViewModel: AppViewModel) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    LaunchedEffect(appViewModel.isLoggedIn) {
+        if (appViewModel.isLoggedIn) appViewModel.loadMaterials(container.materialRepository)
+    }
 
     LaunchedEffect(backStackEntry) {
         val route = currentRoute ?: return@LaunchedEffect

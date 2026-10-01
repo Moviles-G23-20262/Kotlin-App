@@ -116,7 +116,8 @@ fun NotificationsScreen(
                     NotificationRow(notification) {
                         val id = notification.productId
                         when (notification.kind) {
-                            NotificationKind.ALERT_MATCH -> onOpenAlerts()
+                            NotificationKind.ALERT_MATCH ->
+                                if (id != null && vm.isRemoteNotification(notification.id)) onProductClick(id) else onOpenAlerts()
                             NotificationKind.CHAT -> id?.let(onOpenChat)
                             NotificationKind.EXCHANGE -> id?.let(onCompleteExchange)
                             NotificationKind.PRODUCT -> id?.let(onProductClick)
