@@ -55,7 +55,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.campusswap.app.CampusSwapApplication
 import com.campusswap.app.components.ConditionBadge
 import com.campusswap.app.components.EmptyState
 import com.campusswap.app.components.ProductPlaceholderImage
@@ -72,6 +74,7 @@ import com.campusswap.app.ui.theme.AccentBlue
 import com.campusswap.app.ui.theme.JetBrainsMonoFamily
 import com.campusswap.app.ui.theme.SecondaryBlue
 import com.campusswap.app.ui.theme.SuccessGreen
+import kotlinx.coroutines.delay
 
 /**
  * View 09 — Buyer-Seller In-App Chat.
@@ -102,6 +105,15 @@ fun ChatScreen(
 
     val messages = vm.threadFor(product)
     val proposal = vm.meetingProposals[product.id]
+    val proposals = (LocalContext.current.applicationContext as CampusSwapApplication).container.meetingProposalRepository
+    var responseError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(product.id) {
+        while (true) {
+            vm.refreshProposal(proposals, product)
+            delay(PROPOSAL_POLL_MS)
+        }
+    }
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -239,7 +251,18 @@ fun ChatScreen(
                 item { DayDivider("Today") }
                 items(messages, key = { it.id }) { message ->
                     when {
-                        message.proposal != null -> ProposalCard(message.proposal, onChange = onProposeMeeting)
+                        message.proposal != null -> ProposalCard(
+                            proposal = message.proposal,
+                            canRespond = message.proposal.status == ProposalStatus.PENDING &&
+                                message.proposal.proposerId != null &&
+                                message.proposal.proposerId != vm.currentUserId,
+                            error = responseError,
+                            onChange = onProposeMeeting,
+                            onRespond = { accept ->
+                                responseError = null
+                                vm.respondToProposal(proposals, product, accept) { responseError = it }
+                            },
+                        )
                         message.author == MessageAuthor.SYSTEM -> SystemNotice(message.text)
                         else -> MessageBubble(message)
                     }
@@ -375,7 +398,13 @@ private fun StatusTicks(status: MessageStatus) {
 
 /** Meeting proposal rendered inline as a system card (View 10 hand-off result). */
 @Composable
-private fun ProposalCard(proposal: MeetingProposal, onChange: () -> Unit) {
+private fun ProposalCard(
+    proposal: MeetingProposal,
+    canRespond: Boolean,
+    error: String?,
+    onChange: () -> Unit,
+    onRespond: (accept: Boolean) -> Unit,
+) {
     val accepted = proposal.status == ProposalStatus.ACCEPTED
     val accent = if (accepted) SuccessGreen else AccentBlue
     Surface(
@@ -418,14 +447,30 @@ private fun ProposalCard(proposal: MeetingProposal, onChange: () -> Unit) {
                 Icon(Icons.Outlined.Shield, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(14.dp))
                 Text("Verified safe zone · monitored", style = MaterialTheme.typography.labelMedium, color = SuccessGreen)
             }
-            if (!accepted) {
+            if (canRespond) {
+                Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { onRespond(false) },
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = AccentBlue),
+                    ) { Text("Decline") }
+                    Button(
+                        onClick = { onRespond(true) },
+                        modifier = Modifier.weight(1f).height(40.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                    ) { Text("Accept") }
+                }
+            } else if (!accepted) {
                 Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = onChange,
                         modifier = Modifier.weight(1f).height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = AccentBlue),
-                    ) { Text("Change") }
+                    ) { Text(if (proposal.status == ProposalStatus.DECLINED) "Propose another" else "Change") }
                 }
+            }
+            error?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
             }
         }
     }
@@ -460,3 +505,5 @@ private fun ProposeMeetingChip(proposal: MeetingProposal?, onClick: () -> Unit, 
         }
     }
 }
+
+private const val PROPOSAL_POLL_MS = 5_000L
