@@ -55,4 +55,5 @@ object Events {
     const val EXCHANGE_RATED = "exchange_rated"
     const val SEARCH_PERFORMED = "search_performed"            // BQ5
     const val LOGIN_SUCCESS = "login_success"
+    const val EXCHANGE_CONFIRMED = "exchange_confirmed"
 }

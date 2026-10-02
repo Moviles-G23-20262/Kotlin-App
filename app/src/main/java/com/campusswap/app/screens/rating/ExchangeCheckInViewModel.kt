@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.campusswap.app.AppContainer
+import com.campusswap.app.analytics.Analytics
+import com.campusswap.app.analytics.Events
 import com.campusswap.app.data.ConfirmResult
 import com.campusswap.app.data.ExchangeRepository
 import com.campusswap.app.data.location.LocationDataSource
@@ -36,11 +38,14 @@ class ExchangeCheckInViewModel(
     private val target: ExchangeTarget,
     private val location: LocationDataSource,
     private val exchanges: ExchangeRepository,
+    private val logEvent: (name: String, properties: Map<String, Any?>) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(initialState())
     val state: StateFlow<CheckInState> = _state.asStateFlow()
 
     private var lastLocation: GeoPoint? = null
+    private var lastDistanceMeters: Int? = null
+    private var manualReason: ManualReason? = null
 
     fun checkIn() {
         val point = target.meetingPoint ?: return
@@ -60,12 +65,16 @@ class ExchangeCheckInViewModel(
         _state.value = CheckInState.Manual(ManualReason.PERMISSION_DENIED)
     }
 
-    fun confirmManually() = send(location = null)
+    fun confirmManually() {
+        manualReason = (_state.value as? CheckInState.Manual)?.reason ?: manualReason
+        send(location = null)
+    }
 
     fun retry() = send(lastLocation)
 
     private fun onFix(current: GeoPoint, meetingPoint: GeoPoint) {
         val distance = Proximity.distanceMeters(current, meetingPoint)
+        lastDistanceMeters = distance.roundToInt()
         if (distance <= Proximity.CONFIRMATION_RADIUS_METERS) {
             send(current)
         } else {
@@ -78,12 +87,31 @@ class ExchangeCheckInViewModel(
         viewModelScope.launch {
             _state.value = CheckInState.Sending
             _state.value = when (exchanges.confirm(target, location)) {
-                ConfirmResult.Success -> CheckInState.Confirmed(verifiedByGps = location != null)
+                ConfirmResult.Success -> {
+                    logConfirmed(location)
+                    CheckInState.Confirmed(verifiedByGps = location != null)
+                }
                 ConfirmResult.Offline -> CheckInState.Failed(FailReason.OFFLINE)
                 ConfirmResult.NotSynced -> CheckInState.Failed(FailReason.NOT_SYNCED)
                 is ConfirmResult.Rejected -> CheckInState.Failed(FailReason.REJECTED)
             }
         }
+    }
+
+    private fun logConfirmed(location: GeoPoint?) {
+        val byGps = location != null
+        logEvent(
+            Events.EXCHANGE_CONFIRMED,
+            mapOf(
+                "product_id" to target.productId,
+                "meeting_point_id" to target.meetingPointId,
+                "method" to if (byGps) "gps" else "manual",
+                "lat" to location?.lat,
+                "lng" to location?.lng,
+                "distance_m" to if (byGps) lastDistanceMeters else null,
+                "manual_reason" to if (byGps) null else manualReason?.name?.lowercase(),
+            ),
+        )
     }
 
     private fun initialState(): CheckInState = when {
@@ -94,7 +122,11 @@ class ExchangeCheckInViewModel(
 
     companion object {
         fun factory(container: AppContainer, target: ExchangeTarget) = viewModelFactory {
-            initializer { ExchangeCheckInViewModel(target, container.locationDataSource, container.exchangeRepository) }
+            initializer {
+                ExchangeCheckInViewModel(target, container.locationDataSource, container.exchangeRepository) { name, properties ->
+                    Analytics.log(name, *properties.toList().toTypedArray())
+                }
+            }
         }
     }
 }

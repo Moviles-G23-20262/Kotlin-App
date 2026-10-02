@@ -26,6 +26,7 @@ class ExchangeCheckInViewModelTest {
     private val target = ExchangeTarget("p1", "me", "s1", 65000.0, "mp1", meetingPoint)
     private val remote = FakeExchangeRemoteDataSource()
     private val repository = ExchangeRepository(remote)
+    private val events = mutableListOf<Pair<String, Map<String, Any?>>>()
 
     private class FakeLocation(var result: LocationResult) : LocationDataSource {
         override suspend fun currentLocation() = result
@@ -36,7 +37,7 @@ class ExchangeCheckInViewModelTest {
     @After fun tearDown() = Dispatchers.resetMain()
 
     private fun viewModel(location: LocationResult, target: ExchangeTarget = this.target) =
-        ExchangeCheckInViewModel(target, FakeLocation(location), repository)
+        ExchangeCheckInViewModel(target, FakeLocation(location), repository) { name, properties -> events += name to properties }
 
     private fun fixAt(meters: Double) = LocationResult.Fix(north(meetingPoint, meters), accuracyMeters = 5f)
 
@@ -110,5 +111,38 @@ class ExchangeCheckInViewModelTest {
         val reopened = viewModel(fixAt(0.0))
 
         assertEquals(CheckInState.Confirmed(verifiedByGps = null), reopened.state.value)
+    }
+
+    @Test fun gpsConfirmationLogsMethodCoordinatesAndDistance() {
+        viewModel(fixAt(20.0)).checkIn()
+
+        val (name, properties) = events.single()
+        assertEquals("exchange_confirmed", name)
+        assertEquals("gps", properties["method"])
+        assertEquals("mp1", properties["meeting_point_id"])
+        assertEquals(north(meetingPoint, 20.0).lat, properties["lat"] as Double, 1e-9)
+        assertEquals(20, properties["distance_m"])
+        assertNull(properties["manual_reason"])
+    }
+
+    @Test fun manualConfirmationLogsTheFallbackReason() {
+        val vm = viewModel(LocationResult.ProviderDisabled)
+        vm.checkIn()
+
+        vm.confirmManually()
+
+        val properties = events.single().second
+        assertEquals("manual", properties["method"])
+        assertEquals("location_off", properties["manual_reason"])
+        assertNull(properties["lat"])
+        assertNull(properties["distance_m"])
+    }
+
+    @Test fun failedSendIsNotLoggedAsConfirmed() {
+        remote.failure = IOException("offline")
+
+        viewModel(fixAt(10.0)).checkIn()
+
+        assertTrue(events.isEmpty())
     }
 }
