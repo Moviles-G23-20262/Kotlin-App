@@ -123,6 +123,11 @@ class AppViewModel : ViewModel() {
     fun hasPendingExchange(productId: String): Boolean =
         orderFor(productId) != null && ratings[productId] == null
 
+    fun restoreSession(userId: String) {
+        currentUserId = userId
+        isLoggedIn = true
+    }
+
     fun logout() {
         isLoggedIn = false
         cart.clear()

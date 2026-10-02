@@ -10,6 +10,7 @@ class CampusSwapApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        container.sessionManager.launchRestore()
         Analytics.init(this)
     }
 }
