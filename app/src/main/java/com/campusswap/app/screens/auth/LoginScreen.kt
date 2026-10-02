@@ -48,19 +48,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import com.campusswap.app.CampusSwapApplication
-import com.campusswap.app.data.users.UserLookup
+import com.campusswap.app.data.auth.LoginResult
 
 @Composable
-fun LoginScreen(onLoginSuccess: (userId: String?) -> Unit) {
+fun LoginScreen(onLoginSuccess: (userId: String?) -> Unit, sessionExpired: Boolean = false) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var emailError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
-    var infoMessage by remember { mutableStateOf<String?>(null) }
+    var infoMessage by remember { mutableStateOf(if (sessionExpired) "Your session expired. Log in again to continue." else null) }
     val scope = rememberCoroutineScope()
-    val userRepository = (LocalContext.current.applicationContext as CampusSwapApplication).container.userRepository
+    val authRepository = (LocalContext.current.applicationContext as CampusSwapApplication).container.authRepository
 
     fun attemptLogin() {
         emailError = if (email.isBlank() || !email.contains("@")) "Enter your institutional email" else null
@@ -68,12 +68,12 @@ fun LoginScreen(onLoginSuccess: (userId: String?) -> Unit) {
         if (emailError == null && passwordError == null) {
             isLoading = true
             scope.launch {
-                val result = userRepository.findByEmail(email)
+                val result = authRepository.login(email, password)
                 isLoading = false
                 when (result) {
-                    is UserLookup.Found -> onLoginSuccess(result.userId)
-                    UserLookup.NotFound -> emailError = "No CampusSwap account uses this email"
-                    UserLookup.Offline -> emailError = "Can't reach the server. Check your connection and try again."
+                    is LoginResult.Success -> onLoginSuccess(result.session.userId)
+                    LoginResult.InvalidCredentials -> passwordError = "Incorrect email or password"
+                    LoginResult.Offline -> emailError = "Can't reach the server. Check your connection and try again."
                 }
             }
         }
