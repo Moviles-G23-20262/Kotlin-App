@@ -46,9 +46,12 @@ import com.campusswap.app.ui.theme.AccentBlue
 import com.campusswap.app.ui.theme.ErrorRed
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
+import com.campusswap.app.CampusSwapApplication
+import com.campusswap.app.data.users.UserLookup
 
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit) {
+fun LoginScreen(onLoginSuccess: (userId: String?) -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -57,6 +60,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     var passwordError by remember { mutableStateOf<String?>(null) }
     var infoMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val userRepository = (LocalContext.current.applicationContext as CampusSwapApplication).container.userRepository
 
     fun attemptLogin() {
         emailError = if (email.isBlank() || !email.contains("@")) "Enter your institutional email" else null
@@ -64,9 +68,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         if (emailError == null && passwordError == null) {
             isLoading = true
             scope.launch {
-                delay(700)
+                val result = userRepository.findByEmail(email)
                 isLoading = false
-                onLoginSuccess()
+                when (result) {
+                    is UserLookup.Found -> onLoginSuccess(result.userId)
+                    UserLookup.NotFound -> emailError = "No CampusSwap account uses this email"
+                    UserLookup.Offline -> emailError = "Can't reach the server. Check your connection and try again."
+                }
             }
         }
     }
@@ -180,7 +188,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             }
 
             OutlinedButton(
-                onClick = onLoginSuccess,
+                onClick = {onLoginSuccess(null) },
                 modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 12.dp),
             ) {
                 Text("Continue with demo access")

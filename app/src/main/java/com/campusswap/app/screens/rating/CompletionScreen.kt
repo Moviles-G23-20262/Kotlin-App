@@ -105,7 +105,7 @@ fun CompletionScreen(
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
     val target = ExchangeTarget(
         productId = product.id,
-        buyerId = vm.currentUser.id,
+        buyerId = vm.currentUserId ?: vm.currentUser.id,
         sellerId = product.seller.id,
         price = product.price,
         meetingPointId = proposal?.point?.id,
@@ -310,15 +310,15 @@ fun CompletionScreen(
                 },
                 enabled = ready,
                 onClick = {
-                    vm.submitRating(
-                        TransactionRating(
-                            productId = productId,
-                            stars = stars,
-                            confirmedCondition = confirmedCondition,
-                            tags = tags,
-                            review = review.trim(),
-                        )
+                    val rating = TransactionRating(
+                        productId = productId,
+                        stars = stars,
+                        confirmedCondition = confirmedCondition,
+                        tags = tags,
+                        review = review.trim(),
                     )
+                    vm.submitRating(rating)
+                    vm.sendRating(container.ratingRepository, product.seller.id, rating)
                 },
                 contentPadding = PaddingValues(13.dp),
                 modifier = Modifier.fillMaxWidth(),

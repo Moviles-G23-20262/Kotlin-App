@@ -17,11 +17,31 @@ import com.campusswap.app.data.remote.RetrofitPopularityRemoteDataSource
 import com.campusswap.app.domain.RankingStrategySelector
 import com.campusswap.app.domain.TimeOfDayStrategySelector
 import java.time.Clock
+import com.campusswap.app.data.notifications.NotificationRepository
+import com.campusswap.app.data.notifications.NotificationsApi
+import com.campusswap.app.data.notifications.RetrofitNotificationRemoteDataSource
+import com.campusswap.app.data.users.RetrofitUserRemoteDataSource
+import com.campusswap.app.data.users.UserRepository
+import com.campusswap.app.data.users.UsersApi
+import com.campusswap.app.data.materials.MaterialRepository
+import com.campusswap.app.data.materials.MaterialsApi
+import com.campusswap.app.data.materials.RetrofitMaterialRemoteDataSource
+import com.campusswap.app.data.ratings.RatingRepository
+import com.campusswap.app.data.ratings.RatingsApi
+import com.campusswap.app.data.ratings.RetrofitRatingRemoteDataSource
 
 class AppContainer(context: Context) {
     private val api = ApiClient.create<CampusSwapApi>(BuildConfig.BASE_URL)
 
     private val analyticsApi = ApiClient.create<AnalyticsApi>(BuildConfig.ANALYTICS_BASE_URL)
+
+    private val notificationsApi = ApiClient.create<NotificationsApi>(BuildConfig.BASE_URL)
+
+    private val usersApi = ApiClient.create<UsersApi>(BuildConfig.BASE_URL)
+
+    private val materialsApi = ApiClient.create<MaterialsApi>(BuildConfig.BASE_URL)
+
+    private val ratingsApi = ApiClient.create<RatingsApi>(BuildConfig.BASE_URL)
 
     val locationDataSource: LocationDataSource = FusedLocationDataSource(context)
 
@@ -36,4 +56,12 @@ class AppContainer(context: Context) {
     val rankingStrategySelector: RankingStrategySelector = TimeOfDayStrategySelector()
 
     val clock: Clock = Clock.systemDefaultZone()
+
+    val notificationRepository = NotificationRepository(RetrofitNotificationRemoteDataSource(notificationsApi))
+
+    val userRepository = UserRepository(RetrofitUserRemoteDataSource(usersApi))
+
+    val materialRepository = MaterialRepository(RetrofitMaterialRemoteDataSource(materialsApi))
+
+    val ratingRepository = RatingRepository(RetrofitRatingRemoteDataSource(ratingsApi))
 }
