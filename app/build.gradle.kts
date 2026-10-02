@@ -15,7 +15,8 @@ android {
         versionName = "1.0"
 
         buildConfigField("String", "BASE_URL", "\"https://back-end-sigma-seven.vercel.app/\"")
-        buildConfigField("String", "ANALYTICS_BASE_URL", "\"http://10.0.2.2:8000/\"")
+        val analyticsUrl = project.findProperty("campusswap.analyticsUrl") ?: "http://10.0.2.2:8000/"
+        buildConfigField("String", "ANALYTICS_BASE_URL", "\"$analyticsUrl\"")
     }
 
     buildTypes {
