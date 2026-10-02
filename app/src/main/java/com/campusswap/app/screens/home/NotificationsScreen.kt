@@ -34,6 +34,8 @@ import com.campusswap.app.data.AppViewModel
 import com.campusswap.app.data.NotificationKind
 import com.campusswap.app.ui.theme.CampusSwapTheme
 import com.campusswap.app.ui.theme.CampusType
+import androidx.compose.ui.platform.LocalContext
+import com.campusswap.app.CampusSwapApplication
 
 
 @Composable
@@ -50,7 +52,8 @@ fun NotificationsScreen(
     val activeAlerts = vm.alerts.count { it.enabled }
     val pending = vm.pendingExchanges.filter { !it.isRated }
 
-    LaunchedEffect(Unit) { vm.markNotificationsRead() }
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    LaunchedEffect(Unit) { vm.loadNotifications(container.notificationRepository) }
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
         BackHeader(title = "Notifications", onBack = onBack)
@@ -60,6 +63,11 @@ fun NotificationsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
+                        if (!vm.notificationsLive) {
+                item {
+                    BodyText("You're offline. Showing the last notifications we loaded.", color = c.textMuted)
+                }
+            }
             // View 11 — the alert engine gets a permanent slot at the top of the inbox.
             item {
                 SummaryCard(
@@ -108,7 +116,8 @@ fun NotificationsScreen(
                     NotificationRow(notification) {
                         val id = notification.productId
                         when (notification.kind) {
-                            NotificationKind.ALERT_MATCH -> onOpenAlerts()
+                            NotificationKind.ALERT_MATCH ->
+                                if (id != null && vm.isRemoteNotification(notification.id)) onProductClick(id) else onOpenAlerts()
                             NotificationKind.CHAT -> id?.let(onOpenChat)
                             NotificationKind.EXCHANGE -> id?.let(onCompleteExchange)
                             NotificationKind.PRODUCT -> id?.let(onProductClick)

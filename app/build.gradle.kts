@@ -14,7 +14,8 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        buildConfigField("String", "BASE_URL", "\"https://back-end-sigma-seven.vercel.app/\"")
+        val baseUrl = project.findProperty("campusswap.baseUrl") ?: "https://back-end-sigma-seven.vercel.app/"
+        buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
         val analyticsUrl = project.findProperty("campusswap.analyticsUrl") ?: "http://10.0.2.2:8000/"
         buildConfigField("String", "ANALYTICS_BASE_URL", "\"$analyticsUrl\"")
     }
@@ -71,10 +72,12 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver:3.14.9")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

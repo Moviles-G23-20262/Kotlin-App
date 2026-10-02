@@ -1,16 +1,22 @@
 package com.campusswap.app.navigation
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -18,6 +24,8 @@ import androidx.navigation.compose.rememberNavController
 import com.campusswap.app.analytics.Analytics
 import com.campusswap.app.analytics.Events
 import com.campusswap.app.data.AppViewModel
+import com.campusswap.app.data.auth.SessionManager
+import com.campusswap.app.data.auth.SessionState
 import com.campusswap.app.screens.auth.LoginScreen
 import com.campusswap.app.screens.cart.CartScreen
 import com.campusswap.app.screens.cart.CheckoutScreen
@@ -34,12 +42,42 @@ import com.campusswap.app.screens.rating.CompletionScreen
 import com.campusswap.app.screens.search.SearchScreen
 import com.campusswap.app.screens.sell.SellScreen
 import com.campusswap.app.ui.theme.CampusSwapTheme
+import androidx.compose.ui.platform.LocalContext
+import com.campusswap.app.CampusSwapApplication
 
 @Composable
 fun CampusSwapApp(appViewModel: AppViewModel) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
+
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    val session by container.sessionManager.state.collectAsState()
+    if (session == SessionState.Restoring) {
+        Box(Modifier.fillMaxSize().background(CampusSwapTheme.colors.bg), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+    val startDestination = remember { if (session is SessionState.SignedIn) Routes.HOME else Routes.LOGIN }
+
+    LaunchedEffect(session) {
+        when (val current = session) {
+            is SessionState.SignedIn -> if (!appViewModel.isLoggedIn) appViewModel.restoreSession(current.session.userId)
+            is SessionState.SignedOut -> if (current.expired) {
+                appViewModel.logout()
+                navController.navigate(Routes.LOGIN) {
+                    popUpTo(0) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+            SessionState.Restoring -> Unit
+        }
+    }
+
+    LaunchedEffect(appViewModel.isLoggedIn) {
+        if (appViewModel.isLoggedIn) appViewModel.loadMaterials(container.materialRepository)
+    }
 
     LaunchedEffect(backStackEntry) {
         val route = currentRoute ?: return@LaunchedEffect
@@ -88,19 +126,20 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Routes.LOGIN,
+            startDestination = startDestination,
             modifier = Modifier.padding(innerPadding).fillMaxSize(),
         ) {
             composable(Routes.LOGIN) {
                 // login screen keeps the  original design
                 Box(Modifier.systemBarsPadding()) {
                 LoginScreen(
-                    onLoginSuccess = {
-                        appViewModel.login()
+                    onLoginSuccess = { userId ->
+                        appViewModel.login(userId)
                         navController.navigate(Routes.HOME) {
                             popUpTo(Routes.LOGIN) { inclusive = true }
                         }
                     },
+                    sessionExpired = (session as? SessionState.SignedOut)?.expired == true,
                 )
                 }
             }
@@ -186,6 +225,7 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                     onOpenChat = { id -> navController.navigate(Routes.chat(id)) },
                     onCompleteExchange = { id -> navController.navigate(Routes.completion(id)) },
                     onLogout = {
+                        container.authRepository.logout()
                         appViewModel.logout()
                         navController.navigate(Routes.LOGIN) {
                             popUpTo(0) { inclusive = true }
@@ -209,24 +249,28 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
 
             composable(Routes.CHAT) { entry ->
                 val productId = entry.arguments?.getString("productId").orEmpty()
-                ChatScreen(
-                    vm = appViewModel,
-                    productId = productId,
-                    onBack = { navController.popBackStack() },
-                    onViewListing = { id -> navController.navigate(Routes.productDetail(id)) },
-                    onProposeMeeting = { navController.navigate(Routes.meetingPoint(productId)) },
-                    onCompleteExchange = { navController.navigate(Routes.completion(productId)) },
-                )
+                RequireSession(navController, container.sessionManager) {
+                    ChatScreen(
+                        vm = appViewModel,
+                        productId = productId,
+                        onBack = { navController.popBackStack() },
+                        onViewListing = { id -> navController.navigate(Routes.productDetail(id)) },
+                        onProposeMeeting = { navController.navigate(Routes.meetingPoint(productId)) },
+                        onCompleteExchange = { navController.navigate(Routes.completion(productId)) },
+                    )
+                }
             }
 
             composable(Routes.MEETING_POINT) { entry ->
                 val productId = entry.arguments?.getString("productId").orEmpty()
-                MeetingPointScreen(
-                    vm = appViewModel,
-                    productId = productId,
-                    onBack = { navController.popBackStack() },
-                    onProposed = { navController.popBackStack() },
-                )
+                RequireSession(navController, container.sessionManager) {
+                    MeetingPointScreen(
+                        vm = appViewModel,
+                        productId = productId,
+                        onBack = { navController.popBackStack() },
+                        onProposed = { navController.popBackStack() },
+                    )
+                }
             }
 
             composable(Routes.COMPLETION) { entry ->
@@ -264,6 +308,21 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                     onBack = { navController.popBackStack() },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun RequireSession(navController: NavHostController, sessions: SessionManager, content: @Composable () -> Unit) {
+    val session = remember { sessions.validSession() }
+    if (session != null) {
+        content()
+        return
+    }
+    LaunchedEffect(Unit) {
+        navController.navigate(Routes.LOGIN) {
+            popUpTo(0) { inclusive = true }
+            launchSingleTop = true
         }
     }
 }
