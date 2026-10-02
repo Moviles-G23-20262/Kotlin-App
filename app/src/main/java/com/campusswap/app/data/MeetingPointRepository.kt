@@ -9,16 +9,20 @@ import java.io.IOException
 data class MeetingPoints(val points: List<MeetingPoint>, val isLive: Boolean)
 
 class MeetingPointRepository(private val remote: MeetingPointRemoteDataSource) {
+    @Volatile
+    private var lastLive: List<MeetingPoint> = emptyList()
 
     suspend fun load(): MeetingPoints = try {
-        MeetingPoints(remote.meetingPoints().map { it.toMeetingPoint() }, isLive = true)
+        val points = remote.meetingPoints().map { it.toMeetingPoint() }
+        lastLive = points
+        MeetingPoints(points, isLive = true)
     } catch (e: IOException) {
         offline()
     } catch (e: HttpException) {
         offline()
     }
 
-    private fun offline() = MeetingPoints(SampleData.meetingPoints.filter { it.location != null }, isLive = false)
+    private fun offline() = MeetingPoints(lastLive.ifEmpty { SampleData.meetingPoints.filter { it.location != null } }, isLive = false)
 
     private fun MeetingPointDto.toMeetingPoint() = MeetingPoint(
         id = id,

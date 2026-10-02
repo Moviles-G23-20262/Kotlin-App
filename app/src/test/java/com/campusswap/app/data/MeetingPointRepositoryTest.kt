@@ -41,4 +41,21 @@ class MeetingPointRepositoryTest {
         assertTrue(result.points.isNotEmpty())
         assertTrue(result.points.all { it.location != null })
     }
+
+    @Test fun offlineAfterALiveLoadReusesTheBackendPoints() = runBlocking {
+        remote.points = listOf(MeetingPointDto("c-uuid-1", "Library", null, "LIBRARY", true, 4.6, -74.06))
+        repository.load()
+
+        remote.failure = IOException("signal lost")
+        val result = repository.load()
+
+        assertFalse(result.isLive)
+        assertEquals(listOf("c-uuid-1"), result.points.map { it.id })
+    }
+
+    @Test fun offlineWithoutAnyLiveLoadUsesTheBundledPoints() = runBlocking {
+        remote.failure = IOException("offline from the start")
+
+        assertTrue(repository.load().points.all { it.id.startsWith("mp") })
+    }
 }
