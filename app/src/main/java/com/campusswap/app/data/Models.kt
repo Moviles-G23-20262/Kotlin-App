@@ -1,6 +1,7 @@
 package com.campusswap.app.data
 
 import com.campusswap.app.domain.GeoPoint
+import java.time.Instant
 
 enum class Condition(val label: String) {
     LIKE_NEW("Like New"),
@@ -114,18 +115,23 @@ data class TimeSlot(
     val day: String,
     /** True when the slot is a shared free hour between both parties' class schedules. */
     val isSharedBreak: Boolean,
+    val startsAt: Instant? = null,
+    val endsAt: Instant? = null,
 )
 
 enum class ProposalStatus(val label: String) {
     PENDING("Awaiting confirmation"),
     ACCEPTED("Confirmed by both"),
     CHANGED("Alternative proposed"),
+    DECLINED("Declined"),
 }
 
 data class MeetingProposal(
     val point: MeetingPoint,
     val slot: TimeSlot,
     val status: ProposalStatus,
+    val remoteId: String? = null,
+    val proposerId: String? = null,
 )
 
 // saved searches & smart matching (View 11)
