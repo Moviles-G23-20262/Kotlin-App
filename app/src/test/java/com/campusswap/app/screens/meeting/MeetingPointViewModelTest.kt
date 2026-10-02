@@ -1,8 +1,10 @@
 package com.campusswap.app.screens.meeting
 
 import com.campusswap.app.data.FakeMeetingPointRemoteDataSource
+import com.campusswap.app.data.FakeMeetingProposalRemoteDataSource
 import com.campusswap.app.data.FakePopularityRemoteDataSource
 import com.campusswap.app.data.MeetingPointPopularityRepository
+import com.campusswap.app.data.MeetingProposalRepository
 import com.campusswap.app.data.MeetingPointRepository
 import com.campusswap.app.data.location.CounterpartLocationSource
 import com.campusswap.app.data.location.LocationDataSource
@@ -10,6 +12,8 @@ import com.campusswap.app.data.location.LocationResult
 import com.campusswap.app.data.remote.MeetingPointDto
 import com.campusswap.app.data.remote.MeetingPointUsageDto
 import com.campusswap.app.data.remote.MeetingPointUsageResponse
+import com.campusswap.app.data.remote.FreeSlotDto
+import com.campusswap.app.data.remote.SlotSuggestionsDto
 import com.campusswap.app.domain.GeoPoint
 import com.campusswap.app.domain.RankingMode
 import com.campusswap.app.domain.TimeOfDayStrategySelector
@@ -43,6 +47,10 @@ class MeetingPointViewModelTest {
             dto("near-seller", monitored = true, meters = 450.0),
         ),
     )
+    private val proposalRemote = FakeMeetingProposalRemoteDataSource().apply {
+        val slot = FreeSlotDto("2026-10-05T17:00:00Z", "2026-10-05T18:00:00Z", sharedBreak = true)
+        suggestions = SlotSuggestionsDto(listOf(slot), suggested = slot)
+    }
     private val location = FakeLocation(LocationResult.Fix(me, accuracyMeters = 5f))
     private val popularityRemote = FakePopularityRemoteDataSource(
         MeetingPointUsageResponse(true, listOf(MeetingPointUsageDto("near-seller", 6), MeetingPointUsageDto("near-me", 2))),
@@ -69,6 +77,7 @@ class MeetingPointViewModelTest {
         strategies = TimeOfDayStrategySelector(),
         clock = clockAt(hour),
         popularity = MeetingPointPopularityRepository(popularityRemote),
+        proposals = MeetingProposalRepository(proposalRemote),
     )
 
     @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -149,5 +158,20 @@ class MeetingPointViewModelTest {
 
         assertTrue(state.ranked.none { it.isPopular })
         assertEquals("middle-plaza", state.recommended?.point?.id)
+    }
+
+    @Test fun showsTheSharedFreeTimesFromTheServer() {
+        val state = viewModel(hour = 14).state.value
+
+        assertEquals(listOf("12:00 – 13:00"), state.slots.map { it.label })
+    }
+
+    @Test fun freeTimesSurviveTheSecondPublishAfterTheGpsFix() {
+        val vm = viewModel(hour = 14)
+
+        vm.refresh()
+
+        assertEquals(1, vm.state.value.slots.size)
+        assertEquals(MyLocationStatus.FOUND, vm.state.value.myLocation)
     }
 }

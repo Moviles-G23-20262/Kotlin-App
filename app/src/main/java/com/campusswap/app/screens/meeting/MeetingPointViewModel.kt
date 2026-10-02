@@ -7,9 +7,11 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.campusswap.app.AppContainer
 import com.campusswap.app.data.MeetingPoint
 import com.campusswap.app.data.MeetingPointPopularityRepository
+import com.campusswap.app.data.MeetingProposalRepository
 import com.campusswap.app.data.MeetingPointRepository
 import com.campusswap.app.data.MeetingPoints
 import com.campusswap.app.data.SeedIds
+import com.campusswap.app.data.TimeSlot
 import com.campusswap.app.data.location.CounterpartLocationSource
 import com.campusswap.app.data.location.LocationDataSource
 import com.campusswap.app.data.location.LocationResult
@@ -48,6 +50,7 @@ data class MeetingPointUiState(
     val myMapPosition: MapPosition? = null,
     val otherMapPosition: MapPosition? = null,
     val isLive: Boolean = true,
+    val slots: List<TimeSlot> = emptyList(),
 ) {
     val recommended: RankedPoint? get() = ranked.firstOrNull()
 }
@@ -60,12 +63,14 @@ class MeetingPointViewModel(
     private val strategies: RankingStrategySelector,
     private val clock: Clock,
     private val popularity: MeetingPointPopularityRepository,
+    private val proposals: MeetingProposalRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(MeetingPointUiState())
     val state: StateFlow<MeetingPointUiState> = _state.asStateFlow()
 
     private var refreshJob: Job? = null
     private var popularIds: Set<String> = emptySet()
+    private var slots: List<TimeSlot> = emptyList()
 
     init {
         refresh()
@@ -80,12 +85,18 @@ class MeetingPointViewModel(
             val other = counterpart.locationOf(productId)
 
             launch { markPopular(popularity.popularAt(now.hour)) }
+            launch { showSlots(proposals.freeSlots(productId)) }
 
             publish(points, strategy, now, me = null, other = other, status = MyLocationStatus.LOCATING)
 
             val (me, status) = locateMe(points)
             publish(points, strategy, now, me, other, status)
         }
+    }
+
+    private fun showSlots(freeSlots: List<TimeSlot>) {
+        slots = freeSlots
+        _state.update { it.copy(slots = freeSlots) }
     }
 
     private fun markPopular(ids: Set<String>) {
@@ -133,6 +144,7 @@ class MeetingPointViewModel(
             myMapPosition = me?.let(projection::project),
             otherMapPosition = projection.project(other),
             isLive = points.isLive,
+            slots = slots,
         )
     }
 
@@ -149,6 +161,7 @@ class MeetingPointViewModel(
                     strategies = container.rankingStrategySelector,
                     clock = container.clock,
                     popularity = container.popularityRepository,
+                    proposals = container.meetingProposalRepository,
                 )
             }
         }

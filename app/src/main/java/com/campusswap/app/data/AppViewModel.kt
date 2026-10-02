@@ -378,27 +378,66 @@ class AppViewModel : ViewModel() {
         }
     }
 
-    fun recommendedTimeSlot(): TimeSlot = SampleData.timeSlots.first { it.isSharedBreak }
-
-    fun proposeMeeting(product: Product, point: MeetingPoint, slot: TimeSlot) {
-        val proposal = MeetingProposal(point, slot, ProposalStatus.PENDING)
-        meetingProposals[product.id] = proposal
-        val thread = threadFor(product)
-        Analytics.log(Events.MEETING_PROPOSED, "product_id" to product.id, *chatStats(product.id, thread.size))
-        thread.removeAll { it.proposal != null }
-        thread.add(ChatMessage("proposal-${System.currentTimeMillis()}", MessageAuthor.SYSTEM, "Meeting point proposed", now(), proposal = proposal))
+    fun proposeMeeting(
+        repository: MeetingProposalRepository,
+        product: Product,
+        point: MeetingPoint,
+        slot: TimeSlot,
+        onResult: (error: String?) -> Unit,
+    ) {
         viewModelScope.launch {
-            delay(2500)
-            val current = meetingProposals[product.id] ?: return@launch
-            if (current.status == ProposalStatus.PENDING) {
-                val accepted = current.copy(status = ProposalStatus.ACCEPTED)
-                meetingProposals[product.id] = accepted
-                Analytics.log(Events.MEETING_CONFIRMED, "product_id" to product.id, *chatStats(product.id, thread.size))
-                val index = thread.indexOfLast { it.proposal != null }
-                if (index >= 0) thread[index] = thread[index].copy(text = "Meeting confirmed", proposal = accepted)
-                thread.add(ChatMessage("confirm-${System.currentTimeMillis()}", MessageAuthor.OTHER, "Confirmed! See you at ${current.point.name} at ${current.slot.label.substringBefore(' ')}.", now()))
+            when (val result = repository.propose(product.id, point, slot)) {
+                is ProposalResult.Success -> {
+                    showProposal(product, result.proposal)
+                    Analytics.log(Events.MEETING_PROPOSED, "product_id" to product.id, *chatStats(product.id, threadFor(product).size))
+                    onResult(null)
+                }
+                ProposalResult.Offline -> onResult("No connection. Your proposal wasn't sent.")
+                ProposalResult.NotSynced -> onResult("This listing or meeting point isn't on the server, so the proposal can't be sent.")
+                is ProposalResult.Rejected -> onResult(result.message ?: "The server couldn't save the proposal.")
             }
         }
+    }
+
+    suspend fun refreshProposal(repository: MeetingProposalRepository, product: Product) {
+        val latest = repository.latest(product.id) ?: return
+        val previous = meetingProposals[product.id]
+        if (latest == previous) return
+        showProposal(product, latest)
+        val justAccepted = latest.status == ProposalStatus.ACCEPTED &&
+            (previous?.remoteId != latest.remoteId || previous?.status != ProposalStatus.ACCEPTED)
+        if (justAccepted) {
+            val thread = threadFor(product)
+            Analytics.log(Events.MEETING_CONFIRMED, "product_id" to product.id, *chatStats(product.id, thread.size))
+            thread.add(ChatMessage("confirm-${latest.remoteId}", MessageAuthor.SYSTEM, "Confirmed! See you at ${latest.point.name}, ${latest.slot.day} at ${latest.slot.label.substringBefore(' ')}.", now()))
+        }
+    }
+
+    fun respondToProposal(repository: MeetingProposalRepository, product: Product, accept: Boolean, onResult: (error: String?) -> Unit) {
+        val proposal = meetingProposals[product.id] ?: return
+        viewModelScope.launch {
+            when (val result = repository.respond(proposal, accept)) {
+                is ProposalResult.Success -> {
+                    refreshProposal(repository, product)
+                    onResult(null)
+                }
+                ProposalResult.Offline -> onResult("No connection. Try again.")
+                ProposalResult.NotSynced -> onResult("This proposal isn't on the server.")
+                is ProposalResult.Rejected -> onResult(result.message ?: "The server couldn't save your answer.")
+            }
+        }
+    }
+
+    private fun showProposal(product: Product, proposal: MeetingProposal) {
+        meetingProposals[product.id] = proposal
+        val thread = threadFor(product)
+        val text = when (proposal.status) {
+            ProposalStatus.ACCEPTED -> "Meeting confirmed"
+            ProposalStatus.DECLINED -> "Meeting declined"
+            else -> "Meeting point proposed"
+        }
+        thread.removeAll { it.proposal != null }
+        thread.add(ChatMessage("proposal-${proposal.remoteId}", MessageAuthor.SYSTEM, text, now(), proposal = proposal))
     }
 
     private fun chatStats(productId: String, messages: Int): Array<Pair<String, Any?>> = arrayOf(

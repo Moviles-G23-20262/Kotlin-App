@@ -75,7 +75,6 @@ import com.campusswap.app.CampusSwapApplication
 import com.campusswap.app.components.EmptyState
 import com.campusswap.app.data.AppViewModel
 import com.campusswap.app.data.MeetingZoneType
-import com.campusswap.app.data.SampleData
 import com.campusswap.app.data.TimeSlot
 import com.campusswap.app.domain.RankingMode
 import com.campusswap.app.domain.TimeOfDayStrategySelector
@@ -121,7 +120,11 @@ fun MeetingPointScreen(
     val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         guardian.refresh()
     }
-    var selectedSlot by remember { mutableStateOf(existing?.slot ?: vm.recommendedTimeSlot()) }
+    var selectedSlotId by remember { mutableStateOf(existing?.slot?.id) }
+    val slotOptions = state.slots.take(4)
+    val selectedSlot = slotOptions.firstOrNull { it.id == selectedSlotId } ?: slotOptions.firstOrNull()
+    var sending by remember { mutableStateOf(false) }
+    var proposalError by remember { mutableStateOf<String?>(null) }
     var showAlternatives by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val otherName = product.seller.name.substringBefore(' ')
@@ -150,10 +153,16 @@ fun MeetingPointScreen(
                     ) { Text("Change") }
                     Button(
                         onClick = {
-                            selected?.let { vm.proposeMeeting(product, it.point, selectedSlot) }
-                            onProposed()
+                            val point = selected?.point ?: return@Button
+                            val slot = selectedSlot ?: return@Button
+                            sending = true
+                            proposalError = null
+                            vm.proposeMeeting(container.meetingProposalRepository, product, point, slot) { error ->
+                                sending = false
+                                if (error == null) onProposed() else proposalError = error
+                            }
                         },
-                        enabled = selected != null,
+                        enabled = selected != null && selectedSlot != null && !sending,
                         modifier = Modifier.weight(1f).height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                     ) {
@@ -205,15 +214,31 @@ fun MeetingPointScreen(
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    SampleData.timeSlots.take(2).forEach { slot ->
-                        SlotChip(slot, selectedSlot.id == slot.id, modifier = Modifier.weight(1f)) { selectedSlot = slot }
+                if (slotOptions.isEmpty()) {
+                    Text(
+                        "Free times couldn't be loaded from the server. Check your connection and open this screen again.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                slotOptions.chunked(2).forEachIndexed { index, row ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = if (index == 0) 0.dp else 8.dp),
+                    ) {
+                        row.forEach { slot ->
+                            SlotChip(slot, selectedSlot?.id == slot.id, modifier = Modifier.weight(1f)) { selectedSlotId = slot.id }
+                        }
+                        if (row.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    SampleData.timeSlots.drop(2).forEach { slot ->
-                        SlotChip(slot, selectedSlot.id == slot.id, modifier = Modifier.weight(1f)) { selectedSlot = slot }
-                    }
+                proposalError?.let {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
                 }
 
                 Row(
@@ -389,7 +414,7 @@ private fun SmallZoneMarker(ranked: RankedPoint, modifier: Modifier, onClick: ()
 
 /** Context card explaining what the CAS detected (shared break + micro-location). */
 @Composable
-private fun GuardianContextCard(state: MeetingPointUiState, slot: TimeSlot, otherName: String, onUseMyLocation: () -> Unit) {
+private fun GuardianContextCard(state: MeetingPointUiState, slot: TimeSlot?, otherName: String, onUseMyLocation: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = AccentBlue.copy(alpha = 0.10f),
@@ -587,7 +612,7 @@ private fun PopularNowBadge() {
 
 private fun MapPosition.toOffset() = Offset(x, y)
 
-private fun guardianReasons(state: MeetingPointUiState, slot: TimeSlot, otherName: String): List<String> {
+private fun guardianReasons(state: MeetingPointUiState, slot: TimeSlot?, otherName: String): List<String> {
     val time = state.time?.toString().orEmpty()
     val context = when (state.mode) {
         RankingMode.NIGHT_SAFETY ->
@@ -603,7 +628,8 @@ private fun guardianReasons(state: MeetingPointUiState, slot: TimeSlot, otherNam
         else -> "${best.point.name} is ${best.walkMinutesOther} min from $otherName. ${locationHint(state.myLocation)}"
     }
     val offline = if (state.isLive) null else "Offline: showing the campus zones saved on this phone."
-    return listOfNotNull(context, choice, "You're both free ${slot.day}, ${slot.label}.", offline)
+    val freeTime = slot?.let { "You're both free ${it.day}, ${it.label}." }
+    return listOfNotNull(context, choice, freeTime, offline)
 }
 
 private fun locationHint(status: MyLocationStatus): String = when (status) {

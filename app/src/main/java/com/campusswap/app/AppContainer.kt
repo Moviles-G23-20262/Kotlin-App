@@ -4,6 +4,7 @@ import android.content.Context
 import com.campusswap.app.data.ExchangeRepository
 import com.campusswap.app.data.MeetingPointPopularityRepository
 import com.campusswap.app.data.MeetingPointRepository
+import com.campusswap.app.data.MeetingProposalRepository
 import com.campusswap.app.data.auth.AuthRepository
 import com.campusswap.app.data.auth.DataStoreSessionStore
 import com.campusswap.app.data.auth.SessionManager
@@ -19,6 +20,8 @@ import com.campusswap.app.data.remote.CampusSwapApi
 import com.campusswap.app.data.remote.RetrofitAuthRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitExchangeRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitMeetingPointRemoteDataSource
+import com.campusswap.app.data.remote.MeetingProposalApi
+import com.campusswap.app.data.remote.RetrofitMeetingProposalRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitPopularityRemoteDataSource
 import com.campusswap.app.domain.RankingStrategySelector
 import com.campusswap.app.domain.TimeOfDayStrategySelector
@@ -69,6 +72,10 @@ class AppContainer(context: Context) {
     val exchangeRepository = ExchangeRepository(RetrofitExchangeRemoteDataSource(api))
 
     val meetingPointRepository = MeetingPointRepository(RetrofitMeetingPointRemoteDataSource(api))
+
+    val meetingProposalRepository = MeetingProposalRepository(
+        RetrofitMeetingProposalRemoteDataSource(ApiClient.create<MeetingProposalApi>(BuildConfig.BASE_URL, backendClient)),
+    )
 
     val popularityRepository = MeetingPointPopularityRepository(RetrofitPopularityRemoteDataSource(analyticsApi))
 
