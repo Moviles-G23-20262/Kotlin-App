@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -94,9 +95,13 @@ fun AlertsScreen(
                 }
             } else {
                 items(matches, key = { "match-${it.product.id}" }) { match ->
+                    LaunchedEffect(match.product.id) { vm.onMatchShown(match.product.id, match.alert.id) }
                     MatchCard(
                         match = match,
-                        onOpen = { onProductClick(match.product.id) },
+                        onOpen = {
+                            vm.openMatch(match.product.id)
+                            onProductClick(match.product.id)
+                        },
                         onReserve = { vm.reserveMatch(match.product.id) },
                     )
                 }
