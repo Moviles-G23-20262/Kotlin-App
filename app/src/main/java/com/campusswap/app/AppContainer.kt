@@ -17,6 +17,7 @@ import com.campusswap.app.data.remote.AuthApi
 import com.campusswap.app.data.remote.AuthInterceptor
 import com.campusswap.app.data.remote.ApiClient
 import com.campusswap.app.data.remote.CampusSwapApi
+import com.campusswap.app.data.remote.ExchangesApi
 import com.campusswap.app.data.remote.RetrofitAuthRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitExchangeRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitMeetingPointRemoteDataSource
@@ -64,7 +65,9 @@ class AppContainer(context: Context) {
 
     val locationDataSource: LocationDataSource = FusedLocationDataSource(context)
 
-    val exchangeRepository = ExchangeRepository(RetrofitExchangeRemoteDataSource(api))
+    val exchangeRepository = ExchangeRepository(
+        RetrofitExchangeRemoteDataSource(ApiClient.create<ExchangesApi>(BuildConfig.BASE_URL, backendClient)),
+    )
 
     val meetingPointRepository = MeetingPointRepository(RetrofitMeetingPointRemoteDataSource(api))
 
