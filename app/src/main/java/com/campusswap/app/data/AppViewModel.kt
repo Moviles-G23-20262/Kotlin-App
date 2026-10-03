@@ -231,7 +231,19 @@ class AppViewModel : ViewModel() {
     fun isReserved(productId: String) = reservedMatches.contains(productId)
 
     fun reserveMatch(productId: String) {
-        if (!reservedMatches.contains(productId)) reservedMatches.add(productId)
+        if (reservedMatches.contains(productId)) return
+        reservedMatches.add(productId)
+        Analytics.log(Events.SMART_MATCH_RESERVED, "product_id" to productId)
+    }
+
+    private val shownMatches = mutableSetOf<String>()
+
+    fun onMatchShown(productId: String, alertId: String) {
+        if (shownMatches.add(productId)) Analytics.log(Events.SMART_MATCH_SHOWN, "product_id" to productId, "alert_id" to alertId)
+    }
+
+    fun openMatch(productId: String) {
+        Analytics.log(Events.SMART_MATCH_OPENED, "product_id" to productId)
     }
 
     // transaction completion & rating (View 12)

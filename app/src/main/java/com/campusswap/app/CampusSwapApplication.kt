@@ -11,6 +11,6 @@ class CampusSwapApplication : Application() {
         super.onCreate()
         container = AppContainer(this)
         container.sessionManager.launchRestore()
-        Analytics.init(this)
+        Analytics.init(this, container.eventSink)
     }
 }
