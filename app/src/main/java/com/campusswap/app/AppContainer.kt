@@ -34,9 +34,6 @@ import okhttp3.OkHttpClient
 import com.campusswap.app.data.notifications.NotificationRepository
 import com.campusswap.app.data.notifications.NotificationsApi
 import com.campusswap.app.data.notifications.RetrofitNotificationRemoteDataSource
-import com.campusswap.app.data.users.RetrofitUserRemoteDataSource
-import com.campusswap.app.data.users.UserRepository
-import com.campusswap.app.data.users.UsersApi
 import com.campusswap.app.data.materials.MaterialRepository
 import com.campusswap.app.data.materials.MaterialsApi
 import com.campusswap.app.data.materials.RetrofitMaterialRemoteDataSource
@@ -61,8 +58,6 @@ class AppContainer(context: Context) {
 
     private val notificationsApi = ApiClient.create<NotificationsApi>(BuildConfig.BASE_URL, backendClient)
 
-    private val usersApi = ApiClient.create<UsersApi>(BuildConfig.BASE_URL, backendClient)
-
     private val materialsApi = ApiClient.create<MaterialsApi>(BuildConfig.BASE_URL, backendClient)
 
     private val ratingsApi = ApiClient.create<RatingsApi>(BuildConfig.BASE_URL, backendClient)
@@ -84,8 +79,6 @@ class AppContainer(context: Context) {
     val rankingStrategySelector: RankingStrategySelector = TimeOfDayStrategySelector()
 
     val notificationRepository = NotificationRepository(RetrofitNotificationRemoteDataSource(notificationsApi))
-
-    val userRepository = UserRepository(RetrofitUserRemoteDataSource(usersApi))
 
     val materialRepository = MaterialRepository(RetrofitMaterialRemoteDataSource(materialsApi))
 

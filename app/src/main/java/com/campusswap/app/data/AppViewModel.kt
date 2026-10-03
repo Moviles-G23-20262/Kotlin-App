@@ -262,11 +262,10 @@ class AppViewModel : ViewModel() {
     val ratingSync = mutableStateMapOf<String, RatingResult>()
 
     fun sendRating(repository: RatingRepository, ratedUserId: String, rating: TransactionRating) {
-        val raterId = currentUserId ?: return
+        if (currentUserId == null) return
         viewModelScope.launch {
             ratingSync[rating.productId] = repository.submit(
                 productId = rating.productId,
-                raterId = raterId,
                 ratedId = ratedUserId,
                 stars = rating.stars,
                 tags = rating.tags.map { it.label },
