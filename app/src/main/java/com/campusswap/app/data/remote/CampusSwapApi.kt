@@ -3,29 +3,12 @@ package com.campusswap.app.data.remote
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.Body
 import retrofit2.http.GET
-import retrofit2.http.POST
 
 interface CampusSwapApi {
-    @POST("exchanges")
-    suspend fun createExchange(@Body body: CreateExchangeRequest): ExchangeResponse
-
     @GET("meeting-points")
     suspend fun meetingPoints(): List<MeetingPointDto>
 }
-
-data class CreateExchangeRequest(
-    val materialId: String,
-    val buyerId: String,
-    val sellerId: String,
-    val price: String,
-    val meetingPointId: String?,
-    val lat: Double?,
-    val lng: Double?,
-)
-
-data class ExchangeResponse(val id: String)
 
 data class MeetingPointDto(
     val id: String,

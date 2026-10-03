@@ -47,7 +47,7 @@ class ExchangeCheckInViewModelTest {
         vm.checkIn()
 
         assertEquals(CheckInState.Confirmed(verifiedByGps = true), vm.state.value)
-        assertEquals(north(meetingPoint, 20.0).lat, remote.requests.single().lat!!, 1e-9)
+        assertEquals(north(meetingPoint, 20.0).lat, remote.completions.single().lat!!, 1e-9)
     }
 
     @Test fun outsideRadiusReportsDistanceAndSendsNothing() {
@@ -56,7 +56,7 @@ class ExchangeCheckInViewModelTest {
         vm.checkIn()
 
         assertEquals(CheckInState.TooFar(120), vm.state.value)
-        assertTrue(remote.requests.isEmpty())
+        assertTrue(remote.completions.isEmpty())
     }
 
     @Test fun deniedPermissionFallsBackToManualWithoutCoordinates() {
@@ -67,7 +67,7 @@ class ExchangeCheckInViewModelTest {
 
         vm.confirmManually()
         assertEquals(CheckInState.Confirmed(verifiedByGps = false), vm.state.value)
-        assertNull(remote.requests.single().lat)
+        assertNull(remote.completions.single().lat)
     }
 
     @Test fun locationServicesOffFallsBackToManual() {
@@ -102,7 +102,7 @@ class ExchangeCheckInViewModelTest {
         remote.failure = null
         vm.retry()
         assertEquals(CheckInState.Confirmed(verifiedByGps = true), vm.state.value)
-        assertEquals(north(meetingPoint, 10.0).lat, remote.requests.single().lat!!, 1e-9)
+        assertEquals(north(meetingPoint, 10.0).lat, remote.completions.single().lat!!, 1e-9)
     }
 
     @Test fun exchangeConfirmedEarlierInTheSessionStartsConfirmed() {
