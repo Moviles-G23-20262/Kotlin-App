@@ -12,7 +12,9 @@ import com.campusswap.app.data.location.CounterpartLocationSource
 import com.campusswap.app.data.location.FusedLocationDataSource
 import com.campusswap.app.data.location.LocationDataSource
 import com.campusswap.app.data.location.SimulatedCounterpartLocation
+import com.campusswap.app.analytics.HttpEventSink
 import com.campusswap.app.data.remote.AnalyticsApi
+import com.campusswap.app.data.remote.AnalyticsEventsApi
 import com.campusswap.app.data.remote.AuthApi
 import com.campusswap.app.data.remote.AuthInterceptor
 import com.campusswap.app.data.remote.ApiClient
@@ -68,6 +70,8 @@ class AppContainer(context: Context) {
     val exchangeRepository = ExchangeRepository(
         RetrofitExchangeRemoteDataSource(ApiClient.create<ExchangesApi>(BuildConfig.BASE_URL, backendClient)),
     )
+
+    val eventSink = HttpEventSink(ApiClient.create<AnalyticsEventsApi>(BuildConfig.BASE_URL, backendClient)) { sessionManager.token != null }
 
     val meetingPointRepository = MeetingPointRepository(RetrofitMeetingPointRemoteDataSource(api))
 

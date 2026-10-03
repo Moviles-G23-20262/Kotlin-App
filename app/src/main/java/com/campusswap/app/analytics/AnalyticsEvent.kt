@@ -56,4 +56,7 @@ object Events {
     const val SEARCH_PERFORMED = "search_performed"            // BQ5
     const val LOGIN_SUCCESS = "login_success"
     const val EXCHANGE_CONFIRMED = "exchange_confirmed"
+    const val SMART_MATCH_SHOWN = "smart_match_shown"
+    const val SMART_MATCH_OPENED = "smart_match_opened"
+    const val SMART_MATCH_RESERVED = "smart_match_reserved"
 }
