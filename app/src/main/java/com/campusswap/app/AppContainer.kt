@@ -1,6 +1,7 @@
 package com.campusswap.app
 
 import android.content.Context
+import com.campusswap.app.data.ChatRepository
 import com.campusswap.app.data.ChatRoomRepository
 import com.campusswap.app.data.ExchangeRepository
 import com.campusswap.app.data.MeetingPointPopularityRepository
@@ -25,8 +26,10 @@ import com.campusswap.app.data.remote.RetrofitAuthRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitExchangeRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitMeetingPointRemoteDataSource
 import com.campusswap.app.data.remote.ChatRoomsApi
+import com.campusswap.app.data.remote.MessagesApi
 import com.campusswap.app.data.remote.MeetingProposalApi
 import com.campusswap.app.data.remote.RetrofitChatRoomRemoteDataSource
+import com.campusswap.app.data.remote.RetrofitMessageRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitMeetingProposalRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitPopularityRemoteDataSource
 import com.campusswap.app.domain.RankingStrategySelector
@@ -80,6 +83,12 @@ class AppContainer(context: Context) {
 
     val chatRoomRepository = ChatRoomRepository(
         RetrofitChatRoomRemoteDataSource(ApiClient.create<ChatRoomsApi>(BuildConfig.BASE_URL, backendClient)),
+    )
+
+    val chatRepository = ChatRepository(
+        rooms = chatRoomRepository,
+        remote = RetrofitMessageRemoteDataSource(ApiClient.create<MessagesApi>(BuildConfig.BASE_URL, backendClient)),
+        currentUserId = { sessionManager.validSession()?.userId },
     )
 
     val meetingProposalRepository = MeetingProposalRepository(

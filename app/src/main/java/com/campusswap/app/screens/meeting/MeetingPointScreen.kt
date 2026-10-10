@@ -123,7 +123,6 @@ fun MeetingPointScreen(
     var selectedSlotId by remember { mutableStateOf(existing?.slot?.id) }
     val slotOptions = state.slots.take(4)
     val selectedSlot = slotOptions.firstOrNull { it.id == selectedSlotId } ?: slotOptions.firstOrNull()
-    var sending by remember { mutableStateOf(false) }
     var proposalError by remember { mutableStateOf<String?>(null) }
     var showAlternatives by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -155,14 +154,17 @@ fun MeetingPointScreen(
                         onClick = {
                             val point = selected?.point ?: return@Button
                             val slot = selectedSlot ?: return@Button
-                            sending = true
                             proposalError = null
-                            vm.proposeMeeting(container.meetingProposalRepository, product, point, slot) { error ->
-                                sending = false
-                                if (error == null) onProposed() else proposalError = error
+                            guardian.propose(point, slot) { proposal, error ->
+                                if (proposal != null) {
+                                    vm.cacheProposal(product.id, proposal)
+                                    onProposed()
+                                } else {
+                                    proposalError = error
+                                }
                             }
                         },
-                        enabled = selected != null && selectedSlot != null && !sending,
+                        enabled = selected != null && selectedSlot != null && !state.isProposing,
                         modifier = Modifier.weight(1f).height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                     ) {

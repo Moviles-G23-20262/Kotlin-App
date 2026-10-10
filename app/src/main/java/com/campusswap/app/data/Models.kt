@@ -84,6 +84,8 @@ data class ChatMessage(
     val status: MessageStatus = MessageStatus.READ,
     /** Attached meeting proposal, rendered as a system card inside the thread. */
     val proposal: MeetingProposal? = null,
+    /** Server timestamp, used to measure the time to agree on a meeting point (BQ4). */
+    val sentAt: java.time.Instant? = null,
 )
 
 // ---- Dynamic safe meeting points (View 10, "Campus Guardian" CAS) ----

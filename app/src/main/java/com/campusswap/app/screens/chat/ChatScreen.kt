@@ -38,6 +38,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -48,6 +49,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +67,7 @@ import com.campusswap.app.components.EmptyState
 import com.campusswap.app.components.ProductPlaceholderImage
 import com.campusswap.app.components.VerifiedBadge
 import com.campusswap.app.components.formatPrice
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.data.AppViewModel
 import com.campusswap.app.data.ChatMessage
 import com.campusswap.app.data.MeetingProposal
@@ -76,7 +79,6 @@ import com.campusswap.app.ui.theme.AccentBlue
 import com.campusswap.app.ui.theme.JetBrainsMonoFamily
 import com.campusswap.app.ui.theme.SecondaryBlue
 import com.campusswap.app.ui.theme.SuccessGreen
-import kotlinx.coroutines.delay
 
 /**
  * View 09 — Buyer-Seller In-App Chat.
@@ -105,17 +107,12 @@ fun ChatScreen(
         return
     }
 
-    val messages = vm.threadFor(product)
-    val proposal = vm.meetingProposals[product.id]
-    val proposals = (LocalContext.current.applicationContext as CampusSwapApplication).container.meetingProposalRepository
-    var responseError by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(product.id) {
-        while (true) {
-            vm.refreshProposal(proposals, product)
-            delay(PROPOSAL_POLL_MS)
-        }
-    }
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    val chat: ChatViewModel = viewModel(
+        factory = ChatViewModel.factory(container, product.id) { id, proposal -> vm.cacheProposal(id, proposal) },
+    )
+    val state by chat.state.collectAsState()
+    val messages = state.messages
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -169,7 +166,7 @@ fun ChatScreen(
             Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface, modifier = Modifier.imePadding()) {
                 Column {
                     // The change can be closed once a meeting is agreed (Views 9/10) or once the item was paid for at checkout and is still waiting to be finish (View 12)
-                    if (proposal?.status == ProposalStatus.ACCEPTED || vm.hasPendingExchange(product.id)) {
+                    if (state.proposal?.status == ProposalStatus.ACCEPTED || vm.hasPendingExchange(product.id)) {
                         Surface(
                             onClick = onCompleteExchange,
                             color = AccentBlue.copy(alpha = 0.12f),
@@ -197,7 +194,7 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         ProposeMeetingChip(
-                            proposal = proposal,
+                            proposal = state.proposal,
                             onClick = onProposeMeeting,
                             modifier = Modifier.weight(1f),
                         )
@@ -223,10 +220,10 @@ fun ChatScreen(
                                 unfocusedBorderColor = SecondaryBlue.copy(alpha = 0.5f),
                             ),
                         )
-                        val canSend = draft.isNotBlank()
+                        val canSend = draft.isNotBlank() && state.canSend
                         IconButton(
                             onClick = {
-                                vm.sendMessage(product, draft)
+                                chat.send(draft)
                                 draft = ""
                             },
                             enabled = canSend,
@@ -244,7 +241,29 @@ fun ChatScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             TransactionHeader(product = product, onViewListing = { onViewListing(product.id) })
-            LazyColumn(
+            when (state.availability) {
+                ChatAvailability.LOADING -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AccentBlue)
+                }
+                ChatAvailability.NOT_SYNCED -> Box(Modifier.weight(1f)) {
+                    EmptyState(
+                        icon = Icons.Outlined.Person,
+                        title = "Chat unavailable",
+                        message = "This listing is sample data and is not on the server yet, so no conversation can be opened.",
+                        actionLabel = "Go back",
+                        onAction = onBack,
+                    )
+                }
+                ChatAvailability.OFFLINE -> Box(Modifier.weight(1f)) {
+                    EmptyState(
+                        icon = Icons.Outlined.Person,
+                        title = "No connection",
+                        message = "We couldn't load this conversation. Check your connection and try again.",
+                        actionLabel = "Go back",
+                        onAction = onBack,
+                    )
+                }
+                ChatAvailability.READY -> LazyColumn(
                 state = listState,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
@@ -258,16 +277,14 @@ fun ChatScreen(
                             canRespond = message.proposal.status == ProposalStatus.PENDING &&
                                 message.proposal.proposerId != null &&
                                 message.proposal.proposerId != vm.currentUserId,
-                            error = responseError,
+                            error = state.error,
                             onChange = onProposeMeeting,
-                            onRespond = { accept ->
-                                responseError = null
-                                vm.respondToProposal(proposals, product, accept) { responseError = it }
-                            },
+                            onRespond = { accept -> chat.respondToProposal(accept) },
                         )
                         message.author == MessageAuthor.SYSTEM -> SystemNotice(message.text)
                         else -> MessageBubble(message)
                     }
+                }
                 }
             }
         }
@@ -508,4 +525,3 @@ private fun ProposeMeetingChip(proposal: MeetingProposal?, onClick: () -> Unit, 
     }
 }
 
-private const val PROPOSAL_POLL_MS = 5_000L
