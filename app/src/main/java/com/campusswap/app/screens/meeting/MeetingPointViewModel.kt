@@ -5,7 +5,11 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.campusswap.app.AppContainer
+import com.campusswap.app.analytics.Analytics
+import com.campusswap.app.analytics.Events
 import com.campusswap.app.data.MeetingPoint
+import com.campusswap.app.data.MeetingProposal
+import com.campusswap.app.data.ProposalResult
 import com.campusswap.app.data.MeetingPointPopularityRepository
 import com.campusswap.app.data.MeetingProposalRepository
 import com.campusswap.app.data.MeetingPointRepository
@@ -36,7 +40,7 @@ enum class MyLocationStatus { LOCATING, FOUND, PERMISSION_NEEDED, OFF_CAMPUS, UN
 data class RankedPoint(
     val point: MeetingPoint,
     val walkMinutesMe: Int?,
-    val walkMinutesOther: Int,
+    val walkMinutesOther: Int?,
     val map: MapPosition,
     val isPopular: Boolean = false,
 )
@@ -49,8 +53,10 @@ data class MeetingPointUiState(
     val myLocation: MyLocationStatus = MyLocationStatus.LOCATING,
     val myMapPosition: MapPosition? = null,
     val otherMapPosition: MapPosition? = null,
+    val knowsCounterpart: Boolean = false,
     val isLive: Boolean = true,
     val slots: List<TimeSlot> = emptyList(),
+    val isProposing: Boolean = false,
 ) {
     val recommended: RankedPoint? get() = ranked.firstOrNull()
 }
@@ -94,6 +100,25 @@ class MeetingPointViewModel(
         }
     }
 
+    fun propose(point: MeetingPoint, slot: TimeSlot, onResult: (MeetingProposal?, String?) -> Unit) {
+        if (_state.value.isProposing) return
+        _state.update { it.copy(isProposing = true) }
+        viewModelScope.launch {
+            val result = proposals.propose(productId, point, slot)
+            _state.update { it.copy(isProposing = false) }
+            when (result) {
+                is ProposalResult.Success -> {
+                    Analytics.log(Events.MEETING_PROPOSED, "product_id" to productId)
+                    onResult(result.proposal, null)
+                }
+                ProposalResult.Offline -> onResult(null, "No connection. Your proposal wasn't sent.")
+                ProposalResult.NotSynced ->
+                    onResult(null, "This listing or meeting point isn't on the server, so the proposal can't be sent.")
+                is ProposalResult.Rejected -> onResult(null, result.message ?: "The server couldn't save the proposal.")
+            }
+        }
+    }
+
     private fun showSlots(freeSlots: List<TimeSlot>) {
         slots = freeSlots
         _state.update { it.copy(slots = freeSlots) }
@@ -124,13 +149,13 @@ class MeetingPointViewModel(
         strategy: MeetingPointRankingStrategy,
         now: LocalTime,
         me: GeoPoint?,
-        other: GeoPoint,
+        other: GeoPoint?,
         status: MyLocationStatus,
     ) {
         val located = points.points.filter { it.location != null }
         val byId = located.associateBy { it.id }
         val ranked = strategy.rank(located.map { ZoneCandidate(it.id, it.isMonitored, it.location!!) }, me, other)
-        val projection = CampusMapProjection(located.mapNotNull { it.location } + listOfNotNull(me, other))
+        val projection = CampusMapProjection()
 
         _state.value = MeetingPointUiState(
             isLoading = false,
@@ -142,9 +167,11 @@ class MeetingPointViewModel(
             },
             myLocation = status,
             myMapPosition = me?.let(projection::project),
-            otherMapPosition = projection.project(other),
+            otherMapPosition = other?.let(projection::project),
+            knowsCounterpart = other != null,
             isLive = points.isLive,
             slots = slots,
+            isProposing = _state.value.isProposing,
         )
     }
 

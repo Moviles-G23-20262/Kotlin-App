@@ -13,6 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,6 +35,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Shield
@@ -38,7 +44,9 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -48,13 +56,16 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
@@ -62,10 +73,14 @@ import androidx.compose.ui.unit.dp
 import com.campusswap.app.CampusSwapApplication
 import com.campusswap.app.components.ConditionBadge
 import com.campusswap.app.components.EmptyState
+import com.campusswap.app.components.RemoteImage
+import com.campusswap.app.components.plainClickable
 import com.campusswap.app.components.ProductPlaceholderImage
 import com.campusswap.app.components.VerifiedBadge
 import com.campusswap.app.components.formatPrice
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.data.AppViewModel
+import java.io.File
 import com.campusswap.app.data.ChatMessage
 import com.campusswap.app.data.MeetingProposal
 import com.campusswap.app.data.MessageAuthor
@@ -79,7 +94,6 @@ import com.campusswap.app.ui.theme.AccentBlue
 import com.campusswap.app.ui.theme.JetBrainsMonoFamily
 import com.campusswap.app.ui.theme.SecondaryBlue
 import com.campusswap.app.ui.theme.SuccessGreen
-import kotlinx.coroutines.delay
 
 /**
  * View 09 — Buyer-Seller In-App Chat.
@@ -108,22 +122,48 @@ fun ChatScreen(
         return
     }
 
-    val messages = vm.threadFor(product)
-    val proposal = vm.meetingProposals[product.id]
-    val proposals = (LocalContext.current.applicationContext as CampusSwapApplication).container.meetingProposalRepository
-    var responseError by remember { mutableStateOf<String?>(null) }
+    val context = LocalContext.current
+    val container = (context.applicationContext as CampusSwapApplication).container
+    val chat: ChatViewModel = viewModel(
+        factory = ChatViewModel.factory(container, product.id, isOnline = { vm.isOnline }) { id, proposal ->
+            vm.cacheProposal(id, proposal)
+        },
+    )
+    val state by chat.state.collectAsState()
+    val messages = state.messages
+    val counterpart = state.counterpartName ?: product.seller.name
 
-    LaunchedEffect(product.id) {
-        while (true) {
-            vm.refreshProposal(proposals, product)
-            delay(PROPOSAL_POLL_MS)
-        }
+    var showPhotoOptions by remember { mutableStateOf(false) }
+    var cameraTarget by remember { mutableStateOf<Uri?>(null) }
+
+    fun sendFrom(uri: Uri) {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+        chat.sendPhoto(bytes, context.contentResolver.getType(uri) ?: "image/jpeg")
+    }
+
+    val pickFromGallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let(::sendFrom)
+    }
+    val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
+        if (taken) cameraTarget?.let(::sendFrom)
     }
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
+    if (showPhotoOptions) {
+        ModalBottomSheet(onDismissRequest = { showPhotoOptions = false }) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
+                PhotoOption(Icons.Outlined.PhotoCamera, "Take a photo") {
+                    showPhotoOptions = false
+                    cameraTarget = newPhotoUri(context)
+                    cameraTarget?.let(takePhoto::launch)
+                }
+                PhotoOption(Icons.Outlined.AddPhotoAlternate, "Choose from gallery") {
+                    showPhotoOptions = false
+                    pickFromGallery.launch("image/*")
+                }
+            }
+        }
     }
 
     Scaffold(
@@ -145,7 +185,7 @@ fun ChatScreen(
                         }
                         Column(modifier = Modifier.padding(start = 10.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(product.seller.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(counterpart, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 if (product.seller.isVerified) {
                                     Box(modifier = Modifier.size(16.dp)) { VerifiedBadge(compact = true) }
                                 }
@@ -172,7 +212,7 @@ fun ChatScreen(
             Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface, modifier = Modifier.imePadding()) {
                 Column {
                     // The change can be closed once a meeting is agreed (Views 9/10) or once the item was paid for at checkout and is still waiting to be finish (View 12)
-                    if (proposal?.status == ProposalStatus.ACCEPTED || vm.hasPendingExchange(product.id)) {
+                    if (state.proposal?.status == ProposalStatus.ACCEPTED || vm.hasPendingExchange(product.id)) {
                         Surface(
                             onClick = onCompleteExchange,
                             color = AccentBlue.copy(alpha = 0.12f),
@@ -205,7 +245,7 @@ fun ChatScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         ProposeMeetingChip(
-                            proposal = proposal,
+                            proposal = state.proposal,
                             onClick = onProposeMeeting,
                             modifier = Modifier.weight(1f),
                         )
@@ -216,14 +256,21 @@ fun ChatScreen(
                         modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, bottom = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = {}) {
-                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Share a photo securely", tint = AccentBlue)
+                        IconButton(
+                            onClick = { showPhotoOptions = true },
+                            enabled = state.availability == ChatAvailability.READY && !state.isUploadingPhoto,
+                        ) {
+                            if (state.isUploadingPhoto) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = AccentBlue)
+                            } else {
+                                Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Share a photo securely", tint = AccentBlue)
+                            }
                         }
                         OutlinedTextField(
                             value = draft,
                             onValueChange = { draft = InputValidation.sanitizeText(it, InputLimits.MESSAGE_MAX) },
                             modifier = Modifier.weight(1f),
-                            placeholder = { Text("Message ${product.seller.name.substringBefore(' ')}…") },
+                            placeholder = { Text("Message ${counterpart.substringBefore(' ')}…") },
                             maxLines = 4,
                             shape = RoundedCornerShape(24.dp),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -231,10 +278,10 @@ fun ChatScreen(
                                 unfocusedBorderColor = SecondaryBlue.copy(alpha = 0.5f),
                             ),
                         )
-                        val canSend = draft.isNotBlank()
+                        val canSend = draft.isNotBlank() && state.canSend
                         IconButton(
                             onClick = {
-                                vm.sendMessage(product, draft)
+                                chat.send(draft)
                                 draft = ""
                             },
                             enabled = canSend,
@@ -252,30 +299,53 @@ fun ChatScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             TransactionHeader(product = product, onViewListing = { onViewListing(product.id) })
-            LazyColumn(
+            when (state.availability) {
+                ChatAvailability.LOADING -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = AccentBlue)
+                }
+                ChatAvailability.NOT_SYNCED -> Box(Modifier.weight(1f)) {
+                    EmptyState(
+                        icon = Icons.Outlined.Person,
+                        title = "Chat unavailable",
+                        message = "This listing is sample data and is not on the server yet, so no conversation can be opened.",
+                        actionLabel = "Go back",
+                        onAction = onBack,
+                    )
+                }
+                ChatAvailability.OFFLINE -> Box(Modifier.weight(1f)) {
+                    EmptyState(
+                        icon = Icons.Outlined.Person,
+                        title = "No connection",
+                        message = "We couldn't load this conversation. Check your connection and try again.",
+                        actionLabel = "Go back",
+                        onAction = onBack,
+                    )
+                }
+                // Newest first and reversed, so the thread stays pinned to the latest message
+                // and the keyboard pushes it up instead of covering it.
+                ChatAvailability.READY -> LazyColumn(
                 state = listState,
+                reverseLayout = true,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                item { DayDivider("Today") }
-                items(messages, key = { it.id }) { message ->
+                items(messages.asReversed(), key = { it.id }) { message ->
                     when {
                         message.proposal != null -> ProposalCard(
                             proposal = message.proposal,
                             canRespond = message.proposal.status == ProposalStatus.PENDING &&
                                 message.proposal.proposerId != null &&
                                 message.proposal.proposerId != vm.currentUserId,
-                            error = responseError,
+                            error = state.error,
                             onChange = onProposeMeeting,
-                            onRespond = { accept ->
-                                responseError = null
-                                vm.respondToProposal(proposals, product, accept) { responseError = it }
-                            },
+                            onRespond = { accept -> chat.respondToProposal(accept) },
                         )
                         message.author == MessageAuthor.SYSTEM -> SystemNotice(message.text)
                         else -> MessageBubble(message)
                     }
+                }
+                item { DayDivider("Today") }
                 }
             }
         }
@@ -376,7 +446,18 @@ private fun MessageBubble(message: ChatMessage) {
             modifier = Modifier.widthIn(max = 290.dp),
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
-                Text(message.text, style = MaterialTheme.typography.bodyMedium)
+                if (message.imageUrl != null) {
+                    RemoteImage(
+                        url = message.imageUrl,
+                        contentDescription = "Photo shared in the chat",
+                        modifier = Modifier
+                            .padding(top = 2.dp, bottom = 4.dp)
+                            .size(width = 220.dp, height = 165.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                    )
+                } else {
+                    Text(message.text, style = MaterialTheme.typography.bodyMedium)
+                }
                 Row(
                     modifier = Modifier.align(Alignment.End).padding(top = 3.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -518,4 +599,20 @@ private fun ProposeMeetingChip(proposal: MeetingProposal?, onClick: () -> Unit, 
     }
 }
 
-private const val PROPOSAL_POLL_MS = 5_000L
+@Composable
+private fun PhotoOption(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().plainClickable(onClick).padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = AccentBlue)
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+private fun newPhotoUri(context: Context): Uri {
+    val folder = File(context.cacheDir, "photos").apply { mkdirs() }
+    val file = File(folder, "chat-${System.currentTimeMillis()}.jpg")
+    return FileProvider.getUriForFile(context, "${context.packageName}.photos", file)
+}

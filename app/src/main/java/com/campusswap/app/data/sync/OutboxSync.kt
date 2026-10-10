@@ -2,7 +2,8 @@ package com.campusswap.app.data.sync
 
 import com.campusswap.app.data.Category
 import com.campusswap.app.data.Condition
-import com.campusswap.app.data.chat.ChatRemoteDataSource
+import com.campusswap.app.data.ChatRoomRepository
+import com.campusswap.app.data.remote.MessageRemoteDataSource
 import com.campusswap.app.data.materials.toServerCategory
 import com.campusswap.app.data.materials.toServerCondition
 import com.campusswap.app.data.local.OutboxDao
@@ -24,7 +25,8 @@ enum class SyncOutcome { DONE, RETRY_LATER }
 class OutboxSync(
     private val outbox: OutboxDao,
     private val materials: MaterialRemoteDataSource,
-    private val chat: ChatRemoteDataSource,
+    private val rooms: ChatRoomRepository,
+    private val messages: MessageRemoteDataSource,
 ) {
     private sealed interface Attempt {
         data object Sent : Attempt
@@ -44,12 +46,10 @@ class OutboxSync(
             }
         }
 
-        // One room per listing; opening it is idempotent on the server, so remembering it only saves calls.
-        val rooms = mutableMapOf<String, String>()
         for (message in outbox.messagesToSend(ownerId)) {
             val result = attempt {
-                val roomId = rooms.getOrPut(message.materialId) { chat.openRoom(message.materialId) }
-                chat.send(roomId, message.content)
+                val roomId = rooms.roomFor(message.materialId) ?: error("Listing ${message.materialId} is not on the server")
+                messages.send(roomId, message.content)
             }
             when (result) {
                 Attempt.Sent -> outbox.deleteMessage(message.localId)

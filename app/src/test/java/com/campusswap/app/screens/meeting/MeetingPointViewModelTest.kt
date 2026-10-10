@@ -1,5 +1,7 @@
 package com.campusswap.app.screens.meeting
 
+import com.campusswap.app.data.ChatRoomRepository
+import com.campusswap.app.data.FakeChatRoomRemoteDataSource
 import com.campusswap.app.data.FakeMeetingPointRemoteDataSource
 import com.campusswap.app.data.FakeMeetingProposalRemoteDataSource
 import com.campusswap.app.data.FakePopularityRemoteDataSource
@@ -77,7 +79,7 @@ class MeetingPointViewModelTest {
         strategies = TimeOfDayStrategySelector(),
         clock = clockAt(hour),
         popularity = MeetingPointPopularityRepository(popularityRemote),
-        proposals = MeetingProposalRepository(proposalRemote),
+        proposals = MeetingProposalRepository(ChatRoomRepository(FakeChatRoomRemoteDataSource()), proposalRemote),
     )
 
     @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())

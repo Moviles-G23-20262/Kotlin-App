@@ -44,4 +44,16 @@ class BackendEventMapperTest {
         assertNull(BackendEventMapper.toRequest(event(Events.SCREEN_VIEW)))
         assertNull(BackendEventMapper.toRequest(event(Events.APP_START)))
     }
+
+    @Test fun contactingTheSellerReachesTheBackendForTheBuyerJourney() {
+        val request = BackendEventMapper.toRequest(event(Events.CONTACT_SELLER, "product_id" to "p2"))!!
+
+        assertEquals("CONTACT_SELLER", request.eventType)
+        assertEquals("b0000000-0000-4000-8000-000000000002", request.materialId)
+    }
+
+    @Test fun meetingEventsStayOnTheDeviceUntilTheBackendAcceptsThem() {
+        assertNull(BackendEventMapper.toRequest(event(Events.MEETING_PROPOSED, "product_id" to "p1")))
+        assertNull(BackendEventMapper.toRequest(event(Events.MEETING_CONFIRMED, "product_id" to "p1")))
+    }
 }

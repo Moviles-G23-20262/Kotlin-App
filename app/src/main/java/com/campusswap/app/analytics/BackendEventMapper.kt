@@ -26,6 +26,7 @@ object BackendEventMapper {
 
     private fun backendType(event: AnalyticsEvent): String? = when (event.name) {
         Events.LISTING_OPENED -> "LISTING_VIEW"
+        Events.CONTACT_SELLER -> "CONTACT_SELLER"
         Events.SEARCH_PERFORMED -> "SEARCH"
         Events.WISHLIST_TOGGLED -> if (event.properties["added"] == true) "WISHLIST_ADD" else "WISHLIST_REMOVE"
         Events.MATCH_NOTIFIED -> "NOTIFICATION_SENT"

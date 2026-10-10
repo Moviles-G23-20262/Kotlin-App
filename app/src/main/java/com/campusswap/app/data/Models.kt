@@ -90,6 +90,21 @@ data class ChatMessage(
     val status: MessageStatus = MessageStatus.READ,
     /** Attached meeting proposal, rendered as a system card inside the thread. */
     val proposal: MeetingProposal? = null,
+    /** Server timestamp, used to measure the time to agree on a meeting point (BQ4). */
+    val sentAt: java.time.Instant? = null,
+    val imageUrl: String? = null,
+)
+
+/** A thread in the inbox, from either side: the student may be the buyer or the seller. */
+data class Conversation(
+    val productId: String,
+    val productTitle: String,
+    val counterpartName: String,
+    val lastMessage: String?,
+    val lastMessageAt: java.time.Instant?,
+    val time: String,
+    val unread: Int,
+    val sellingThis: Boolean,
 )
 
 // ---- Dynamic safe meeting points (View 10, "Campus Guardian" CAS) ----

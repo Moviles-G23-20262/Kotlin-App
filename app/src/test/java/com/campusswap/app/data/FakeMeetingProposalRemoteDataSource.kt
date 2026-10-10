@@ -9,17 +9,10 @@ class FakeMeetingProposalRemoteDataSource : MeetingProposalRemoteDataSource {
     var suggestions = SlotSuggestionsDto(emptyList(), null)
     var proposals = mutableListOf<MeetingProposalDto>()
     var failure: Exception? = null
-    val openedMaterials = mutableListOf<String>()
     val created = mutableListOf<CreateMeetingProposalRequest>()
     val responses = mutableListOf<Pair<String, Boolean>>()
 
     private fun check() = failure?.let { throw it }
-
-    override suspend fun openChatRoom(materialId: String): String {
-        check()
-        openedMaterials += materialId
-        return "room-1"
-    }
 
     override suspend fun suggestions(chatRoomId: String): SlotSuggestionsDto {
         check()

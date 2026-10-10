@@ -223,7 +223,6 @@ object SampleData {
     private val marioLasernaLocation: GeoPoint? = GeoPoint(4.602725, -74.064696)
     private val plazoletaLlerasLocation: GeoPoint? = GeoPoint(4.601859, -74.065176)
 
-    val simulatedCounterpartLocation = GeoPoint(4.604180, -74.065956)
 
     // Pre-mapped, public, monitored campus zones used by the Campus Guardian CAS (PAS 6 / PAS 10).
     // Walk times are relative to the two parties' last known campus micro-location.
@@ -233,33 +232,6 @@ object SampleData {
         MeetingPoint("mp3", "Mario Laserna lobby", "Ground floor, engineering building", MeetingZoneType.BUILDING_LOBBY, isMonitored = true, walkMinutesMe = 2, walkMinutesOther = 9, mapX = 0.33f, mapY = 0.27f, location = marioLasernaLocation),
         MeetingPoint("mp4", "Plazoleta Lleras", "Open area in front of Lleras building", MeetingZoneType.PLAZA, isMonitored = false, walkMinutesMe = 6, walkMinutesOther = 6, mapX = 0.40f, mapY = 0.78f, location = plazoletaLlerasLocation),
     )
-
-    // Shared free hours are computed from both parties' class schedules; other slots are plain suggestions.
-    val timeSlots = listOf(
-        TimeSlot("t1", "10:00 – 11:00", "Wed 16 Sep", isSharedBreak = true),
-        TimeSlot("t2", "13:00 – 14:00", "Wed 16 Sep", isSharedBreak = false),
-        TimeSlot("t3", "09:00 – 10:00", "Thu 17 Sep", isSharedBreak = true),
-        TimeSlot("t4", "15:30 – 16:30", "Thu 17 Sep", isSharedBreak = false),
-    )
-
-    /** Seed conversation shown when a buyer opens a chat for the first time. */
-    fun initialThread(product: Product): List<ChatMessage> = listOf(
-        ChatMessage("c1", MessageAuthor.SYSTEM, "Chat started about \"${product.title}\". Your phone number is never shared.", "10:31"),
-        ChatMessage("c2", MessageAuthor.ME, "Hi ${product.seller.name.substringBefore(' ')}! Is this still available?", "10:32"),
-        ChatMessage("c3", MessageAuthor.OTHER, "Hey! Yes it is. It's in the condition shown in the photos, I only used it one semester.", "10:34"),
-        ChatMessage("c4", MessageAuthor.ME, "Great. Could you do ${formatShortPrice(product.price * 0.9)}? I can pick it up on campus this week.", "10:36"),
-        ChatMessage("c5", MessageAuthor.OTHER, "Sure, that works for me. Let's agree on a spot and a time.", "10:38"),
-    )
-
-    val cannedReplies = listOf(
-        "Sounds good!",
-        "Perfect, see you there.",
-        "Yes, I'll bring it in its original case.",
-        "Let me check my schedule and confirm.",
-    )
-
-    private fun formatShortPrice(amount: Double): String =
-        "$" + java.text.NumberFormat.getNumberInstance(java.util.Locale("es", "CO")).format(Math.round(amount / 1000.0) * 1000)
 
     fun productById(id: String): Product? = products.find { it.id == id }
 }

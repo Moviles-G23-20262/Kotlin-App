@@ -134,3 +134,13 @@ val LightCampusColors = CampusColors(
 )
 
 val LocalCampusColors = staticCompositionLocalOf { DarkCampusColors }
+
+// Campus map layers, drawn from the bundled OpenStreetMap extract.
+val CampusLand = Color(0xFF14161C)
+val CampusGreen = Color(0xFF1B3A2A)
+val CampusWater = Color(0xFF15304A)
+val CampusPath = Color(0xFF3A4152)
+val CampusRoadLine = Color(0xFF4A5366)
+val CampusBuildingFill = Color(0xFF242A36)
+val CampusBuildingEdge = Color(0xFF39414F)
+val CampusBlockLabel = Color(0xFF93A0B5)

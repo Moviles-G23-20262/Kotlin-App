@@ -7,9 +7,6 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface MeetingProposalApi {
-    @POST("chatrooms")
-    suspend fun openChatRoom(@Body body: OpenChatRoomRequest): ChatRoomDto
-
     @GET("meeting-proposals/suggestions")
     suspend fun suggestions(@Query("chatRoomId") chatRoomId: String): SlotSuggestionsDto
 
@@ -22,10 +19,6 @@ interface MeetingProposalApi {
     @POST("meeting-proposals/{id}/{action}")
     suspend fun respond(@Path("id") id: String, @Path("action") action: String): MeetingProposalDto
 }
-
-data class OpenChatRoomRequest(val materialId: String)
-
-data class ChatRoomDto(val id: String)
 
 data class FreeSlotDto(val startsAt: String, val endsAt: String, val sharedBreak: Boolean)
 
@@ -49,7 +42,6 @@ data class MeetingProposalDto(
 )
 
 interface MeetingProposalRemoteDataSource {
-    suspend fun openChatRoom(materialId: String): String
     suspend fun suggestions(chatRoomId: String): SlotSuggestionsDto
     suspend fun proposals(chatRoomId: String): List<MeetingProposalDto>
     suspend fun propose(request: CreateMeetingProposalRequest): MeetingProposalDto
@@ -57,7 +49,6 @@ interface MeetingProposalRemoteDataSource {
 }
 
 class RetrofitMeetingProposalRemoteDataSource(private val api: MeetingProposalApi) : MeetingProposalRemoteDataSource {
-    override suspend fun openChatRoom(materialId: String) = api.openChatRoom(OpenChatRoomRequest(materialId)).id
     override suspend fun suggestions(chatRoomId: String) = api.suggestions(chatRoomId)
     override suspend fun proposals(chatRoomId: String) = api.proposals(chatRoomId)
     override suspend fun propose(request: CreateMeetingProposalRequest) = api.propose(request)
