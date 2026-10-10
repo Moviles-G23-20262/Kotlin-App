@@ -71,6 +71,7 @@ fun ProductCard(
             }
             Badge(product.condition.label, modifier = Modifier.padding(bottom = 6.dp))
             PriceText(product.price)
+            product.pendingSync?.let { PendingSyncLabel(it, modifier = Modifier.padding(top = 6.dp)) }
         }
     }
 }

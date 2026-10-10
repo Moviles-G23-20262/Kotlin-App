@@ -5,6 +5,7 @@ import com.campusswap.app.data.Condition
 import com.campusswap.app.data.Course
 import com.campusswap.app.data.Product
 import com.campusswap.app.data.Seller
+import com.campusswap.app.data.local.CachedMaterialEntity
 import kotlin.math.abs
 
 fun MaterialDto.toProduct(): Product = Product(
@@ -45,3 +46,42 @@ private fun maskEmail(email: String): String {
     val (user, domain) = email.split("@", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
     return "${user.take(2)}***@$domain"
 }
+fun MaterialDto.toCachedEntity(position: Int, cachedAtMillis: Long) = CachedMaterialEntity(
+    id = id,
+    title = title,
+    description = description,
+    courseCode = courseCode,
+    price = price,
+    condition = condition,
+    status = status,
+    category = category,
+    sellerId = sellerId,
+    sellerName = seller?.fullName,
+    sellerEmail = seller?.email,
+    sellerRating = seller?.rating,
+    position = position,
+    cachedAtMillis = cachedAtMillis,
+)
+
+fun CachedMaterialEntity.toDto() = MaterialDto(
+    id = id,
+    title = title,
+    description = description,
+    courseCode = courseCode,
+    price = price,
+    condition = condition,
+    status = status,
+    category = category,
+    sellerId = sellerId,
+    seller = if (sellerName != null && sellerEmail != null) MaterialSellerDto(sellerId, sellerEmail, sellerName, sellerRating) else null,
+)
+
+/** Server enums for a listing written in the app. */
+fun Category.toServerCategory(): String = when (this) {
+    Category.TEXTBOOKS, Category.NOTES -> "BOOKS"
+    Category.CALCULATORS -> "CALCULATORS"
+    Category.LAB_SUPPLIES -> "LAB_EQUIPMENT"
+    else -> "OTHER"
+}
+
+fun Condition.toServerCondition(): String = name

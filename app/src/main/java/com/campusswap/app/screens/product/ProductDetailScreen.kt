@@ -46,6 +46,7 @@ import com.campusswap.app.components.EmptyState
 import com.campusswap.app.components.HeadingText
 import com.campusswap.app.components.InitialsAvatar
 import com.campusswap.app.components.PriceText
+import com.campusswap.app.components.PendingSyncLabel
 import com.campusswap.app.components.PrimaryButton
 import com.campusswap.app.components.ProductPlaceholderImage
 import com.campusswap.app.components.RatingLabel
@@ -73,7 +74,8 @@ fun ProductDetailScreen(
     onCompleteExchange: (String) -> Unit,
 ) {
     val c = CampusSwapTheme.colors
-    val product = remember(productId, vm.allProducts.size) { vm.allProducts.find { it.id == productId } }
+    // Not remembered by list size: a queued listing changes state (queued → refused) without the list growing.
+    val product = vm.allProducts.find { it.id == productId }
 
     if (product == null) {
         Box(Modifier.fillMaxSize().background(c.bg), contentAlignment = Alignment.Center) {
@@ -180,6 +182,23 @@ fun ProductDetailScreen(
                     product.rating?.let { "${formatRating(it)} (${product.reviewCount} reviews)" } ?: "No reviews yet",
                     size = CampusType.sizeXs,
                 )
+            }
+
+            product.pendingSync?.let { sync ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    PendingSyncLabel(sync, modifier = Modifier.weight(1f))
+                    if (sync.failedReason != null) {
+                        BodyText(
+                            "Discard",
+                            color = c.error,
+                            weight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(start = 12.dp).plainClickable { vm.discardPendingListing(product); onBack() },
+                        )
+                    }
+                }
             }
 
             SellerCard(product = product, onChat = { onChatWithSeller(product.id) })

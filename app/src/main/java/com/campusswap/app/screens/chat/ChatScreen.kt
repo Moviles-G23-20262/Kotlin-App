@@ -70,6 +70,9 @@ import com.campusswap.app.data.ChatMessage
 import com.campusswap.app.data.MeetingProposal
 import com.campusswap.app.data.MessageAuthor
 import com.campusswap.app.data.MessageStatus
+import com.campusswap.app.components.OfflineBanner
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.material.icons.outlined.ErrorOutline
 import com.campusswap.app.data.Product
 import com.campusswap.app.data.ProposalStatus
 import com.campusswap.app.ui.theme.AccentBlue
@@ -191,6 +194,11 @@ fun ChatScreen(
                             }
                         }
                     }
+                    OfflineBanner(
+                        visible = !vm.isOnline,
+                        message = "You're offline. Messages will be sent when you reconnect.",
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp),
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -386,14 +394,16 @@ private fun MessageBubble(message: ChatMessage) {
     }
 }
 
-/** Delivery status: clock (sending) → single tick (sent) → double tick (delivered) → light double tick (read). */
+/** Delivery status: cloud (queued offline) → clock (sending) → single tick (sent) → double tick (delivered) → light double tick (read). */
 @Composable
 private fun StatusTicks(status: MessageStatus) {
     val (icon, tint, label) = when (status) {
+        MessageStatus.QUEUED -> Triple(Icons.Outlined.CloudOff, Color.White.copy(alpha = 0.6f), "Waiting for connection")
         MessageStatus.SENDING -> Triple(Icons.Outlined.Schedule, Color.White.copy(alpha = 0.6f), "Sending")
         MessageStatus.SENT -> Triple(Icons.Filled.Check, Color.White.copy(alpha = 0.75f), "Sent")
         MessageStatus.DELIVERED -> Triple(Icons.Filled.DoneAll, Color.White.copy(alpha = 0.75f), "Delivered")
         MessageStatus.READ -> Triple(Icons.Filled.DoneAll, Color(0xFFB9F6CA), "Read")
+        MessageStatus.FAILED -> Triple(Icons.Outlined.ErrorOutline, Color(0xFFFFCDD2), "Not sent")
     }
     Icon(icon, contentDescription = label, tint = tint, modifier = Modifier.size(14.dp))
 }

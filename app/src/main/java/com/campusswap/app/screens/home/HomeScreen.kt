@@ -1,5 +1,7 @@
 package com.campusswap.app.screens.home
 
+import com.campusswap.app.components.OfflineBanner
+import com.campusswap.app.components.timeAgo
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -70,11 +72,13 @@ fun HomeScreen(
     val c = CampusSwapTheme.colors
     var selectedCategory by rememberSaveable { mutableStateOf(Category.ALL) }
 
-    val offers: List<Product> = remember(selectedCategory, vm.allProducts.size) {
+    // Keyed on the list itself: a queued listing being replaced by the published one keeps the same size.
+    val products = vm.allProducts.toList()
+    val offers: List<Product> = remember(selectedCategory, products) {
         val list = if (selectedCategory == Category.ALL) vm.allProducts.toList() else vm.allProducts.filter { it.category == selectedCategory }
         list.take(4)
     }
-    val recommended: List<Product> = remember(vm.allProducts.size) {
+    val recommended: List<Product> = remember(products) {
         vm.allProducts.filter { it.seller.id != vm.currentUser.id }.drop(1).take(3)
     }
 
@@ -86,6 +90,12 @@ fun HomeScreen(
             onSearchClick = onSearchClick,
             onNotificationsClick = onNotificationsClick,
             onWishlistClick = onWishlistClick,
+        )
+
+        OfflineBanner(
+            visible = !vm.isOnline || !vm.materialsLive,
+            message = offlineFeedMessage(vm.isOnline, vm.materialsUpdatedAtMillis),
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
         )
 
         LazyColumn(
@@ -364,5 +374,14 @@ private fun HomeHeader(
             }
         }
         FakeSearchField(placeholder = "Search course materials...", onClick = onSearchClick)
+    }
+}
+
+private fun offlineFeedMessage(isOnline: Boolean, updatedAtMillis: Long?): String {
+    val head = if (isOnline) "Can't reach CampusSwap" else "You're offline"
+    return if (updatedAtMillis != null) {
+        "$head. Showing listings saved ${timeAgo(updatedAtMillis)}."
+    } else {
+        "$head. Showing the listings saved on this phone."
     }
 }

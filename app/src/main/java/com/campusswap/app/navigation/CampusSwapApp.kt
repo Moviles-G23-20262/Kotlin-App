@@ -76,8 +76,22 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
         }
     }
 
+    LaunchedEffect(Unit) {
+        appViewModel.startOfflineSync(
+            connectivity = container.connectivity,
+            outbox = container.outboxRepository,
+            materials = container.materialRepository,
+            sessionUserId = { (container.sessionManager.state.value as? SessionState.SignedIn)?.session?.userId },
+        )
+    }
+
     LaunchedEffect(appViewModel.isLoggedIn) {
-        if (appViewModel.isLoggedIn) appViewModel.loadMaterials(container.materialRepository)
+        // Demo access has no token: the server would answer 401 and Home would wrongly look offline.
+        if (appViewModel.isLoggedIn && container.sessionManager.token != null) {
+            appViewModel.loadMaterials(container.materialRepository)
+            // Anything queued before a log-out or an expired session goes out with the new one.
+            container.outboxRepository.syncNow()
+        }
     }
 
     LaunchedEffect(backStackEntry) {
