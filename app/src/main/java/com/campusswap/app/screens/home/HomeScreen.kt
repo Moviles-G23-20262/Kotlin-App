@@ -66,6 +66,8 @@ fun HomeScreen(
     onSearchClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onWishlistClick: () -> Unit,
+    onMessagesClick: () -> Unit,
+    unreadMessages: Int,
 ) {
     val c = CampusSwapTheme.colors
     var selectedCategory by rememberSaveable { mutableStateOf(Category.ALL) }
@@ -86,6 +88,8 @@ fun HomeScreen(
             onSearchClick = onSearchClick,
             onNotificationsClick = onNotificationsClick,
             onWishlistClick = onWishlistClick,
+            onMessagesClick = onMessagesClick,
+            unreadMessages = unreadMessages,
         )
 
         LazyColumn(
@@ -320,6 +324,8 @@ private fun HomeHeader(
     onSearchClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onWishlistClick: () -> Unit,
+    onMessagesClick: () -> Unit,
+    unreadMessages: Int,
 ) {
     val c = CampusSwapTheme.colors
     CampusHeader {
@@ -348,6 +354,18 @@ private fun HomeHeader(
                     onClick = onThemeToggle,
                     iconSize = 18.dp,
                 )
+                Box {
+                    CampusIconButton(CampusIcons.Message, contentDescription = "Messages", onClick = onMessagesClick)
+                    if (unreadMessages > 0) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(top = 6.dp, end = 6.dp)
+                                .size(7.dp)
+                                .background(c.accentHi, CircleShape),
+                        )
+                    }
+                }
                 Box {
                     CampusIconButton(CampusIcons.Bell, contentDescription = "Notifications", onClick = onNotificationsClick)
                     if (unreadNotifications > 0) {

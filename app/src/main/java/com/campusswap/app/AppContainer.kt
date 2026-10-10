@@ -3,6 +3,7 @@ package com.campusswap.app
 import android.content.Context
 import com.campusswap.app.data.ChatRepository
 import com.campusswap.app.data.ChatRoomRepository
+import com.campusswap.app.data.ConversationsRepository
 import com.campusswap.app.data.ExchangeRepository
 import com.campusswap.app.data.MeetingPointPopularityRepository
 import com.campusswap.app.data.MeetingPointRepository
@@ -83,6 +84,11 @@ class AppContainer(context: Context) {
 
     val chatRoomRepository = ChatRoomRepository(
         RetrofitChatRoomRemoteDataSource(ApiClient.create<ChatRoomsApi>(BuildConfig.BASE_URL, backendClient)),
+    )
+
+    val conversationsRepository = ConversationsRepository(
+        remote = RetrofitChatRoomRemoteDataSource(ApiClient.create<ChatRoomsApi>(BuildConfig.BASE_URL, backendClient)),
+        currentUserId = { sessionManager.validSession()?.userId },
     )
 
     val chatRepository = ChatRepository(

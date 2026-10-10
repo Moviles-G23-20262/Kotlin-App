@@ -88,6 +88,18 @@ data class ChatMessage(
     val sentAt: java.time.Instant? = null,
 )
 
+/** A thread in the inbox, from either side: the student may be the buyer or the seller. */
+data class Conversation(
+    val productId: String,
+    val productTitle: String,
+    val counterpartName: String,
+    val lastMessage: String?,
+    val lastMessageAt: java.time.Instant?,
+    val time: String,
+    val unread: Int,
+    val sellingThis: Boolean,
+)
+
 // ---- Dynamic safe meeting points (View 10, "Campus Guardian" CAS) ----
 
 enum class MeetingZoneType(val label: String) {
