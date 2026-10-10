@@ -122,12 +122,7 @@ fun ChatScreen(
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
-    }
-
     Scaffold(
-        modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -170,7 +165,7 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface) {
+            Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface, modifier = Modifier.imePadding()) {
                 Column {
                     // The change can be closed once a meeting is agreed (Views 9/10) or once the item was paid for at checkout and is still waiting to be finish (View 12)
                     if (state.proposal?.status == ProposalStatus.ACCEPTED || vm.hasPendingExchange(product.id)) {
@@ -275,14 +270,16 @@ fun ChatScreen(
                         onAction = onBack,
                     )
                 }
+                // Newest first and reversed, so the thread stays pinned to the latest message
+                // and the keyboard pushes it up instead of covering it.
                 ChatAvailability.READY -> LazyColumn(
                 state = listState,
+                reverseLayout = true,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                item { DayDivider("Today") }
-                items(messages, key = { it.id }) { message ->
+                items(messages.asReversed(), key = { it.id }) { message ->
                     when {
                         message.proposal != null -> ProposalCard(
                             proposal = message.proposal,
@@ -297,6 +294,7 @@ fun ChatScreen(
                         else -> MessageBubble(message)
                     }
                 }
+                item { DayDivider("Today") }
                 }
             }
         }
