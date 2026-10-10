@@ -13,6 +13,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,6 +35,7 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Shield
@@ -40,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
@@ -56,7 +63,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
@@ -64,11 +73,14 @@ import androidx.compose.ui.unit.dp
 import com.campusswap.app.CampusSwapApplication
 import com.campusswap.app.components.ConditionBadge
 import com.campusswap.app.components.EmptyState
+import com.campusswap.app.components.RemoteImage
+import com.campusswap.app.components.plainClickable
 import com.campusswap.app.components.ProductPlaceholderImage
 import com.campusswap.app.components.VerifiedBadge
 import com.campusswap.app.components.formatPrice
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.data.AppViewModel
+import java.io.File
 import com.campusswap.app.data.ChatMessage
 import com.campusswap.app.data.MeetingProposal
 import com.campusswap.app.data.MessageAuthor
@@ -110,7 +122,8 @@ fun ChatScreen(
         return
     }
 
-    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    val context = LocalContext.current
+    val container = (context.applicationContext as CampusSwapApplication).container
     val chat: ChatViewModel = viewModel(
         factory = ChatViewModel.factory(container, product.id, isOnline = { vm.isOnline }) { id, proposal ->
             vm.cacheProposal(id, proposal)
@@ -119,8 +132,39 @@ fun ChatScreen(
     val state by chat.state.collectAsState()
     val messages = state.messages
     val counterpart = state.counterpartName ?: product.seller.name
+
+    var showPhotoOptions by remember { mutableStateOf(false) }
+    var cameraTarget by remember { mutableStateOf<Uri?>(null) }
+
+    fun sendFrom(uri: Uri) {
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+        chat.sendPhoto(bytes, context.contentResolver.getType(uri) ?: "image/jpeg")
+    }
+
+    val pickFromGallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let(::sendFrom)
+    }
+    val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
+        if (taken) cameraTarget?.let(::sendFrom)
+    }
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+
+    if (showPhotoOptions) {
+        ModalBottomSheet(onDismissRequest = { showPhotoOptions = false }) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
+                PhotoOption(Icons.Outlined.PhotoCamera, "Take a photo") {
+                    showPhotoOptions = false
+                    cameraTarget = newPhotoUri(context)
+                    cameraTarget?.let(takePhoto::launch)
+                }
+                PhotoOption(Icons.Outlined.AddPhotoAlternate, "Choose from gallery") {
+                    showPhotoOptions = false
+                    pickFromGallery.launch("image/*")
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -212,8 +256,15 @@ fun ChatScreen(
                         modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, bottom = 10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        IconButton(onClick = {}) {
-                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Share a photo securely", tint = AccentBlue)
+                        IconButton(
+                            onClick = { showPhotoOptions = true },
+                            enabled = state.availability == ChatAvailability.READY && !state.isUploadingPhoto,
+                        ) {
+                            if (state.isUploadingPhoto) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = AccentBlue)
+                            } else {
+                                Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Share a photo securely", tint = AccentBlue)
+                            }
                         }
                         OutlinedTextField(
                             value = draft,
@@ -395,7 +446,18 @@ private fun MessageBubble(message: ChatMessage) {
             modifier = Modifier.widthIn(max = 290.dp),
         ) {
             Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
-                Text(message.text, style = MaterialTheme.typography.bodyMedium)
+                if (message.imageUrl != null) {
+                    RemoteImage(
+                        url = message.imageUrl,
+                        contentDescription = "Photo shared in the chat",
+                        modifier = Modifier
+                            .padding(top = 2.dp, bottom = 4.dp)
+                            .size(width = 220.dp, height = 165.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                    )
+                } else {
+                    Text(message.text, style = MaterialTheme.typography.bodyMedium)
+                }
                 Row(
                     modifier = Modifier.align(Alignment.End).padding(top = 3.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -537,3 +599,20 @@ private fun ProposeMeetingChip(proposal: MeetingProposal?, onClick: () -> Unit, 
     }
 }
 
+@Composable
+private fun PhotoOption(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().plainClickable(onClick).padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Icon(icon, contentDescription = null, tint = AccentBlue)
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+private fun newPhotoUri(context: Context): Uri {
+    val folder = File(context.cacheDir, "photos").apply { mkdirs() }
+    val file = File(folder, "chat-${System.currentTimeMillis()}.jpg")
+    return FileProvider.getUriForFile(context, "${context.packageName}.photos", file)
+}

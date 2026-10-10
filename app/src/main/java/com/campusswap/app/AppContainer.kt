@@ -31,6 +31,8 @@ import com.campusswap.app.data.remote.MessagesApi
 import com.campusswap.app.data.remote.MeetingProposalApi
 import com.campusswap.app.data.remote.RetrofitChatRoomRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitMessageRemoteDataSource
+import com.campusswap.app.data.remote.RetrofitUploadRemoteDataSource
+import com.campusswap.app.data.remote.UploadsApi
 import com.campusswap.app.data.remote.RetrofitMeetingProposalRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitPopularityRemoteDataSource
 import com.campusswap.app.domain.RankingStrategySelector
@@ -104,7 +106,11 @@ class AppContainer(context: Context) {
 
     val conversationsRepository = ConversationsRepository(chatRoomRemote, signedInUserId)
 
-    val chatRepository = ChatRepository(chatRoomRepository, messageRemote, signedInUserId)
+    private val uploadRemote = RetrofitUploadRemoteDataSource(
+        ApiClient.create<UploadsApi>(BuildConfig.BASE_URL, backendClient),
+    )
+
+    val chatRepository = ChatRepository(chatRoomRepository, messageRemote, uploadRemote, signedInUserId)
 
     val meetingProposalRepository = MeetingProposalRepository(
         rooms = chatRoomRepository,

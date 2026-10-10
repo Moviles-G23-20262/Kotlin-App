@@ -37,6 +37,7 @@ data class ChatUiState(
     val isSending: Boolean = false,
     val error: String? = null,
     val counterpartName: String? = null,
+    val isUploadingPhoto: Boolean = false,
 ) {
     val canSend: Boolean get() = availability == ChatAvailability.READY && !isSending
 }
@@ -151,6 +152,22 @@ class ChatViewModel(
      * The message goes to the outbox, so it survives having no signal and is sent by the
      * background sync. It appears in the thread right away as queued or sending.
      */
+    fun sendPhoto(bytes: ByteArray, mimeType: String) {
+        val userId = currentUserId() ?: return
+        if (_state.value.availability != ChatAvailability.READY) return
+        _state.update { it.copy(isUploadingPhoto = true, error = null) }
+        viewModelScope.launch {
+            val url = chat.uploadPhoto(bytes, mimeType)
+            _state.update { it.copy(isUploadingPhoto = false) }
+            if (url == null) {
+                _state.update { it.copy(error = "We couldn't send that photo. Check your connection and try again.") }
+            } else {
+                outbox.queueMessage("pending-${System.currentTimeMillis()}", userId, productId, url)
+                Analytics.log(Events.CHAT_PHOTO_SENT, "product_id" to productId)
+            }
+        }
+    }
+
     fun send(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty() || !_state.value.canSend) return

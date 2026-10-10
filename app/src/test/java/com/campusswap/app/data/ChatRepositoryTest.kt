@@ -15,7 +15,8 @@ import java.io.IOException
 class ChatRepositoryTest {
     private val rooms = FakeChatRoomRemoteDataSource()
     private val messages = FakeMessageRemoteDataSource()
-    private val repository = ChatRepository(ChatRoomRepository(rooms), messages, currentUserId = { ME })
+    private val uploads = FakeUploadRemoteDataSource()
+    private val repository = ChatRepository(ChatRoomRepository(rooms), messages, uploads, currentUserId = { ME })
 
     private val seededProduct = "p1"
     private val localOnlyProduct = "local-7"
@@ -93,5 +94,36 @@ class ChatRepositoryTest {
         val loaded = repository.messages(seededProduct) as ChatLoad.Success
 
         assertNull(repository.latestProposal(loaded.messages))
+    }
+
+    @Test
+    fun `a photo message carries the picture, not the link as text`() = runTest {
+        messages.stored += message("m1", OTHER, "https://blob.campusswap.test/photo-1.jpg")
+
+        val loaded = repository.messages(seededProduct) as ChatLoad.Success
+
+        assertEquals("https://blob.campusswap.test/photo-1.jpg", loaded.messages.single().imageUrl)
+    }
+
+    @Test
+    fun `an ordinary message is not mistaken for a photo`() = runTest {
+        messages.stored += message("m1", OTHER, "See https://uniandes.edu.co for the course page")
+
+        val loaded = repository.messages(seededProduct) as ChatLoad.Success
+
+        assertNull(loaded.messages.single().imageUrl)
+    }
+
+    @Test
+    fun `a photo that cannot be uploaded reports no url instead of a broken one`() = runTest {
+        uploads.failure = IOException("no network")
+
+        assertNull(repository.uploadPhoto(ByteArray(10), "image/jpeg"))
+    }
+
+    @Test
+    fun `uploading returns the stored url`() = runTest {
+        assertEquals("https://blob.campusswap.test/photo-1.jpg", repository.uploadPhoto(ByteArray(4), "image/png"))
+        assertEquals(listOf(4 to "image/png"), uploads.uploaded)
     }
 }

@@ -92,6 +92,7 @@ data class ChatMessage(
     val proposal: MeetingProposal? = null,
     /** Server timestamp, used to measure the time to agree on a meeting point (BQ4). */
     val sentAt: java.time.Instant? = null,
+    val imageUrl: String? = null,
 )
 
 /** A thread in the inbox, from either side: the student may be the buyer or the seller. */

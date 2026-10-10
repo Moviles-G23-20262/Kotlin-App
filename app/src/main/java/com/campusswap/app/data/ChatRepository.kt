@@ -3,6 +3,7 @@ package com.campusswap.app.data
 import com.campusswap.app.data.remote.ApiErrors
 import com.campusswap.app.data.remote.MessageDto
 import com.campusswap.app.data.remote.MessageRemoteDataSource
+import com.campusswap.app.data.remote.UploadRemoteDataSource
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException
@@ -27,6 +28,7 @@ sealed interface SendResult {
 class ChatRepository(
     private val rooms: ChatRoomRepository,
     private val remote: MessageRemoteDataSource,
+    private val uploads: UploadRemoteDataSource,
     private val currentUserId: () -> String?,
     private val zone: ZoneId = MeetingProposalMapper.CAMPUS_ZONE,
 ) {
@@ -54,6 +56,14 @@ class ChatRepository(
         SendResult.Rejected(ApiErrors.message(e))
     }
 
+    suspend fun uploadPhoto(bytes: ByteArray, mimeType: String): String? = try {
+        uploads.upload(bytes, mimeType)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
+
     suspend fun markRead(productId: String) = rooms.markRead(productId)
 
     suspend fun counterpartName(productId: String): String? {
@@ -69,6 +79,7 @@ class ChatRepository(
         val proposal = dto.meetingProposal?.let { MeetingProposalMapper.toProposal(it, zone) }
         val mine = dto.senderId == currentUserId()
         val sentAt = runCatching { Instant.parse(dto.createdAt) }.getOrNull()
+        val photo = dto.content.takeIf(::isPhoto)
         return ChatMessage(
             id = dto.id,
             author = if (proposal != null) MessageAuthor.SYSTEM else if (mine) MessageAuthor.ME else MessageAuthor.OTHER,
@@ -77,6 +88,14 @@ class ChatRepository(
             status = if (dto.isRead == true) MessageStatus.READ else MessageStatus.DELIVERED,
             proposal = proposal,
             sentAt = sentAt,
+            imageUrl = photo,
         )
+    }
+
+    private fun isPhoto(content: String) =
+        content.startsWith("https://") && PHOTO_SUFFIXES.any { content.substringBefore('?').endsWith(it, ignoreCase = true) }
+
+    private companion object {
+        val PHOTO_SUFFIXES = listOf(".jpg", ".jpeg", ".png", ".webp")
     }
 }
