@@ -195,6 +195,7 @@ fun MeetingPointScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 GuardianContextCard(
                     state = state,
+                    chosen = selected,
                     slot = selectedSlot,
                     otherName = otherName,
                     onUseMyLocation = {
@@ -416,7 +417,13 @@ private fun SmallZoneMarker(ranked: RankedPoint, modifier: Modifier, onClick: ()
 
 /** Context card explaining what the CAS detected (shared break + micro-location). */
 @Composable
-private fun GuardianContextCard(state: MeetingPointUiState, slot: TimeSlot?, otherName: String, onUseMyLocation: () -> Unit) {
+private fun GuardianContextCard(
+    state: MeetingPointUiState,
+    chosen: RankedPoint?,
+    slot: TimeSlot?,
+    otherName: String,
+    onUseMyLocation: () -> Unit,
+) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = AccentBlue.copy(alpha = 0.10f),
@@ -431,7 +438,7 @@ private fun GuardianContextCard(state: MeetingPointUiState, slot: TimeSlot?, oth
             }
             Column(modifier = Modifier.padding(start = 12.dp)) {
                 Text("Campus Guardian suggestion", style = MaterialTheme.typography.titleSmall, color = AccentBlue)
-                guardianReasons(state, slot, otherName).forEach { line ->
+                guardianReasons(state, chosen, slot, otherName).forEach { line ->
                     Text(
                         line,
                         style = MaterialTheme.typography.bodySmall,
@@ -615,14 +622,19 @@ private fun PopularNowBadge() {
 
 private fun MapPosition.toOffset() = Offset(x, y)
 
-private fun guardianReasons(state: MeetingPointUiState, slot: TimeSlot?, otherName: String): List<String> {
+private fun guardianReasons(
+    state: MeetingPointUiState,
+    chosen: RankedPoint?,
+    slot: TimeSlot?,
+    otherName: String,
+): List<String> {
     val time = state.time?.toString().orEmpty()
     val context = when (state.mode) {
         RankingMode.NIGHT_SAFETY ->
             "It's $time, after dark (from ${TimeOfDayStrategySelector.NIGHT_START}), so only zones monitored by campus security are suggested."
         RankingMode.DAYTIME -> "It's $time and still daylight, so every public zone is considered."
     }
-    val best = state.recommended
+    val best = chosen ?: state.recommended
     val mine = best?.walkMinutesMe
     val theirs = best?.walkMinutesOther
     val choice = when {
