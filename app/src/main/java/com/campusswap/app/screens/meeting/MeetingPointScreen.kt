@@ -62,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -318,6 +319,7 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(CampusMapProjection.CAMPUS_MAP_ASPECT)
+            .clipToBounds()
             .background(CampusLand),
     ) {
         val w = maxWidth
