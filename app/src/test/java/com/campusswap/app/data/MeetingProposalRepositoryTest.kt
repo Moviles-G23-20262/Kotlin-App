@@ -19,7 +19,8 @@ import java.time.Instant
 
 class MeetingProposalRepositoryTest {
     private val remote = FakeMeetingProposalRemoteDataSource()
-    private val repository = MeetingProposalRepository(remote)
+    private val chatRooms = FakeChatRoomRemoteDataSource()
+    private val repository = MeetingProposalRepository(ChatRoomRepository(chatRooms), remote)
     private val pointId = "c0000000-0000-4000-8000-000000000001"
     private val point = MeetingPoint(pointId, "Library", "", MeetingZoneType.LIBRARY, true, 0, 0, 0f, 0f, GeoPoint(4.6, -74.06))
     private val noon = FreeSlotDto("2026-10-05T17:00:00Z", "2026-10-05T18:00:00Z", sharedBreak = true)
@@ -39,7 +40,7 @@ class MeetingProposalRepositoryTest {
         assertEquals("12:00 – 13:00", slots.first().label)
         assertEquals("Mon 5 Oct", slots.first().day)
         assertTrue(slots.first().isSharedBreak)
-        assertEquals(listOf("b0000000-0000-4000-8000-000000000001"), remote.openedMaterials)
+        assertEquals(listOf("b0000000-0000-4000-8000-000000000001"), chatRooms.openedMaterials)
     }
 
     @Test fun freeSlotsAreEmptyWhenTheServerIsUnreachable() = runBlocking {

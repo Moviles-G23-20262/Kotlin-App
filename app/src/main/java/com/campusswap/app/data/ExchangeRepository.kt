@@ -20,8 +20,8 @@ class ExchangeRepository(private val remote: ExchangeRemoteDataSource) {
 
     suspend fun confirm(target: ExchangeTarget, location: GeoPoint?): ConfirmResult {
         if (isConfirmed(target.productId)) return ConfirmResult.Success
-        val materialId = SeedIds.material(target.productId) ?: target.productId.takeIf(::isBackendId) ?: return ConfirmResult.NotSynced
-        val buyerId = SeedIds.user(target.buyerId) ?: target.buyerId.takeIf(::isBackendId)
+        val materialId = SeedIds.backendMaterial(target.productId) ?: return ConfirmResult.NotSynced
+        val buyerId = SeedIds.backendUser(target.buyerId)
         return try {
             val mine = remote.exchangesFor(materialId).filter { buyerId == null || it.buyerId == buyerId }
             if (mine.none { it.status == COMPLETED }) {
@@ -42,7 +42,3 @@ class ExchangeRepository(private val remote: ExchangeRemoteDataSource) {
         const val COMPLETED = "COMPLETED"
     }
 }
-
-// Detecta si un ID es un UUID valido (formato backend) para evitar enviar IDs de semillas al backend
-private fun isBackendId(id: String) =
-    Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$").matches(id)
