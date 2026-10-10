@@ -1,5 +1,6 @@
 package com.campusswap.app.screens.cart
 
+import com.campusswap.app.domain.InputLimits
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -147,11 +148,12 @@ private fun CartLineCard(
                     color = c.text,
                     modifier = Modifier.defaultMinSize(minWidth = 16.dp),
                 )
+                val canIncrease = line.quantity < InputLimits.CART_QUANTITY_MAX
                 Icon(
                     CampusIcons.Plus,
                     contentDescription = "Increase quantity",
-                    tint = c.text2,
-                    modifier = Modifier.size(18.dp).plainClickable(onIncrease),
+                    tint = if (canIncrease) c.text2 else c.textMuted.copy(alpha = 0.4f),
+                    modifier = Modifier.size(18.dp).plainClickable { if (canIncrease) onIncrease() },
                 )
             }
         }

@@ -49,9 +49,17 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import com.campusswap.app.CampusSwapApplication
 import com.campusswap.app.data.auth.LoginResult
+import com.campusswap.app.components.NoClipboard
+import com.campusswap.app.components.typedOnly
+import com.campusswap.app.domain.InputLimits
+import com.campusswap.app.domain.InputValidation
 
 @Composable
-fun LoginScreen(onLoginSuccess: (userId: String?) -> Unit, sessionExpired: Boolean = false) {
+fun LoginScreen(
+    onLoginSuccess: (userId: String?) -> Unit,
+    onCreateAccount: () -> Unit,
+    sessionExpired: Boolean = false,
+) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -63,8 +71,8 @@ fun LoginScreen(onLoginSuccess: (userId: String?) -> Unit, sessionExpired: Boole
     val authRepository = (LocalContext.current.applicationContext as CampusSwapApplication).container.authRepository
 
     fun attemptLogin() {
-        emailError = if (email.isBlank() || !email.contains("@")) "Enter your institutional email" else null
-        passwordError = if (password.length < 6) "Password must be at least 6 characters" else null
+        emailError = InputValidation.emailError(email)
+        passwordError = if (password.length < InputLimits.PASSWORD_MIN) "Password must be at least ${InputLimits.PASSWORD_MIN} characters" else null
         if (emailError == null && passwordError == null) {
             isLoading = true
             scope.launch {
@@ -120,7 +128,7 @@ fun LoginScreen(onLoginSuccess: (userId: String?) -> Unit, sessionExpired: Boole
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it; emailError = null },
+                onValueChange = { email = InputValidation.sanitizeEmail(it); emailError = null },
                 label = { Text("Institutional email") },
                 singleLine = true,
                 isError = emailError != null,
@@ -137,24 +145,26 @@ fun LoginScreen(onLoginSuccess: (userId: String?) -> Unit, sessionExpired: Boole
             }
 
             Column(modifier = Modifier.padding(top = 16.dp)) {
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it; passwordError = null },
-                    label = { Text("Password") },
-                    singleLine = true,
-                    isError = passwordError != null,
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                                contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                NoClipboard {
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = typedOnly(password, InputValidation.sanitizePassword(it)); passwordError = null },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        isError = passwordError != null,
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 if (passwordError != null) {
                     Text(
                         passwordError!!,
@@ -196,7 +206,7 @@ fun LoginScreen(onLoginSuccess: (userId: String?) -> Unit, sessionExpired: Boole
 
             Row(modifier = Modifier.padding(top = 24.dp)) {
                 Text("New to CampusSwap?", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextButton(onClick = { infoMessage = "Registration isn't wired up in this prototype." }) {
+                TextButton(onClick = onCreateAccount) {
                     Text("Create account", color = AccentBlue)
                 }
             }

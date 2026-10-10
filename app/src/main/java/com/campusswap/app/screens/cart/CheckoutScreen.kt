@@ -1,5 +1,7 @@
 package com.campusswap.app.screens.cart
 
+import com.campusswap.app.domain.InputLimits
+import com.campusswap.app.domain.InputValidation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.background
@@ -106,7 +108,7 @@ fun CheckoutScreen(
                 if (delivery == DeliveryMethod.ADDRESS) {
                     CampusTextField(
                         value = address,
-                        onValueChange = { address = it },
+                        onValueChange = { address = InputValidation.sanitizeText(it, InputLimits.ADDRESS_MAX) },
                         placeholder = "Enter delivery address",
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     )
@@ -176,7 +178,8 @@ fun CheckoutScreen(
                         onOrderPlaced(vm.placeOrder(meetOnCampus = delivery == DeliveryMethod.CAMPUS))
                     }
                 },
-                enabled = !placing && vm.cart.isNotEmpty(),
+                enabled = !placing && vm.cart.isNotEmpty() &&
+                    (delivery == DeliveryMethod.CAMPUS || address.trim().length >= InputLimits.ADDRESS_MIN),
                 leadingIcon = CampusIcons.Send,
                 contentPadding = PaddingValues(13.dp),
                 modifier = Modifier.fillMaxWidth(),

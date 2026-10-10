@@ -1,5 +1,7 @@
 package com.campusswap.app.screens.search
 
+import com.campusswap.app.domain.InputLimits
+import com.campusswap.app.domain.InputValidation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -101,7 +103,7 @@ fun SearchScreen(
                 CampusIconButton(CampusIcons.Back, contentDescription = "Back", onClick = onBack)
                 CampusTextField(
                     value = query,
-                    onValueChange = { query = it },
+                    onValueChange = { query = InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX) },
                     placeholder = "Search course materials...",
                     leadingIcon = CampusIcons.Search,
                     modifier = Modifier.weight(1f),

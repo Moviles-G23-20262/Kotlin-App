@@ -1,5 +1,7 @@
 package com.campusswap.app.data
 
+import com.campusswap.app.domain.InputLimits
+import com.campusswap.app.domain.InputValidation
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -148,7 +150,7 @@ class AppViewModel : ViewModel() {
         val index = cart.indexOfFirst { it.product.id == product.id }
         if (index >= 0) {
             val existing = cart[index]
-            cart[index] = existing.copy(quantity = existing.quantity + 1)
+            cart[index] = existing.copy(quantity = (existing.quantity + 1).coerceAtMost(InputLimits.CART_QUANTITY_MAX))
         } else {
             cart.add(CartLine(product, 1))
         }
@@ -164,7 +166,7 @@ class AppViewModel : ViewModel() {
         if (quantity <= 0) {
             cart.removeAt(index)
         } else {
-            cart[index] = cart[index].copy(quantity = quantity)
+            cart[index] = cart[index].copy(quantity = quantity.coerceAtMost(InputLimits.CART_QUANTITY_MAX))
         }
     }
 
@@ -466,8 +468,8 @@ class AppViewModel : ViewModel() {
     fun publishListing(draft: SellDraft): Product {
         val product = Product(
             id = "local-${allProducts.size + 1}",
-            title = draft.title,
-            description = draft.description,
+            title = draft.title.trim(),
+            description = draft.description.trim(),
             price = draft.price.toDoubleOrNull() ?: 0.0,
             category = draft.category,
             course = if (draft.notAssociatedWithCourse) null else draft.course,
@@ -517,7 +519,10 @@ data class SellDraft(
     val condition: Condition? = null,
 ) {
     val isProductInfoValid: Boolean
-        get() = title.isNotBlank() && description.isNotBlank() && price.toDoubleOrNull() != null && photoCount > 0
+        get() = photoCount > 0 &&
+            InputValidation.titleError(title) == null &&
+            InputValidation.descriptionError(description) == null &&
+            InputValidation.priceError(price) == null
 
     val isCourseConditionValid: Boolean
         get() = (notAssociatedWithCourse || course != null) && condition != null

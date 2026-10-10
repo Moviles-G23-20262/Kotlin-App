@@ -1,5 +1,7 @@
 package com.campusswap.app.screens.home
 
+import com.campusswap.app.domain.InputLimits
+import com.campusswap.app.domain.InputValidation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -304,7 +306,7 @@ private fun NewAlertForm(onCancel: () -> Unit, onCreate: (SmartAlert) -> Unit) {
         HeadingText("New alert", size = CampusType.sizeSm)
         CampusTextField(
             value = keyword,
-            onValueChange = { keyword = it },
+            onValueChange = { keyword = InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX) },
             placeholder = "Item or course code",
             leadingIcon = CampusIcons.Search,
             modifier = Modifier.fillMaxWidth(),
