@@ -81,8 +81,21 @@ fun CampusSwapBottomBar(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        Icon(item.icon, contentDescription = item.label, tint = color, modifier = Modifier.size(22.dp))
-                        Text(item.label, style = TextStyle(fontFamily = OutfitFamily, fontSize = 10.sp, color = color))
+                        Icon(
+                            if (selected) item.selectedIcon else item.icon,
+                            contentDescription = item.label,
+                            tint = color,
+                            modifier = Modifier.size(22.dp),
+                        )
+                        Text(
+                            item.label,
+                            style = TextStyle(
+                                fontFamily = OutfitFamily,
+                                fontSize = 10.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                color = color,
+                            ),
+                        )
                     }
                     if (item.route == Routes.CART && cartCount > 0) {
                         Box(

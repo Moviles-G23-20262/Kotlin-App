@@ -27,6 +27,7 @@ import com.campusswap.app.data.AppViewModel
 import com.campusswap.app.data.auth.SessionManager
 import com.campusswap.app.data.auth.SessionState
 import com.campusswap.app.screens.auth.LoginScreen
+import com.campusswap.app.screens.auth.RegisterScreen
 import com.campusswap.app.screens.cart.CartScreen
 import com.campusswap.app.screens.cart.CheckoutScreen
 import com.campusswap.app.screens.cart.OrderConfirmationScreen
@@ -93,6 +94,7 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
     // plus the focused full-screen tasks (Sell flow, Chat, Meeting point).
     val hideChrome = currentRoute == null ||
         currentRoute == Routes.LOGIN ||
+        currentRoute == Routes.REGISTER ||
         currentRoute == Routes.CONFIRMATION ||
         currentRoute == Routes.SELL ||
         currentRoute == Routes.CHAT ||
@@ -139,11 +141,25 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                             popUpTo(Routes.LOGIN) { inclusive = true }
                         }
                     },
+                    onCreateAccount = { navController.navigate(Routes.REGISTER) { launchSingleTop = true } },
                     sessionExpired = (session as? SessionState.SignedOut)?.expired == true,
                 )
                 }
             }
 
+            composable(Routes.REGISTER) {
+                Box(Modifier.systemBarsPadding()) {
+                    RegisterScreen(
+                        onRegistered = { userId ->
+                            appViewModel.login(userId)
+                            navController.navigate(Routes.HOME) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onBackToLogin = { navController.popBackStack() },
+                    )
+                }
+            }
             composable(Routes.HOME) {
                 HomeScreen(
                     vm = appViewModel,

@@ -51,6 +51,13 @@ import com.campusswap.app.components.CampusSwapChip
 import com.campusswap.app.components.ConditionBadge
 import com.campusswap.app.components.ProductPlaceholderImage
 import com.campusswap.app.components.formatPrice
+import com.campusswap.app.components.NoClipboard
+import com.campusswap.app.components.PriceVisualTransformation
+import com.campusswap.app.domain.InputLimits
+import com.campusswap.app.domain.InputValidation
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import com.campusswap.app.data.AppViewModel
 import com.campusswap.app.data.Category
 import com.campusswap.app.data.Condition
@@ -213,6 +220,11 @@ private fun ProductInfoStep(
     onDraftChange: (SellDraft) -> Unit,
     onContinue: () -> Unit,
 ) {
+    // Errors appear once the user has typed in a field, not on an untouched form.
+    val showTitleError = draft.title.isNotEmpty() && InputValidation.titleError(draft.title) != null
+    val showDescriptionError = draft.description.isNotEmpty() && InputValidation.descriptionError(draft.description) != null
+    val showPriceError = draft.price.isNotEmpty() && InputValidation.priceError(draft.price) != null
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -277,20 +289,41 @@ private fun ProductInfoStep(
             }
         }
 
-        OutlinedTextField(
-            value = draft.title,
-            onValueChange = { onDraftChange(draft.copy(title = it)) },
-            label = { Text("Title") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
-        )
-        OutlinedTextField(
-            value = draft.description,
-            onValueChange = { onDraftChange(draft.copy(description = it)) },
-            label = { Text("Description") },
-            minLines = 3,
-            modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
-        )
+        NoClipboard {
+            OutlinedTextField(
+                value = draft.title,
+                onValueChange = {
+                    onDraftChange(draft.copy(title = InputValidation.sanitizeText(it, InputLimits.TITLE_MAX).replace('\n', ' ')))
+                },
+                label = { Text("Title") },
+                singleLine = true,
+                isError = showTitleError,
+                supportingText = {
+                    FieldSupport(
+                        error = if (showTitleError) InputValidation.titleError(draft.title) else null,
+                        counter = "${draft.title.length}/${InputLimits.TITLE_MAX}",
+                    )
+                },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+            )
+            OutlinedTextField(
+                value = draft.description,
+                onValueChange = { onDraftChange(draft.copy(description = InputValidation.sanitizeText(it, InputLimits.DESCRIPTION_MAX))) },
+                label = { Text("Description") },
+                minLines = 3,
+                maxLines = 8,
+                isError = showDescriptionError,
+                supportingText = {
+                    FieldSupport(
+                        error = if (showDescriptionError) InputValidation.descriptionError(draft.description) else null,
+                        counter = "${draft.description.length}/${InputLimits.DESCRIPTION_MAX}",
+                    )
+                },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            )
+        }
 
         Text("Category", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = 18.dp))
         LazyRow(
@@ -306,15 +339,26 @@ private fun ProductInfoStep(
             }
         }
 
-        OutlinedTextField(
-            value = draft.price,
-            onValueChange = { value -> if (value.all { it.isDigit() }) onDraftChange(draft.copy(price = value)) },
-            label = { Text("Price") },
-            singleLine = true,
-            leadingIcon = { Text("$", modifier = Modifier.padding(start = 12.dp)) },
-            suffix = { Text("COP") },
-            modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
-        )
+        NoClipboard {
+            OutlinedTextField(
+                value = draft.price,
+                onValueChange = { onDraftChange(draft.copy(price = InputValidation.sanitizePrice(it))) },
+                label = { Text("Price") },
+                singleLine = true,
+                leadingIcon = { Text("$", modifier = Modifier.padding(start = 12.dp)) },
+                suffix = { Text("COP") },
+                isError = showPriceError,
+                supportingText = {
+                    FieldSupport(
+                        error = if (showPriceError) InputValidation.priceError(draft.price) else null,
+                        hint = "Between ${formatPrice(InputLimits.PRICE_MIN.toDouble())} and ${formatPrice(InputLimits.PRICE_MAX.toDouble())}",
+                    )
+                },
+                visualTransformation = PriceVisualTransformation,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                modifier = Modifier.fillMaxWidth().padding(top = 18.dp),
+            )
+        }
 
         Button(
             onClick = onContinue,
@@ -324,6 +368,14 @@ private fun ProductInfoStep(
         ) {
             Text("Continue")
         }
+    }
+}
+
+@Composable
+private fun FieldSupport(error: String?, hint: String? = null, counter: String? = null) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(error ?: hint.orEmpty(), color = if (error != null) MaterialTheme.colorScheme.error else Color.Unspecified, modifier = Modifier.weight(1f))
+        if (counter != null) Text(counter, modifier = Modifier.padding(start = 8.dp))
     }
 }
 
@@ -346,7 +398,7 @@ private fun CourseConditionStep(
         OutlinedTextField(
             value = courseQuery,
             onValueChange = {
-                courseQuery = it
+                courseQuery = InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX)
                 if (draft.course != null) onDraftChange(draft.copy(course = null))
             },
             label = { Text("Search course code or name") },

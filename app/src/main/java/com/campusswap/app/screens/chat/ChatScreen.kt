@@ -1,5 +1,7 @@
 package com.campusswap.app.screens.chat
 
+import com.campusswap.app.domain.InputLimits
+import com.campusswap.app.domain.InputValidation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -211,7 +213,7 @@ fun ChatScreen(
                         }
                         OutlinedTextField(
                             value = draft,
-                            onValueChange = { draft = it },
+                            onValueChange = { draft = InputValidation.sanitizeText(it, InputLimits.MESSAGE_MAX) },
                             modifier = Modifier.weight(1f),
                             placeholder = { Text("Message ${product.seller.name.substringBefore(' ')}…") },
                             maxLines = 4,

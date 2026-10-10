@@ -5,6 +5,7 @@ import com.campusswap.app.components.CampusIcons
 
 object Routes {
     const val LOGIN = "login"
+    const val REGISTER = "register"
     const val HOME = "home"
     const val SEARCH = "search"
     const val SELL = "sell"
@@ -31,15 +32,16 @@ data class BottomNavItem(
     val route: String,
     val label: String,
     val icon: ImageVector,
+    val selectedIcon: ImageVector = icon,
     val isCentral: Boolean = false,
     val alsoActiveOn: Set<String> = emptySet(),
 )
 
 val bottomNavItems: List<BottomNavItem>
     get() = listOf(
-        BottomNavItem(Routes.HOME, "Home", CampusIcons.Home),
-        BottomNavItem(Routes.SEARCH, "Search", CampusIcons.Search),
+        BottomNavItem(Routes.HOME, "Home", CampusIcons.Home, CampusIcons.HomeFilled),
+        BottomNavItem(Routes.SEARCH, "Search", CampusIcons.Search, CampusIcons.SearchFilled),
         BottomNavItem(Routes.SELL, "Sell", CampusIcons.Plus, isCentral = true),
-        BottomNavItem(Routes.CART, "Cart", CampusIcons.Cart, alsoActiveOn = setOf(Routes.CHECKOUT)),
-        BottomNavItem(Routes.PROFILE, "Seller", CampusIcons.User),
+        BottomNavItem(Routes.CART, "Cart", CampusIcons.Cart, CampusIcons.CartFilled, alsoActiveOn = setOf(Routes.CHECKOUT)),
+        BottomNavItem(Routes.PROFILE, "Seller", CampusIcons.User, CampusIcons.UserFilled),
     )

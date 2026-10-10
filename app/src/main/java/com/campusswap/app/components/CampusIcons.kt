@@ -1,6 +1,7 @@
 package com.campusswap.app.components
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -34,6 +35,8 @@ object CampusIcons {
         vararg paths: String,
         strokeWidth: Float = 2f,
         filled: Boolean = false,
+        strokeOnly: Set<Int> = emptySet(),
+        fillType: PathFillType = PathFillType.NonZero,
     ): ImageVector {
         val builder = ImageVector.Builder(
             name = name,
@@ -42,10 +45,11 @@ object CampusIcons {
             viewportWidth = 24f,
             viewportHeight = 24f,
         )
-        paths.forEach { d ->
+        paths.forEachIndexed { index, d ->
             builder.addPath(
                 pathData = addPathNodes(d),
-                fill = if (filled) SolidColor(Color.Black) else null,
+                pathFillType = fillType,
+                fill = if (filled && index !in strokeOnly) SolidColor(Color.Black) else null,
                 stroke = SolidColor(Color.Black),
                 strokeLineWidth = strokeWidth,
                 strokeLineCap = StrokeCap.Round,
@@ -65,6 +69,24 @@ object CampusIcons {
         )
     }
     val Home by lazy { icon("Home", "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", poly("9 22 9 12 15 12 15 22")) }
+
+    // Filled variants for the selected bottom-bar tab. The house keeps its door as a cut-out.
+    val HomeFilled by lazy {
+        icon("HomeFilled", "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10z", filled = true, fillType = PathFillType.EvenOdd)
+    }
+    val SearchFilled by lazy { icon("SearchFilled", circle(11f, 11f, 8f), line(21f, 21f, 16.65f, 16.65f), strokeWidth = 3f) }
+    val CartFilled by lazy {
+        icon(
+            "CartFilled",
+            circle(9f, 21f, 1f),
+            circle(20f, 21f, 1f),
+            "M1 1h4l1 5",
+            "M6 6h17l-1.6 8.39a2 2 0 0 1-2 1.61H9.68a2 2 0 0 1-2-1.61z",
+            filled = true,
+            strokeOnly = setOf(2),
+        )
+    }
+    val UserFilled by lazy { icon("UserFilled", "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2z", circle(12f, 7f, 4f), filled = true) }
     val Search by lazy { icon("Search", circle(11f, 11f, 8f), line(21f, 21f, 16.65f, 16.65f)) }
     val SearchLight by lazy { icon("SearchLight", circle(11f, 11f, 8f), line(21f, 21f, 16.65f, 16.65f), strokeWidth = 1.5f) }
     val Cart by lazy {
