@@ -16,7 +16,7 @@ android {
 
         val baseUrl = project.findProperty("campusswap.baseUrl") ?: "https://back-end-sigma-seven.vercel.app/"
         buildConfigField("String", "BASE_URL", "\"$baseUrl\"")
-        val analyticsUrl = project.findProperty("campusswap.analyticsUrl") ?: "http://10.0.2.2:8000/"
+        val analyticsUrl = project.findProperty("campusswap.analyticsUrl") ?: "https://analytics-back-end.vercel.app/"
         buildConfigField("String", "ANALYTICS_BASE_URL", "\"$analyticsUrl\"")
     }
 
