@@ -82,6 +82,14 @@ import com.campusswap.app.data.TimeSlot
 import com.campusswap.app.domain.RankingMode
 import com.campusswap.app.domain.TimeOfDayStrategySelector
 import com.campusswap.app.ui.theme.AccentBlue
+import com.campusswap.app.ui.theme.CampusBlockLabel
+import com.campusswap.app.ui.theme.CampusBuildingEdge
+import com.campusswap.app.ui.theme.CampusBuildingFill
+import com.campusswap.app.ui.theme.CampusGreen
+import com.campusswap.app.ui.theme.CampusLand
+import com.campusswap.app.ui.theme.CampusPath
+import com.campusswap.app.ui.theme.CampusRoadLine
+import com.campusswap.app.ui.theme.CampusWater
 import com.campusswap.app.ui.theme.JetBrainsMonoFamily
 import com.campusswap.app.ui.theme.PrimaryBlue
 import com.campusswap.app.ui.theme.SecondaryBlue
@@ -295,21 +303,22 @@ fun MeetingPointScreen(
     }
 }
 
-/** Stylised campus map: walkways, building blocks, both parties and every pre-mapped safe zone. */
+/** The campus as OpenStreetMap has it, with both parties and every pre-mapped safe zone on top. */
 @Composable
 private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherName: String, onPointTap: (RankedPoint) -> Unit) {
     val context = LocalContext.current
-    val buildings = remember { CampusGeometry.buildings(context) }
+    val campus = remember { CampusGeometry.load(context) }
     val projection = remember { CampusMapProjection() }
-    val outlines = remember(buildings) {
-        buildings.map { building -> building to building.outline.map(projection::project) }
-    }
+    val greens = remember(campus) { campus.greens.map { shape -> shape.map(projection::project) } }
+    val water = remember(campus) { campus.water.map { shape -> shape.map(projection::project) } }
+    val roads = remember(campus) { campus.roads.map { it.weight to it.line.map(projection::project) } }
+    val outlines = remember(campus) { campus.buildings.map { it to it.outline.map(projection::project) } }
 
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(CampusMapProjection.CAMPUS_MAP_ASPECT)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(CampusLand),
     ) {
         val w = maxWidth
         val h = maxHeight
@@ -317,18 +326,40 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
         val otherPosition = state.otherMapPosition?.toOffset()
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val footprint = PrimaryBlue.copy(alpha = 0.16f)
-            val edge = SecondaryBlue.copy(alpha = 0.45f)
+            fun shape(points: List<MapPosition>) = Path().apply {
+                points.forEachIndexed { index, position ->
+                    val x = size.width * position.x
+                    val y = size.height * position.y
+                    if (index == 0) moveTo(x, y) else lineTo(x, y)
+                }
+                close()
+            }
+
+            greens.forEach { drawPath(shape(it), CampusGreen) }
+            water.forEach { drawPath(shape(it), CampusWater) }
+
+            roads.sortedBy { it.first.ordinal }.forEach { (weight, line) ->
+                val stroke = when (weight) {
+                    RoadWeight.FOOTPATH -> 2.5f
+                    RoadWeight.STREET -> 6f
+                    RoadWeight.AVENUE -> 10f
+                }
+                val colour = if (weight == RoadWeight.FOOTPATH) CampusPath else CampusRoadLine
+                for (i in 0 until line.size - 1) {
+                    drawLine(
+                        color = colour,
+                        start = Offset(size.width * line[i].x, size.height * line[i].y),
+                        end = Offset(size.width * line[i + 1].x, size.height * line[i + 1].y),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
 
             outlines.forEach { (_, projected) ->
-                val path = Path()
-                projected.forEachIndexed { index, position ->
-                    val point = Offset(size.width * position.x, size.height * position.y)
-                    if (index == 0) path.moveTo(point.x, point.y) else path.lineTo(point.x, point.y)
-                }
-                path.close()
-                drawPath(path, footprint)
-                drawPath(path, edge, style = Stroke(width = 1.5f))
+                val path = shape(projected)
+                drawPath(path, CampusBuildingFill)
+                drawPath(path, CampusBuildingEdge, style = Stroke(width = 1.5f))
             }
 
             if (selected != null) {
@@ -349,7 +380,7 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = CampusBlockLabel,
                 modifier = Modifier.offset(x = w * centre.x - 16.dp, y = h * centre.y - 7.dp).width(32.dp),
                 textAlign = TextAlign.Center,
                 maxLines = 1,
