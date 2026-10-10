@@ -573,7 +573,8 @@ private fun AlternativeRow(ranked: RankedPoint, selected: Boolean, isRecommended
                     if (ranked.isPopular) PopularNowBadge()
                 }
                 Text(
-                    "You ${ranked.walkMinutesMe?.let { "$it min" } ?: "—"} · $otherName ${ranked.walkMinutesOther} min",
+                    "You ${ranked.walkMinutesMe?.let { "$it min" } ?: "—"} · " +
+                        "$otherName ${ranked.walkMinutesOther?.let { "$it min" } ?: "—"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -622,17 +623,25 @@ private fun guardianReasons(state: MeetingPointUiState, slot: TimeSlot?, otherNa
         RankingMode.DAYTIME -> "It's $time and still daylight, so every public zone is considered."
     }
     val best = state.recommended
+    val mine = best?.walkMinutesMe
+    val theirs = best?.walkMinutesOther
     val choice = when {
         best == null -> "No monitored zone is available right now. Try again in daylight or pick a time slot tomorrow."
-        best.walkMinutesMe != null ->
-            "${best.point.name} keeps the longer walk to ${maxOf(best.walkMinutesMe, best.walkMinutesOther)} min: " +
-                "you ${best.walkMinutesMe} min, $otherName ${best.walkMinutesOther} min."
-        else -> "${best.point.name} is ${best.walkMinutesOther} min from $otherName. ${locationHint(state.myLocation)}"
+        mine != null && theirs != null ->
+            "${best.point.name} keeps the longer walk to ${maxOf(mine, theirs)} min: " +
+                "you $mine min, $otherName $theirs min."
+        theirs != null -> "${best.point.name} is $theirs min from $otherName. ${locationHint(state.myLocation)}"
+        mine != null -> "${best.point.name} is $mine min from you. ${counterpartHint(otherName)}"
+        else -> "${best.point.name} is the safest zone available. ${locationHint(state.myLocation)}"
     }
+    val unknownCounterpart = if (state.knowsCounterpart || best == null) null else counterpartHint(otherName)
     val offline = if (state.isLive) null else "Offline: showing the campus zones saved on this phone."
     val freeTime = slot?.let { "You're both free ${it.day}, ${it.label}." }
-    return listOfNotNull(context, choice, freeTime, offline)
+    return listOfNotNull(context, choice, unknownCounterpart.takeIf { mine == null }, freeTime, offline)
 }
+
+private fun counterpartHint(otherName: String) =
+    "We don't know where $otherName will be yet, so their walk isn't counted. It's taken from the spot you agree on in the chat."
 
 private fun locationHint(status: MyLocationStatus): String = when (status) {
     MyLocationStatus.LOCATING -> "Finding your location to include your walk…"

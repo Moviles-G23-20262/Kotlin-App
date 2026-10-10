@@ -40,7 +40,7 @@ enum class MyLocationStatus { LOCATING, FOUND, PERMISSION_NEEDED, OFF_CAMPUS, UN
 data class RankedPoint(
     val point: MeetingPoint,
     val walkMinutesMe: Int?,
-    val walkMinutesOther: Int,
+    val walkMinutesOther: Int?,
     val map: MapPosition,
     val isPopular: Boolean = false,
 )
@@ -53,6 +53,7 @@ data class MeetingPointUiState(
     val myLocation: MyLocationStatus = MyLocationStatus.LOCATING,
     val myMapPosition: MapPosition? = null,
     val otherMapPosition: MapPosition? = null,
+    val knowsCounterpart: Boolean = false,
     val isLive: Boolean = true,
     val slots: List<TimeSlot> = emptyList(),
     val isProposing: Boolean = false,
@@ -148,7 +149,7 @@ class MeetingPointViewModel(
         strategy: MeetingPointRankingStrategy,
         now: LocalTime,
         me: GeoPoint?,
-        other: GeoPoint,
+        other: GeoPoint?,
         status: MyLocationStatus,
     ) {
         val located = points.points.filter { it.location != null }
@@ -166,7 +167,8 @@ class MeetingPointViewModel(
             },
             myLocation = status,
             myMapPosition = me?.let(projection::project),
-            otherMapPosition = projection.project(other),
+            otherMapPosition = other?.let(projection::project),
+            knowsCounterpart = other != null,
             isLive = points.isLive,
             slots = slots,
             isProposing = _state.value.isProposing,

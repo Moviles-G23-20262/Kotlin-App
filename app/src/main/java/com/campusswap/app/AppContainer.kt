@@ -13,7 +13,7 @@ import com.campusswap.app.data.auth.SessionManager
 import com.campusswap.app.data.location.CounterpartLocationSource
 import com.campusswap.app.data.location.FusedLocationDataSource
 import com.campusswap.app.data.location.LocationDataSource
-import com.campusswap.app.data.location.SimulatedCounterpartLocation
+import com.campusswap.app.data.location.ProposedMeetingLocation
 import com.campusswap.app.analytics.HttpEventSink
 import com.campusswap.app.data.remote.AnalyticsApi
 import com.campusswap.app.data.remote.AnalyticsEventsApi
@@ -98,7 +98,8 @@ class AppContainer(context: Context) {
 
     val popularityRepository = MeetingPointPopularityRepository(RetrofitPopularityRemoteDataSource(analyticsApi))
 
-    val counterpartLocationSource: CounterpartLocationSource = SimulatedCounterpartLocation()
+    val counterpartLocationSource: CounterpartLocationSource =
+        ProposedMeetingLocation(meetingProposalRepository) { sessionManager.validSession()?.userId }
 
     val rankingStrategySelector: RankingStrategySelector = TimeOfDayStrategySelector()
 
