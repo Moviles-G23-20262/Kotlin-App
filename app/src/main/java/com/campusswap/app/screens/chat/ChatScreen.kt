@@ -121,6 +121,7 @@ fun ChatScreen(
     }
 
     Scaffold(
+        modifier = Modifier.imePadding(),
         topBar = {
             TopAppBar(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -163,7 +164,7 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface, modifier = Modifier.imePadding()) {
+            Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface) {
                 Column {
                     // The change can be closed once a meeting is agreed (Views 9/10) or once the item was paid for at checkout and is still waiting to be finish (View 12)
                     if (state.proposal?.status == ProposalStatus.ACCEPTED || vm.hasPendingExchange(product.id)) {
