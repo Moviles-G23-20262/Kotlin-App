@@ -34,6 +34,7 @@ data class ChatUiState(
     val proposal: MeetingProposal? = null,
     val isSending: Boolean = false,
     val error: String? = null,
+    val counterpartName: String? = null,
 ) {
     val canSend: Boolean get() = availability == ChatAvailability.READY && !isSending
 }
@@ -51,6 +52,7 @@ class ChatViewModel(
     private var pending: List<ChatMessage> = emptyList()
     private var lastProposalStatus: ProposalStatus? = null
     private var firstContact = true
+    private var counterpart: String? = null
 
     init {
         startPolling()
@@ -68,7 +70,10 @@ class ChatViewModel(
 
     suspend fun refresh() {
         when (val result = chat.messages(productId)) {
-            is ChatLoad.Success -> publish(result.messages)
+            is ChatLoad.Success -> {
+                if (counterpart == null) counterpart = chat.counterpartName(productId)
+                publish(result.messages)
+            }
             ChatLoad.NotSynced -> _state.update { it.copy(availability = ChatAvailability.NOT_SYNCED, isSending = false) }
             ChatLoad.Offline -> _state.update {
                 it.copy(availability = if (it.messages.isEmpty()) ChatAvailability.OFFLINE else ChatAvailability.READY)
@@ -88,6 +93,7 @@ class ChatViewModel(
             proposal = proposal,
             isSending = pending.isNotEmpty(),
             error = _state.value.error,
+            counterpartName = counterpart,
         )
         proposal?.let { onProposalChanged(productId, it) }
         viewModelScope.launch { chat.markRead(productId) }

@@ -9,7 +9,10 @@ class FakeChatRoomRemoteDataSource : ChatRoomRemoteDataSource {
     val readRooms = mutableListOf<String>()
     var summaries = mutableListOf<ChatRoomSummaryDto>()
 
+    var openCalls = 0
+
     override suspend fun open(materialId: String): String {
+        openCalls++
         failure?.let { throw it }
         openedMaterials += materialId
         return "room-1"

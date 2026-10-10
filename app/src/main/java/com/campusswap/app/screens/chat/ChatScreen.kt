@@ -113,6 +113,7 @@ fun ChatScreen(
     )
     val state by chat.state.collectAsState()
     val messages = state.messages
+    val counterpart = state.counterpartName ?: product.seller.name
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
 
@@ -140,7 +141,7 @@ fun ChatScreen(
                         }
                         Column(modifier = Modifier.padding(start = 10.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(product.seller.name, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(counterpart, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 if (product.seller.isVerified) {
                                     Box(modifier = Modifier.size(16.dp)) { VerifiedBadge(compact = true) }
                                 }
@@ -213,7 +214,7 @@ fun ChatScreen(
                             value = draft,
                             onValueChange = { draft = InputValidation.sanitizeText(it, InputLimits.MESSAGE_MAX) },
                             modifier = Modifier.weight(1f),
-                            placeholder = { Text("Message ${product.seller.name.substringBefore(' ')}…") },
+                            placeholder = { Text("Message ${counterpart.substringBefore(' ')}…") },
                             maxLines = 4,
                             shape = RoundedCornerShape(24.dp),
                             colors = OutlinedTextFieldDefaults.colors(

@@ -56,6 +56,12 @@ class ChatRepository(
 
     suspend fun markRead(productId: String) = rooms.markRead(productId)
 
+    suspend fun counterpartName(productId: String): String? {
+        val summary = rooms.summaryFor(productId) ?: return null
+        val mine = currentUserId()
+        return (if (summary.sellerId == mine) summary.buyer else summary.seller)?.fullName
+    }
+
     fun latestProposal(messages: List<ChatMessage>): MeetingProposal? =
         messages.lastOrNull { it.proposal != null }?.proposal
 
