@@ -64,7 +64,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -295,10 +298,17 @@ fun MeetingPointScreen(
 /** Stylised campus map: walkways, building blocks, both parties and every pre-mapped safe zone. */
 @Composable
 private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherName: String, onPointTap: (RankedPoint) -> Unit) {
+    val context = LocalContext.current
+    val buildings = remember { CampusGeometry.buildings(context) }
+    val projection = remember { CampusMapProjection() }
+    val outlines = remember(buildings) {
+        buildings.map { building -> building to building.outline.map(projection::project) }
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1.25f)
+            .aspectRatio(CampusMapProjection.CAMPUS_MAP_ASPECT)
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {
         val w = maxWidth
@@ -307,30 +317,43 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
         val otherPosition = state.otherMapPosition?.toOffset()
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val block = PrimaryBlue.copy(alpha = 0.12f)
-            val path = SecondaryBlue.copy(alpha = 0.55f)
-            // Walkways
-            drawLine(path, Offset(0f, size.height * 0.42f), Offset(size.width, size.height * 0.42f), strokeWidth = 14f, cap = StrokeCap.Round)
-            drawLine(path, Offset(size.width * 0.50f, 0f), Offset(size.width * 0.50f, size.height), strokeWidth = 14f, cap = StrokeCap.Round)
-            drawLine(path, Offset(size.width * 0.18f, size.height * 0.42f), Offset(size.width * 0.40f, size.height * 0.95f), strokeWidth = 10f, cap = StrokeCap.Round)
-            drawLine(path, Offset(size.width * 0.50f, size.height * 0.68f), Offset(size.width, size.height * 0.68f), strokeWidth = 10f, cap = StrokeCap.Round)
-            // Building blocks
-            drawRoundRect(block, Offset(size.width * 0.06f, size.height * 0.08f), androidx.compose.ui.geometry.Size(size.width * 0.30f, size.height * 0.24f), androidx.compose.ui.geometry.CornerRadius(18f))
-            drawRoundRect(block, Offset(size.width * 0.58f, size.height * 0.08f), androidx.compose.ui.geometry.Size(size.width * 0.34f, size.height * 0.22f), androidx.compose.ui.geometry.CornerRadius(18f))
-            drawRoundRect(block, Offset(size.width * 0.56f, size.height * 0.50f), androidx.compose.ui.geometry.Size(size.width * 0.36f, size.height * 0.12f), androidx.compose.ui.geometry.CornerRadius(18f))
-            drawRoundRect(block, Offset(size.width * 0.06f, size.height * 0.56f), androidx.compose.ui.geometry.Size(size.width * 0.20f, size.height * 0.30f), androidx.compose.ui.geometry.CornerRadius(18f))
-            // Green space
-            drawCircle(SuccessGreen.copy(alpha = 0.16f), radius = size.width * 0.09f, center = Offset(size.width * 0.40f, size.height * 0.78f))
+            val footprint = PrimaryBlue.copy(alpha = 0.16f)
+            val edge = SecondaryBlue.copy(alpha = 0.45f)
+
+            outlines.forEach { (_, projected) ->
+                val path = Path()
+                projected.forEachIndexed { index, position ->
+                    val point = Offset(size.width * position.x, size.height * position.y)
+                    if (index == 0) path.moveTo(point.x, point.y) else path.lineTo(point.x, point.y)
+                }
+                path.close()
+                drawPath(path, footprint)
+                drawPath(path, edge, style = Stroke(width = 1.5f))
+            }
+
             if (selected != null) {
-                // Routes from each party to the selected point
                 val dash = PathEffect.dashPathEffect(floatArrayOf(14f, 12f))
                 val target = Offset(size.width * selected.map.x, size.height * selected.map.y)
                 listOfNotNull(mePosition, otherPosition).forEach { from ->
                     drawLine(AccentBlue, Offset(size.width * from.x, size.height * from.y), target, strokeWidth = 5f, pathEffect = dash, cap = StrokeCap.Round)
                 }
-                // Highlight ring on the selected safe zone
-                drawCircle(AccentBlue.copy(alpha = 0.18f), radius = size.width * 0.11f, center = target)
+                drawCircle(AccentBlue.copy(alpha = 0.18f), radius = size.width * 0.08f, center = target)
             }
+        }
+
+        outlines.forEach { (building, projected) ->
+            val label = building.label ?: return@forEach
+            val centre = projected.fold(MapPosition(0f, 0f)) { acc, position ->
+                MapPosition(acc.x + position.x / projected.size, acc.y + position.y / projected.size)
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.offset(x = w * centre.x - 16.dp, y = h * centre.y - 7.dp).width(32.dp),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
         }
 
         // Other safe zones (small markers)
@@ -347,7 +370,12 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
         // Selected zone (large pin with label)
         if (selected != null) Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.offset(x = w * selected.map.x - 90.dp, y = h * selected.map.y - 46.dp).width(180.dp),
+            modifier = Modifier
+                .offset(
+                    x = (w * selected.map.x - 90.dp).coerceIn(0.dp, (w - 180.dp).coerceAtLeast(0.dp)),
+                    y = (h * selected.map.y - 46.dp).coerceAtLeast(0.dp),
+                )
+                .width(180.dp),
         ) {
             Surface(
                 shape = RoundedCornerShape(8.dp),

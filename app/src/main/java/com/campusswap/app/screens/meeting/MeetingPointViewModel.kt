@@ -155,7 +155,7 @@ class MeetingPointViewModel(
         val located = points.points.filter { it.location != null }
         val byId = located.associateBy { it.id }
         val ranked = strategy.rank(located.map { ZoneCandidate(it.id, it.isMonitored, it.location!!) }, me, other)
-        val projection = CampusMapProjection(located.mapNotNull { it.location } + listOfNotNull(me, other))
+        val projection = CampusMapProjection()
 
         _state.value = MeetingPointUiState(
             isLoading = false,
