@@ -51,6 +51,16 @@ import com.campusswap.app.components.CampusSwapChip
 import com.campusswap.app.components.ConditionBadge
 import com.campusswap.app.components.ProductPlaceholderImage
 import com.campusswap.app.components.formatPrice
+import com.campusswap.app.CampusSwapApplication
+import com.campusswap.app.components.OfflineBanner
+import com.campusswap.app.data.Product
+import androidx.compose.material.icons.outlined.CloudOff
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
 import com.campusswap.app.components.NoClipboard
 import com.campusswap.app.components.PriceVisualTransformation
 import com.campusswap.app.domain.InputLimits
@@ -95,11 +105,28 @@ fun SellScreen(
     var draft by remember { mutableStateOf(SellDraft()) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var isPublishing by remember { mutableStateOf(false) }
-    var publishedProductId by remember { mutableStateOf<String?>(null) }
+    var publishedProduct by remember { mutableStateOf<Product?>(null) }
+    var draftRestored by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val draftStore = (LocalContext.current.applicationContext as CampusSwapApplication).container.draftStore
 
-    val isDirty = draft.title.isNotBlank() || draft.description.isNotBlank() || draft.photoCount > 0 ||
-        draft.course != null || draft.condition != null || draft.price.isNotBlank()
+    val isDirty = draft.isDirty
+
+    // Local storage: the draft lives in DataStore, so leaving the screen, closing the app or
+    // losing signal mid-form never loses what the seller typed.
+    LaunchedEffect(Unit) {
+        val saved = draftStore.read()
+        if (saved != null && saved.isDirty && !draft.isDirty) {
+            draft = saved
+            draftRestored = true
+        }
+    }
+    LaunchedEffect(Unit) {
+        snapshotFlow { draft }.drop(1).collectLatest { current ->
+            delay(400) // write once the user pauses typing, not on every key
+            if (current.isDirty) draftStore.save(current) else draftStore.clear()
+        }
+    }
 
     fun requestExit() {
         if (isDirty) showDiscardDialog = true else onExit()
@@ -148,6 +175,8 @@ fun SellScreen(
             when (step) {
                 SellStep.PRODUCT_INFO -> ProductInfoStep(
                     draft = draft,
+                    draftRestored = draftRestored,
+                    isOnline = vm.isOnline,
                     onDraftChange = { draft = it },
                     onContinue = { step = SellStep.COURSE_CONDITION },
                 )
@@ -166,16 +195,18 @@ fun SellScreen(
                     onPublish = {
                         isPublishing = true
                         scope.launch {
-                            delay(900)
-                            val product = vm.publishListing(draft)
-                            publishedProductId = product.id
+                            publishedProduct = vm.publishListing(draft)
+                            draft = SellDraft()
+                            draftStore.clear()
                             isPublishing = false
                             step = SellStep.CONFIRMATION
                         }
                     },
                 )
                 SellStep.CONFIRMATION -> ConfirmationStep(
-                    onViewListing = { publishedProductId?.let(onPublished) },
+                    queued = publishedProduct?.pendingSync != null,
+                    isOnline = vm.isOnline,
+                    onViewListing = { publishedProduct?.id?.let(onPublished) },
                     onBackToHome = onExit,
                 )
             }
@@ -185,15 +216,23 @@ fun SellScreen(
     if (showDiscardDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
-            title = { Text("Discard this listing?") },
-            text = { Text("Your photos and details won't be saved.") },
+            title = { Text("Leave this listing?") },
+            text = { Text("Your draft is saved on this phone, so you can finish it later. Or discard it now.") },
             confirmButton = {
-                TextButton(onClick = { showDiscardDialog = false; draft = SellDraft(); step = SellStep.PRODUCT_INFO; onExit() }) {
-                    Text("Discard", color = MaterialTheme.colorScheme.error)
-                }
+                TextButton(onClick = { showDiscardDialog = false; onExit() }) { Text("Keep draft") }
             },
             dismissButton = {
-                TextButton(onClick = { showDiscardDialog = false }) { Text("Keep editing") }
+                TextButton(
+                    onClick = {
+                        showDiscardDialog = false
+                        draft = SellDraft()
+                        step = SellStep.PRODUCT_INFO
+                        scope.launch { draftStore.clear() }
+                        onExit()
+                    },
+                ) {
+                    Text("Discard", color = MaterialTheme.colorScheme.error)
+                }
             },
         )
     }
@@ -217,6 +256,8 @@ private fun StepIndicator(step: SellStep, modifier: Modifier = Modifier) {
 @Composable
 private fun ProductInfoStep(
     draft: SellDraft,
+    draftRestored: Boolean,
+    isOnline: Boolean,
     onDraftChange: (SellDraft) -> Unit,
     onContinue: () -> Unit,
 ) {
@@ -231,6 +272,19 @@ private fun ProductInfoStep(
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {
+        OfflineBanner(
+            visible = !isOnline,
+            message = "You're offline. You can still publish: the listing is sent when you reconnect.",
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
+        if (draftRestored) {
+            Text(
+                "We restored the draft you left unfinished.",
+                style = MaterialTheme.typography.bodySmall,
+                color = AccentBlue,
+                modifier = Modifier.padding(bottom = 10.dp),
+            )
+        }
         Text("Add photos", style = MaterialTheme.typography.titleMedium)
         Text(
             "The first photo is used as the cover.",
@@ -363,7 +417,7 @@ private fun ProductInfoStep(
         Button(
             onClick = onContinue,
             enabled = draft.isProductInfoValid,
-            modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 24.dp),
+            modifier = Modifier.padding(top = 24.dp).fillMaxWidth().height(52.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
         ) {
             Text("Continue")
@@ -575,6 +629,8 @@ private fun ReviewStep(
 
 @Composable
 private fun ConfirmationStep(
+    queued: Boolean,
+    isOnline: Boolean,
     onViewListing: () -> Unit,
     onBackToHome: () -> Unit,
 ) {
@@ -583,33 +639,40 @@ private fun ConfirmationStep(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
+        val (title, message) = when {
+            queued && !isOnline -> "Saved on your phone" to
+                "You're offline. We'll publish it automatically as soon as you reconnect, even if you close the app."
+            queued -> "Publishing your listing" to "It'll be visible to other students in a moment."
+            else -> "Your listing is live!" to "Verified students can now find it in Search and Home."
+        }
         Icon(
-            Icons.Filled.CheckCircle,
+            if (queued && !isOnline) Icons.Outlined.CloudOff else Icons.Filled.CheckCircle,
             contentDescription = null,
-            tint = SuccessGreen,
+            tint = if (queued && !isOnline) AccentBlue else SuccessGreen,
             modifier = Modifier.size(72.dp),
         )
         Text(
-            "Your listing is live!",
+            title,
             style = MaterialTheme.typography.headlineSmall,
             modifier = Modifier.padding(top = 16.dp),
         )
         Text(
-            "Verified students can now find it in Search and Home.",
+            message,
+            textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 6.dp),
         )
         Button(
             onClick = onViewListing,
-            modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 28.dp),
+            modifier = Modifier.padding(top = 28.dp).fillMaxWidth().height(52.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
         ) {
             Text("View listing")
         }
         OutlinedButton(
             onClick = onBackToHome,
-            modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 12.dp),
+            modifier = Modifier.padding(top = 12.dp).fillMaxWidth().height(52.dp),
         ) {
             Text("Back to Home")
         }
