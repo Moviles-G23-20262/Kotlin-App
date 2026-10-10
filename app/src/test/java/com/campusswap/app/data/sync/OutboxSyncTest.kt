@@ -1,6 +1,9 @@
 package com.campusswap.app.data.sync
 
-import com.campusswap.app.data.chat.ChatRemoteDataSource
+import com.campusswap.app.data.ChatRoomRepository
+import com.campusswap.app.data.FakeChatRoomRemoteDataSource
+import com.campusswap.app.data.remote.MessageDto
+import com.campusswap.app.data.remote.MessageRemoteDataSource
 import com.campusswap.app.data.local.OutboxDao
 import com.campusswap.app.data.local.PendingListingEntity
 import com.campusswap.app.data.local.PendingMessageEntity
@@ -52,22 +55,28 @@ class OutboxSyncTest {
         }
     }
 
-    private class FakeChat(var failOn: String? = null) : ChatRemoteDataSource {
-        val rooms = mutableListOf<String>()
+    private class FakeChat(var failOn: String? = null) : MessageRemoteDataSource {
         val sent = mutableListOf<String>()
-        override suspend fun openRoom(materialId: String): String { rooms += materialId; return "room-$materialId" }
-        override suspend fun send(chatRoomId: String, content: String) {
+        override suspend fun messages(chatRoomId: String): List<MessageDto> = emptyList()
+        override suspend fun send(chatRoomId: String, content: String): MessageDto {
             if (content == failOn) throw IOException("signal lost")
             sent += content
+            return MessageDto("m-${sent.size}", chatRoomId, "u1", content, "TEXT", false, "2026-10-05T17:00:00Z", null, null)
         }
     }
+
+    private fun chatRooms() = ChatRoomRepository(FakeChatRoomRemoteDataSource())
 
     private fun listing(owner: String = "u1", title: String = "Calculus") = PendingListingEntity(
         ownerId = owner, title = title, description = "Barely used", courseCode = "MATE1203",
         price = "45000", condition = "LIKE_NEW", category = "LAB_SUPPLIES", createdAtMillis = 1,
     )
 
-    private fun message(id: String, content: String, material: String = "m1") = PendingMessageEntity(id, "u1", material, content, 1)
+    private val materialA = "b0000000-0000-4000-8000-0000000000a1"
+    private val materialB = "b0000000-0000-4000-8000-0000000000b2"
+
+    private fun message(id: String, content: String, material: String = materialA) =
+        PendingMessageEntity(id, "u1", material, content, 1)
 
     private fun http(code: Int, body: String = "") = HttpException(Response.error<Any>(code, ResponseBody.create(null, body)))
 
@@ -75,7 +84,7 @@ class OutboxSyncTest {
         val outbox = FakeOutbox().apply { insertListing(listing()) }
         val materials = FakeMaterials()
 
-        assertEquals(SyncOutcome.DONE, OutboxSync(outbox, materials, FakeChat()).flush("u1"))
+        assertEquals(SyncOutcome.DONE, OutboxSync(outbox, materials, chatRooms(), FakeChat()).flush("u1"))
 
         assertTrue(outbox.listings.value.isEmpty())
         assertEquals("LAB_EQUIPMENT", materials.created.single().category)
@@ -85,7 +94,7 @@ class OutboxSyncTest {
     @Test fun noNetworkKeepsEverythingQueued() = runTest {
         val outbox = FakeOutbox().apply { insertListing(listing()) }
 
-        val outcome = OutboxSync(outbox, FakeMaterials { throw IOException() }, FakeChat()).flush("u1")
+        val outcome = OutboxSync(outbox, FakeMaterials { throw IOException() }, chatRooms(), FakeChat()).flush("u1")
 
         assertEquals(SyncOutcome.RETRY_LATER, outcome)
         assertEquals(1, outbox.listings.value.single().attempts)
@@ -96,7 +105,7 @@ class OutboxSyncTest {
         val outbox = FakeOutbox().apply { insertListing(listing()); insertListing(listing(title = "Second")) }
         val materials = FakeMaterials { if (it.title == "Calculus") throw http(400, """{"message":["title must be longer than or equal to 2 characters"]}""") }
 
-        assertEquals(SyncOutcome.DONE, OutboxSync(outbox, materials, FakeChat()).flush("u1"))
+        assertEquals(SyncOutcome.DONE, OutboxSync(outbox, materials, chatRooms(), FakeChat()).flush("u1"))
 
         assertEquals("title must be longer than or equal to 2 characters", outbox.listings.value.single().failedReason)
         assertEquals(listOf("Second"), materials.created.map { it.title })
@@ -105,7 +114,7 @@ class OutboxSyncTest {
     @Test fun expiredSessionAndServerErrorsAreRetried() = runTest {
         for (code in listOf(401, 503)) {
             val outbox = FakeOutbox().apply { insertListing(listing()) }
-            assertEquals(SyncOutcome.RETRY_LATER, OutboxSync(outbox, FakeMaterials { throw http(code) }, FakeChat()).flush("u1"))
+            assertEquals(SyncOutcome.RETRY_LATER, OutboxSync(outbox, FakeMaterials { throw http(code) }, chatRooms(), FakeChat()).flush("u1"))
             assertEquals(1, outbox.listings.value.size)
         }
     }
@@ -114,7 +123,7 @@ class OutboxSyncTest {
         val outbox = FakeOutbox().apply { insertListing(listing(owner = "someone-else")) }
         val materials = FakeMaterials()
 
-        OutboxSync(outbox, materials, FakeChat()).flush("u1")
+        OutboxSync(outbox, materials, chatRooms(), FakeChat()).flush("u1")
 
         assertTrue(materials.created.isEmpty())
         assertEquals(1, outbox.listings.value.size)
@@ -128,7 +137,7 @@ class OutboxSyncTest {
         }
         val chat = FakeChat(failOn = "still available?")
 
-        assertEquals(SyncOutcome.RETRY_LATER, OutboxSync(outbox, FakeMaterials(), chat).flush("u1"))
+        assertEquals(SyncOutcome.RETRY_LATER, OutboxSync(outbox, FakeMaterials(), chatRooms(), chat).flush("u1"))
 
         assertEquals(listOf("hi"), chat.sent)
         assertEquals(listOf("2", "3"), outbox.messages.value.map { it.localId })
@@ -136,15 +145,16 @@ class OutboxSyncTest {
 
     @Test fun oneRoomIsOpenedPerListing() = runTest {
         val outbox = FakeOutbox().apply {
-            insertMessage(message("1", "a", material = "m1"))
-            insertMessage(message("2", "b", material = "m1"))
-            insertMessage(message("3", "c", material = "m2"))
+            insertMessage(message("1", "a", material = materialA))
+            insertMessage(message("2", "b", material = materialA))
+            insertMessage(message("3", "c", material = materialB))
         }
         val chat = FakeChat()
+        val roomRemote = FakeChatRoomRemoteDataSource()
 
-        OutboxSync(outbox, FakeMaterials(), chat).flush("u1")
+        OutboxSync(outbox, FakeMaterials(), ChatRoomRepository(roomRemote), chat).flush("u1")
 
-        assertEquals(listOf("m1", "m2"), chat.rooms)
+        assertEquals(listOf(materialA, materialB), roomRemote.openedMaterials)
         assertEquals(listOf("a", "b", "c"), chat.sent)
         assertTrue(outbox.messages.value.isEmpty())
     }

@@ -62,9 +62,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -79,6 +83,14 @@ import com.campusswap.app.data.TimeSlot
 import com.campusswap.app.domain.RankingMode
 import com.campusswap.app.domain.TimeOfDayStrategySelector
 import com.campusswap.app.ui.theme.AccentBlue
+import com.campusswap.app.ui.theme.CampusBlockLabel
+import com.campusswap.app.ui.theme.CampusBuildingEdge
+import com.campusswap.app.ui.theme.CampusBuildingFill
+import com.campusswap.app.ui.theme.CampusGreen
+import com.campusswap.app.ui.theme.CampusLand
+import com.campusswap.app.ui.theme.CampusPath
+import com.campusswap.app.ui.theme.CampusRoadLine
+import com.campusswap.app.ui.theme.CampusWater
 import com.campusswap.app.ui.theme.JetBrainsMonoFamily
 import com.campusswap.app.ui.theme.PrimaryBlue
 import com.campusswap.app.ui.theme.SecondaryBlue
@@ -123,7 +135,6 @@ fun MeetingPointScreen(
     var selectedSlotId by remember { mutableStateOf(existing?.slot?.id) }
     val slotOptions = state.slots.take(4)
     val selectedSlot = slotOptions.firstOrNull { it.id == selectedSlotId } ?: slotOptions.firstOrNull()
-    var sending by remember { mutableStateOf(false) }
     var proposalError by remember { mutableStateOf<String?>(null) }
     var showAlternatives by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -155,14 +166,17 @@ fun MeetingPointScreen(
                         onClick = {
                             val point = selected?.point ?: return@Button
                             val slot = selectedSlot ?: return@Button
-                            sending = true
                             proposalError = null
-                            vm.proposeMeeting(container.meetingProposalRepository, product, point, slot) { error ->
-                                sending = false
-                                if (error == null) onProposed() else proposalError = error
+                            guardian.propose(point, slot) { proposal, error ->
+                                if (proposal != null) {
+                                    vm.cacheProposal(product.id, proposal)
+                                    onProposed()
+                                } else {
+                                    proposalError = error
+                                }
                             }
                         },
-                        enabled = selected != null && selectedSlot != null && !sending,
+                        enabled = selected != null && selectedSlot != null && !state.isProposing,
                         modifier = Modifier.weight(1f).height(50.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                     ) {
@@ -193,6 +207,7 @@ fun MeetingPointScreen(
             Column(modifier = Modifier.padding(16.dp)) {
                 GuardianContextCard(
                     state = state,
+                    chosen = selected,
                     slot = selectedSlot,
                     otherName = otherName,
                     onUseMyLocation = {
@@ -289,14 +304,23 @@ fun MeetingPointScreen(
     }
 }
 
-/** Stylised campus map: walkways, building blocks, both parties and every pre-mapped safe zone. */
+/** The campus as OpenStreetMap has it, with both parties and every pre-mapped safe zone on top. */
 @Composable
 private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherName: String, onPointTap: (RankedPoint) -> Unit) {
+    val context = LocalContext.current
+    val campus = remember { CampusGeometry.load(context) }
+    val projection = remember { CampusMapProjection() }
+    val greens = remember(campus) { campus.greens.map { shape -> shape.map(projection::project) } }
+    val water = remember(campus) { campus.water.map { shape -> shape.map(projection::project) } }
+    val roads = remember(campus) { campus.roads.map { it.weight to it.line.map(projection::project) } }
+    val outlines = remember(campus) { campus.buildings.map { it to it.outline.map(projection::project) } }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1.25f)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .aspectRatio(CampusMapProjection.CAMPUS_MAP_ASPECT)
+            .clipToBounds()
+            .background(CampusLand),
     ) {
         val w = maxWidth
         val h = maxHeight
@@ -304,30 +328,65 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
         val otherPosition = state.otherMapPosition?.toOffset()
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val block = PrimaryBlue.copy(alpha = 0.12f)
-            val path = SecondaryBlue.copy(alpha = 0.55f)
-            // Walkways
-            drawLine(path, Offset(0f, size.height * 0.42f), Offset(size.width, size.height * 0.42f), strokeWidth = 14f, cap = StrokeCap.Round)
-            drawLine(path, Offset(size.width * 0.50f, 0f), Offset(size.width * 0.50f, size.height), strokeWidth = 14f, cap = StrokeCap.Round)
-            drawLine(path, Offset(size.width * 0.18f, size.height * 0.42f), Offset(size.width * 0.40f, size.height * 0.95f), strokeWidth = 10f, cap = StrokeCap.Round)
-            drawLine(path, Offset(size.width * 0.50f, size.height * 0.68f), Offset(size.width, size.height * 0.68f), strokeWidth = 10f, cap = StrokeCap.Round)
-            // Building blocks
-            drawRoundRect(block, Offset(size.width * 0.06f, size.height * 0.08f), androidx.compose.ui.geometry.Size(size.width * 0.30f, size.height * 0.24f), androidx.compose.ui.geometry.CornerRadius(18f))
-            drawRoundRect(block, Offset(size.width * 0.58f, size.height * 0.08f), androidx.compose.ui.geometry.Size(size.width * 0.34f, size.height * 0.22f), androidx.compose.ui.geometry.CornerRadius(18f))
-            drawRoundRect(block, Offset(size.width * 0.56f, size.height * 0.50f), androidx.compose.ui.geometry.Size(size.width * 0.36f, size.height * 0.12f), androidx.compose.ui.geometry.CornerRadius(18f))
-            drawRoundRect(block, Offset(size.width * 0.06f, size.height * 0.56f), androidx.compose.ui.geometry.Size(size.width * 0.20f, size.height * 0.30f), androidx.compose.ui.geometry.CornerRadius(18f))
-            // Green space
-            drawCircle(SuccessGreen.copy(alpha = 0.16f), radius = size.width * 0.09f, center = Offset(size.width * 0.40f, size.height * 0.78f))
+            fun shape(points: List<MapPosition>) = Path().apply {
+                points.forEachIndexed { index, position ->
+                    val x = size.width * position.x
+                    val y = size.height * position.y
+                    if (index == 0) moveTo(x, y) else lineTo(x, y)
+                }
+                close()
+            }
+
+            greens.forEach { drawPath(shape(it), CampusGreen) }
+            water.forEach { drawPath(shape(it), CampusWater) }
+
+            roads.sortedBy { it.first.ordinal }.forEach { (weight, line) ->
+                val stroke = when (weight) {
+                    RoadWeight.FOOTPATH -> 2.5f
+                    RoadWeight.STREET -> 6f
+                    RoadWeight.AVENUE -> 10f
+                }
+                val colour = if (weight == RoadWeight.FOOTPATH) CampusPath else CampusRoadLine
+                for (i in 0 until line.size - 1) {
+                    drawLine(
+                        color = colour,
+                        start = Offset(size.width * line[i].x, size.height * line[i].y),
+                        end = Offset(size.width * line[i + 1].x, size.height * line[i + 1].y),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
+
+            outlines.forEach { (_, projected) ->
+                val path = shape(projected)
+                drawPath(path, CampusBuildingFill)
+                drawPath(path, CampusBuildingEdge, style = Stroke(width = 1.5f))
+            }
+
             if (selected != null) {
-                // Routes from each party to the selected point
                 val dash = PathEffect.dashPathEffect(floatArrayOf(14f, 12f))
                 val target = Offset(size.width * selected.map.x, size.height * selected.map.y)
                 listOfNotNull(mePosition, otherPosition).forEach { from ->
                     drawLine(AccentBlue, Offset(size.width * from.x, size.height * from.y), target, strokeWidth = 5f, pathEffect = dash, cap = StrokeCap.Round)
                 }
-                // Highlight ring on the selected safe zone
-                drawCircle(AccentBlue.copy(alpha = 0.18f), radius = size.width * 0.11f, center = target)
+                drawCircle(AccentBlue.copy(alpha = 0.18f), radius = size.width * 0.08f, center = target)
             }
+        }
+
+        outlines.forEach { (building, projected) ->
+            val label = building.label ?: return@forEach
+            val centre = projected.fold(MapPosition(0f, 0f)) { acc, position ->
+                MapPosition(acc.x + position.x / projected.size, acc.y + position.y / projected.size)
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = CampusBlockLabel,
+                modifier = Modifier.offset(x = w * centre.x - 16.dp, y = h * centre.y - 7.dp).width(32.dp),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+            )
         }
 
         // Other safe zones (small markers)
@@ -344,7 +403,12 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
         // Selected zone (large pin with label)
         if (selected != null) Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.offset(x = w * selected.map.x - 90.dp, y = h * selected.map.y - 46.dp).width(180.dp),
+            modifier = Modifier
+                .offset(
+                    x = (w * selected.map.x - 90.dp).coerceIn(0.dp, (w - 180.dp).coerceAtLeast(0.dp)),
+                    y = (h * selected.map.y - 46.dp).coerceAtLeast(0.dp),
+                )
+                .width(180.dp),
         ) {
             Surface(
                 shape = RoundedCornerShape(8.dp),
@@ -414,7 +478,13 @@ private fun SmallZoneMarker(ranked: RankedPoint, modifier: Modifier, onClick: ()
 
 /** Context card explaining what the CAS detected (shared break + micro-location). */
 @Composable
-private fun GuardianContextCard(state: MeetingPointUiState, slot: TimeSlot?, otherName: String, onUseMyLocation: () -> Unit) {
+private fun GuardianContextCard(
+    state: MeetingPointUiState,
+    chosen: RankedPoint?,
+    slot: TimeSlot?,
+    otherName: String,
+    onUseMyLocation: () -> Unit,
+) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = AccentBlue.copy(alpha = 0.10f),
@@ -429,7 +499,7 @@ private fun GuardianContextCard(state: MeetingPointUiState, slot: TimeSlot?, oth
             }
             Column(modifier = Modifier.padding(start = 12.dp)) {
                 Text("Campus Guardian suggestion", style = MaterialTheme.typography.titleSmall, color = AccentBlue)
-                guardianReasons(state, slot, otherName).forEach { line ->
+                guardianReasons(state, chosen, slot, otherName).forEach { line ->
                     Text(
                         line,
                         style = MaterialTheme.typography.bodySmall,
@@ -571,7 +641,8 @@ private fun AlternativeRow(ranked: RankedPoint, selected: Boolean, isRecommended
                     if (ranked.isPopular) PopularNowBadge()
                 }
                 Text(
-                    "You ${ranked.walkMinutesMe?.let { "$it min" } ?: "—"} · $otherName ${ranked.walkMinutesOther} min",
+                    "You ${ranked.walkMinutesMe?.let { "$it min" } ?: "—"} · " +
+                        "$otherName ${ranked.walkMinutesOther?.let { "$it min" } ?: "—"}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -612,25 +683,38 @@ private fun PopularNowBadge() {
 
 private fun MapPosition.toOffset() = Offset(x, y)
 
-private fun guardianReasons(state: MeetingPointUiState, slot: TimeSlot?, otherName: String): List<String> {
+private fun guardianReasons(
+    state: MeetingPointUiState,
+    chosen: RankedPoint?,
+    slot: TimeSlot?,
+    otherName: String,
+): List<String> {
     val time = state.time?.toString().orEmpty()
     val context = when (state.mode) {
         RankingMode.NIGHT_SAFETY ->
             "It's $time, after dark (from ${TimeOfDayStrategySelector.NIGHT_START}), so only zones monitored by campus security are suggested."
         RankingMode.DAYTIME -> "It's $time and still daylight, so every public zone is considered."
     }
-    val best = state.recommended
+    val best = chosen ?: state.recommended
+    val mine = best?.walkMinutesMe
+    val theirs = best?.walkMinutesOther
     val choice = when {
         best == null -> "No monitored zone is available right now. Try again in daylight or pick a time slot tomorrow."
-        best.walkMinutesMe != null ->
-            "${best.point.name} keeps the longer walk to ${maxOf(best.walkMinutesMe, best.walkMinutesOther)} min: " +
-                "you ${best.walkMinutesMe} min, $otherName ${best.walkMinutesOther} min."
-        else -> "${best.point.name} is ${best.walkMinutesOther} min from $otherName. ${locationHint(state.myLocation)}"
+        mine != null && theirs != null ->
+            "${best.point.name} keeps the longer walk to ${maxOf(mine, theirs)} min: " +
+                "you $mine min, $otherName $theirs min."
+        theirs != null -> "${best.point.name} is $theirs min from $otherName. ${locationHint(state.myLocation)}"
+        mine != null -> "${best.point.name} is $mine min from you. ${counterpartHint(otherName)}"
+        else -> "${best.point.name} is the safest zone available. ${locationHint(state.myLocation)}"
     }
+    val unknownCounterpart = if (state.knowsCounterpart || best == null) null else counterpartHint(otherName)
     val offline = if (state.isLive) null else "Offline: showing the campus zones saved on this phone."
     val freeTime = slot?.let { "You're both free ${it.day}, ${it.label}." }
-    return listOfNotNull(context, choice, freeTime, offline)
+    return listOfNotNull(context, choice, unknownCounterpart.takeIf { mine == null }, freeTime, offline)
 }
+
+private fun counterpartHint(otherName: String) =
+    "We don't know where $otherName will be yet, so their walk isn't counted. It's taken from the spot you agree on in the chat."
 
 private fun locationHint(status: MyLocationStatus): String = when (status) {
     MyLocationStatus.LOCATING -> "Finding your location to include your walk…"

@@ -1,6 +1,7 @@
 package com.campusswap.app.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -45,5 +46,20 @@ class MeetingPointRankingStrategyTest {
 
         assertEquals("near-other", ranked.first().zone.id)
         assertEquals(null, ranked.first().walkMinutesMe)
+    }
+
+    @Test fun withoutTheCounterpartTheRankingFallsBackToMyOwnWalk() {
+        val ranked = DaytimeStrategy().rank(zones, me = me, other = null)
+
+        assertEquals(listOf("near-me", "middle", "near-other"), ranked.map { it.zone.id })
+        assertNull(ranked.first().walkMinutesOther)
+        assertEquals(1, ranked.first().walkMinutesMe)
+    }
+
+    @Test fun withNeitherLocationKnownTheMonitoredZoneStillWins() {
+        val ranked = DaytimeStrategy().rank(zones, me = null, other = null)
+
+        assertTrue(ranked.first().zone.isMonitored)
+        assertEquals(3, ranked.size)
     }
 }

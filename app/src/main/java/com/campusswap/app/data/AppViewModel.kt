@@ -63,7 +63,7 @@ class AppViewModel : ViewModel() {
     /**
      * Starts the offline machinery once per app run: follows the network state, refreshes the
      * listings and sends the outbox when the connection comes back, and mirrors the outbox
-     * (Room) into the UI so queued listings and messages show their state.
+     * (Room) into the UI so queued listings show their state.
      */
     fun startOfflineSync(
         connectivity: ConnectivityObserver,
@@ -84,17 +84,14 @@ class AppViewModel : ViewModel() {
             }
         }
         viewModelScope.launch { outbox.pendingListings.collect { allPendingListings = it; showPendingListings() } }
-        viewModelScope.launch { outbox.pendingMessages.collect { allPendingMessages = it; showPendingMessages() } }
         if (sessionUserId() != null) outbox.syncNow()
     }
 
     private var allPendingListings: List<PendingListingEntity> = emptyList()
-    private var allPendingMessages: List<PendingMessageEntity> = emptyList()
 
     /** The outbox may hold another account's items; each user only sees their own. */
     private fun refreshPendingViews() {
         showPendingListings()
-        showPendingMessages()
     }
 
     private fun onBackOnline() {
@@ -102,9 +99,6 @@ class AppViewModel : ViewModel() {
             materialRepository?.let(::loadMaterials)
             outbox?.syncNow()
         }
-        val waiting = queuedDemoMessages.toList()
-        queuedDemoMessages.clear()
-        waiting.forEach { (product, id) -> simulateDelivery(product, threadFor(product), id) }
     }
 
     private var pendingListingIds: Set<Long> = emptySet()
@@ -455,169 +449,17 @@ class AppViewModel : ViewModel() {
 
     fun isRemoteNotification(id: String) = id in loadedNotificationIds
 
-    // ---- In-app chat & meeting coordination (Views 09 / 10) ----
-
-    private val chatThreads = mutableStateMapOf<String, SnapshotStateList<ChatMessage>>()
-
-    /** Latest meeting proposal per product thread; null until the buyer proposes one. */
-    val meetingProposals = mutableStateMapOf<String, MeetingProposal>()
-
-    private val chatStartedAt = mutableMapOf<String, Long>()
-
-    private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-
-    fun threadFor(product: Product): SnapshotStateList<ChatMessage> =
-        chatThreads.getOrPut(product.id) {
-            mutableStateListOf<ChatMessage>().apply {
-                addAll(SampleData.initialThread(product))
-                // Messages queued before the app was closed are still in Room: show them again.
-                pendingMessageRows.filter { it.materialId == product.id }.forEach { row ->
-                    trackedMessages[row.localId] = product.id
-                    add(ChatMessage(row.localId, MessageAuthor.ME, row.content, now(), statusFor(row)))
-                }
-            }
-        }
-
-    /** Outgoing messages to real listings, by local id → listing id, until the server has them. */
-    private val trackedMessages = mutableMapOf<String, String>()
-    private var pendingMessageRows: List<PendingMessageEntity> = emptyList()
-
-    /** Demo-thread messages typed offline; they're "delivered" when the connection returns. */
-    private val queuedDemoMessages = mutableListOf<Pair<Product, String>>()
-
-    private fun statusFor(row: PendingMessageEntity) = when {
-        row.failedReason != null -> MessageStatus.FAILED
-        isOnline -> MessageStatus.SENDING
-        else -> MessageStatus.QUEUED
-    }
-
-    private fun showPendingMessages() {
-        val rows = allPendingMessages.filter { it.ownerId == currentUserId }
-        pendingMessageRows = rows
-        val byId = rows.associateBy { it.localId }
-        trackedMessages.entries.removeAll { (localId, productId) ->
-            val thread = chatThreads[productId] ?: return@removeAll false
-            val row = byId[localId]
-            updateStatus(thread, localId, if (row == null) MessageStatus.SENT else statusFor(row))
-            row == null
-        }
-    }
+    // ---- Meeting coordination cache (Views 09 / 10) ----
 
     /**
-     * Appends an outgoing message and simulates the Messaging Service round-trip:
-     * SENDING -> SENT -> DELIVERED -> READ, followed by a canned reply from the seller.
+     * Latest proposal per product, published by the chat and meeting screens so the home
+     * card and the completion screen know whether the exchange can be closed.
      */
-    fun sendMessage(product: Product, text: String) {
-        val trimmed = text.trim()
-        if (trimmed.isEmpty()) return
-        val thread = threadFor(product)
-        val id = "m-${System.currentTimeMillis()}"
-        val initialStatus = if (isOnline) MessageStatus.SENDING else MessageStatus.QUEUED
-        thread.add(ChatMessage(id, MessageAuthor.ME, trimmed, now(), initialStatus))
-        chatStartedAt.getOrPut(product.id) { System.currentTimeMillis() }
-        Analytics.log(
-            Events.CHAT_MESSAGE_SENT,
-            "product_id" to product.id,
-            "my_messages" to thread.count { it.author == MessageAuthor.ME },
-        )
-        val queue = outbox
-        val userId = sessionUserId()
-        if (queue != null && userId != null && product.id in loadedMaterialIds) {
-            // Real listing: the message goes through the outbox (Room + WorkManager), online or not.
-            trackedMessages[id] = product.id
-            viewModelScope.launch { queue.queueMessage(id, userId, product.id, trimmed) }
-        } else if (isOnline) {
-            simulateDelivery(product, thread, id)
-        } else {
-            queuedDemoMessages += product to id
-        }
+    val meetingProposals = mutableStateMapOf<String, MeetingProposal>()
+
+    fun cacheProposal(productId: String, proposal: MeetingProposal) {
+        meetingProposals[productId] = proposal
     }
-
-    /** Demo listings have no server conversation: fake the round-trip and a reply from the seller. */
-    private fun simulateDelivery(product: Product, thread: SnapshotStateList<ChatMessage>, id: String) {
-        viewModelScope.launch {
-            delay(500); updateStatus(thread, id, MessageStatus.SENT)
-            delay(700); updateStatus(thread, id, MessageStatus.DELIVERED)
-            delay(1300); updateStatus(thread, id, MessageStatus.READ)
-            delay(1200)
-            val reply = SampleData.cannedReplies[thread.size % SampleData.cannedReplies.size]
-            thread.add(ChatMessage("$id-reply", MessageAuthor.OTHER, reply, now()))
-        }
-    }
-
-    fun proposeMeeting(
-        repository: MeetingProposalRepository,
-        product: Product,
-        point: MeetingPoint,
-        slot: TimeSlot,
-        onResult: (error: String?) -> Unit,
-    ) {
-        viewModelScope.launch {
-            when (val result = repository.propose(product.id, point, slot)) {
-                is ProposalResult.Success -> {
-                    showProposal(product, result.proposal)
-                    Analytics.log(Events.MEETING_PROPOSED, "product_id" to product.id, *chatStats(product.id, threadFor(product).size))
-                    onResult(null)
-                }
-                ProposalResult.Offline -> onResult("No connection. Your proposal wasn't sent.")
-                ProposalResult.NotSynced -> onResult("This listing or meeting point isn't on the server, so the proposal can't be sent.")
-                is ProposalResult.Rejected -> onResult(result.message ?: "The server couldn't save the proposal.")
-            }
-        }
-    }
-
-    suspend fun refreshProposal(repository: MeetingProposalRepository, product: Product) {
-        val latest = repository.latest(product.id) ?: return
-        val previous = meetingProposals[product.id]
-        if (latest == previous) return
-        showProposal(product, latest)
-        val justAccepted = latest.status == ProposalStatus.ACCEPTED &&
-            (previous?.remoteId != latest.remoteId || previous?.status != ProposalStatus.ACCEPTED)
-        if (justAccepted) {
-            val thread = threadFor(product)
-            Analytics.log(Events.MEETING_CONFIRMED, "product_id" to product.id, *chatStats(product.id, thread.size))
-            thread.add(ChatMessage("confirm-${latest.remoteId}", MessageAuthor.SYSTEM, "Confirmed! See you at ${latest.point.name}, ${latest.slot.day} at ${latest.slot.label.substringBefore(' ')}.", now()))
-        }
-    }
-
-    fun respondToProposal(repository: MeetingProposalRepository, product: Product, accept: Boolean, onResult: (error: String?) -> Unit) {
-        val proposal = meetingProposals[product.id] ?: return
-        viewModelScope.launch {
-            when (val result = repository.respond(proposal, accept)) {
-                is ProposalResult.Success -> {
-                    refreshProposal(repository, product)
-                    onResult(null)
-                }
-                ProposalResult.Offline -> onResult("No connection. Try again.")
-                ProposalResult.NotSynced -> onResult("This proposal isn't on the server.")
-                is ProposalResult.Rejected -> onResult(result.message ?: "The server couldn't save your answer.")
-            }
-        }
-    }
-
-    private fun showProposal(product: Product, proposal: MeetingProposal) {
-        meetingProposals[product.id] = proposal
-        val thread = threadFor(product)
-        val text = when (proposal.status) {
-            ProposalStatus.ACCEPTED -> "Meeting confirmed"
-            ProposalStatus.DECLINED -> "Meeting declined"
-            else -> "Meeting point proposed"
-        }
-        thread.removeAll { it.proposal != null }
-        thread.add(ChatMessage("proposal-${proposal.remoteId}", MessageAuthor.SYSTEM, text, now(), proposal = proposal))
-    }
-
-    private fun chatStats(productId: String, messages: Int): Array<Pair<String, Any?>> = arrayOf(
-        "messages_in_thread" to messages,
-        "elapsed_ms" to chatStartedAt[productId]?.let { System.currentTimeMillis() - it },
-    )
-
-    private fun updateStatus(thread: SnapshotStateList<ChatMessage>, id: String, status: MessageStatus) {
-        val index = thread.indexOfFirst { it.id == id }
-        if (index >= 0) thread[index] = thread[index].copy(status = status)
-    }
-
-    private fun now(): String = LocalTime.now().format(timeFormatter)
 
     /**
      * Signed-in users publish through the outbox, so the listing survives having no signal and is

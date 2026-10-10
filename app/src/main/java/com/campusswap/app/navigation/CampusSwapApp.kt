@@ -12,6 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +35,7 @@ import com.campusswap.app.screens.cart.CartScreen
 import com.campusswap.app.screens.cart.CheckoutScreen
 import com.campusswap.app.screens.cart.OrderConfirmationScreen
 import com.campusswap.app.screens.chat.ChatScreen
+import com.campusswap.app.screens.chat.MessagesScreen
 import com.campusswap.app.screens.home.AlertsScreen
 import com.campusswap.app.screens.home.HomeScreen
 import com.campusswap.app.screens.home.NotificationsScreen
@@ -91,6 +95,14 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
             appViewModel.loadMaterials(container.materialRepository)
             // Anything queued before a log-out or an expired session goes out with the new one.
             container.outboxRepository.syncNow()
+        }
+    }
+
+    var unreadMessages by remember { mutableIntStateOf(0) }
+    LaunchedEffect(appViewModel.isLoggedIn, currentRoute) {
+        while (appViewModel.isLoggedIn) {
+            unreadMessages = container.conversationsRepository.unreadCount()
+            delay(UNREAD_POLL_MS)
         }
     }
 
@@ -185,6 +197,8 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                     onSearchClick = { navigateToTab(Routes.SEARCH) },
                     onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
                     onWishlistClick = { navController.navigate(Routes.WISHLIST) },
+                    onMessagesClick = { navController.navigate(Routes.MESSAGES) },
+                    unreadMessages = unreadMessages,
                 )
             }
 
@@ -277,6 +291,13 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                 )
             }
 
+            composable(Routes.MESSAGES) {
+                MessagesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenChat = { id -> navController.navigate(Routes.chat(id)) },
+                )
+            }
+
             composable(Routes.CHAT) { entry ->
                 val productId = entry.arguments?.getString("productId").orEmpty()
                 RequireSession(navController, container.sessionManager) {
@@ -356,3 +377,5 @@ private fun RequireSession(navController: NavHostController, sessions: SessionMa
         }
     }
 }
+
+private const val UNREAD_POLL_MS = 15_000L
