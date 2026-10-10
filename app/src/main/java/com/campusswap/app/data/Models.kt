@@ -52,7 +52,12 @@ data class Product(
     val reviewCount: Int,
     val seller: Seller,
     val imageSeed: Int,
+    /** Set while the listing only exists on this phone, waiting in the outbox to reach the server. */
+    val pendingSync: PendingSync? = null,
 )
+
+/** [failedReason] is null while the listing is still queued, and the server's answer once it was refused. */
+data class PendingSync(val localId: Long, val failedReason: String?)
 
 data class CartLine(
     val product: Product,
@@ -72,7 +77,8 @@ data class AppNotification(
 
 // ---- In-app chat (View 09) ----
 
-enum class MessageStatus { SENDING, SENT, DELIVERED, READ }
+/** QUEUED: saved on the phone, waiting for a connection. FAILED: the server refused it. */
+enum class MessageStatus { QUEUED, SENDING, SENT, DELIVERED, READ, FAILED }
 
 enum class MessageAuthor { ME, OTHER, SYSTEM }
 

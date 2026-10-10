@@ -50,6 +50,14 @@ import com.campusswap.app.data.materials.RetrofitMaterialRemoteDataSource
 import com.campusswap.app.data.ratings.RatingRepository
 import com.campusswap.app.data.ratings.RatingsApi
 import com.campusswap.app.data.ratings.RetrofitRatingRemoteDataSource
+import com.campusswap.app.data.connectivity.ConnectivityObserver
+import com.campusswap.app.data.connectivity.NetworkConnectivityObserver
+import com.campusswap.app.data.local.CampusSwapDatabase
+import com.campusswap.app.data.local.DataStoreDraftStore
+import com.campusswap.app.data.local.DraftStore
+import com.campusswap.app.data.sync.OutboxRepository
+import com.campusswap.app.data.sync.OutboxSync
+import com.campusswap.app.data.sync.OutboxWorker
 
 class AppContainer(context: Context) {
     val clock: Clock = Clock.systemDefaultZone()
@@ -82,20 +90,21 @@ class AppContainer(context: Context) {
 
     val meetingPointRepository = MeetingPointRepository(RetrofitMeetingPointRemoteDataSource(api))
 
-    val chatRoomRepository = ChatRoomRepository(
-        RetrofitChatRoomRemoteDataSource(ApiClient.create<ChatRoomsApi>(BuildConfig.BASE_URL, backendClient)),
+    private val chatRoomRemote = RetrofitChatRoomRemoteDataSource(
+        ApiClient.create<ChatRoomsApi>(BuildConfig.BASE_URL, backendClient),
     )
 
-    val conversationsRepository = ConversationsRepository(
-        remote = RetrofitChatRoomRemoteDataSource(ApiClient.create<ChatRoomsApi>(BuildConfig.BASE_URL, backendClient)),
-        currentUserId = { sessionManager.validSession()?.userId },
+    private val messageRemote = RetrofitMessageRemoteDataSource(
+        ApiClient.create<MessagesApi>(BuildConfig.BASE_URL, backendClient),
     )
 
-    val chatRepository = ChatRepository(
-        rooms = chatRoomRepository,
-        remote = RetrofitMessageRemoteDataSource(ApiClient.create<MessagesApi>(BuildConfig.BASE_URL, backendClient)),
-        currentUserId = { sessionManager.validSession()?.userId },
-    )
+    private val signedInUserId: () -> String? = { sessionManager.validSession()?.userId }
+
+    val chatRoomRepository = ChatRoomRepository(chatRoomRemote)
+
+    val conversationsRepository = ConversationsRepository(chatRoomRemote, signedInUserId)
+
+    val chatRepository = ChatRepository(chatRoomRepository, messageRemote, signedInUserId)
 
     val meetingProposalRepository = MeetingProposalRepository(
         rooms = chatRoomRepository,
@@ -105,13 +114,30 @@ class AppContainer(context: Context) {
     val popularityRepository = MeetingPointPopularityRepository(RetrofitPopularityRemoteDataSource(analyticsApi))
 
     val counterpartLocationSource: CounterpartLocationSource =
-        ProposedMeetingLocation(meetingProposalRepository) { sessionManager.validSession()?.userId }
+        ProposedMeetingLocation(meetingProposalRepository, signedInUserId)
 
     val rankingStrategySelector: RankingStrategySelector = TimeOfDayStrategySelector()
 
     val notificationRepository = NotificationRepository(RetrofitNotificationRemoteDataSource(notificationsApi))
 
-    val materialRepository = MaterialRepository(RetrofitMaterialRemoteDataSource(materialsApi))
+    private val database = CampusSwapDatabase.create(context)
+
+    private val materialRemote = RetrofitMaterialRemoteDataSource(materialsApi)
+
+    val materialRepository = MaterialRepository(materialRemote, database.cachedMaterials(), clock)
+
+    val connectivity: ConnectivityObserver = NetworkConnectivityObserver(context)
+
+    val draftStore: DraftStore = DataStoreDraftStore(context)
+
+    val outboxSync = OutboxSync(
+        database.outbox(),
+        materialRemote,
+        chatRoomRepository,
+        messageRemote,
+    )
+
+    val outboxRepository = OutboxRepository(database.outbox(), clock) { OutboxWorker.schedule(context) }
 
     val ratingRepository = RatingRepository(RetrofitRatingRemoteDataSource(ratingsApi))
 }

@@ -187,7 +187,7 @@ fun LoginScreen(
             Button(
                 onClick = { attemptLogin() },
                 enabled = !isLoading,
-                modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 8.dp),
+                modifier = Modifier.padding(top = 8.dp).fillMaxWidth().height(52.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
             ) {
                 if (isLoading) {
@@ -199,7 +199,7 @@ fun LoginScreen(
 
             OutlinedButton(
                 onClick = {onLoginSuccess(null) },
-                modifier = Modifier.fillMaxWidth().height(52.dp).padding(top = 12.dp),
+                modifier = Modifier.padding(top = 12.dp).fillMaxWidth().height(52.dp),
             ) {
                 Text("Continue with demo access")
             }

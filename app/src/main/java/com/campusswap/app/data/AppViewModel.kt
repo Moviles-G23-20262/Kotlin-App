@@ -7,14 +7,21 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.campusswap.app.analytics.Analytics
 import com.campusswap.app.analytics.Events
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import com.campusswap.app.data.notifications.NotificationRepository
 import com.campusswap.app.data.materials.MaterialRepository
+import com.campusswap.app.data.connectivity.ConnectivityObserver
+import com.campusswap.app.data.local.PendingListingEntity
+import com.campusswap.app.data.local.PendingMessageEntity
+import com.campusswap.app.data.sync.OutboxRepository
 import com.campusswap.app.data.ratings.RatingRepository
 import com.campusswap.app.data.ratings.RatingResult
 
@@ -36,6 +43,95 @@ class AppViewModel : ViewModel() {
     val currentUser = SampleData.currentSeller
 
     val allProducts = mutableStateListOf<Product>().apply { addAll(SampleData.products) }
+
+    // ---- Eventual connectivity ----
+
+    var isOnline by mutableStateOf(true)
+        private set
+
+    /** False when Home is showing the on-device copy of the listings because the server couldn't be reached. */
+    var materialsLive by mutableStateOf(true)
+        private set
+
+    var materialsUpdatedAtMillis by mutableStateOf<Long?>(null)
+        private set
+
+    private var outbox: OutboxRepository? = null
+    private var materialRepository: MaterialRepository? = null
+    private var sessionUserId: () -> String? = { null }
+
+    /**
+     * Starts the offline machinery once per app run: follows the network state, refreshes the
+     * listings and sends the outbox when the connection comes back, and mirrors the outbox
+     * (Room) into the UI so queued listings show their state.
+     */
+    fun startOfflineSync(
+        connectivity: ConnectivityObserver,
+        outbox: OutboxRepository,
+        materials: MaterialRepository,
+        sessionUserId: () -> String?,
+    ) {
+        if (this.outbox != null) return
+        this.outbox = outbox
+        this.materialRepository = materials
+        this.sessionUserId = sessionUserId
+        viewModelScope.launch {
+            var wasOnline = connectivity.isOnline.value
+            connectivity.isOnline.collect { online ->
+                isOnline = online
+                if (online && !wasOnline) onBackOnline()
+                wasOnline = online
+            }
+        }
+        viewModelScope.launch { outbox.pendingListings.collect { allPendingListings = it; showPendingListings() } }
+        if (sessionUserId() != null) outbox.syncNow()
+    }
+
+    private var allPendingListings: List<PendingListingEntity> = emptyList()
+
+    /** The outbox may hold another account's items; each user only sees their own. */
+    private fun refreshPendingViews() {
+        showPendingListings()
+    }
+
+    private fun onBackOnline() {
+        if (sessionUserId() != null) {
+            materialRepository?.let(::loadMaterials)
+            outbox?.syncNow()
+        }
+    }
+
+    private var pendingListingIds: Set<Long> = emptySet()
+
+    private fun showPendingListings() {
+        val rows = allPendingListings.filter { it.ownerId == currentUserId }
+        val published = pendingListingIds - rows.map { it.localId }.toSet()
+        pendingListingIds = rows.map { it.localId }.toSet()
+        allProducts.removeAll { it.pendingSync != null }
+        allProducts.addAll(0, rows.reversed().map { it.toProduct() })
+        // A listing left the outbox because the server accepted it: fetch it back as a real listing.
+        if (published.isNotEmpty()) materialRepository?.let(::loadMaterials)
+    }
+
+    private fun PendingListingEntity.toProduct() = Product(
+        id = pendingProductId(localId),
+        title = title,
+        description = description,
+        price = price.toDoubleOrNull() ?: 0.0,
+        category = Category.entries.firstOrNull { it.name == category } ?: Category.SUPPLIES,
+        course = courseCode?.let { code -> SampleData.courses.firstOrNull { it.code == code } ?: Course(code, code) },
+        condition = Condition.entries.firstOrNull { it.name == condition } ?: Condition.GOOD,
+        rating = null,
+        reviewCount = 0,
+        seller = currentUser,
+        imageSeed = (localId % 12).toInt(),
+        pendingSync = PendingSync(localId, failedReason),
+    )
+
+    fun discardPendingListing(product: Product) {
+        val sync = product.pendingSync ?: return
+        viewModelScope.launch { outbox?.discardListing(sync.localId) }
+    }
 
     val cart = mutableStateListOf<CartLine>()
 
@@ -59,6 +155,7 @@ class AppViewModel : ViewModel() {
     fun login(userId: String? = null) {
         currentUserId = userId
         isLoggedIn = true
+        refreshPendingViews()
         Analytics.log(Events.LOGIN_SUCCESS)
     }
 
@@ -125,6 +222,7 @@ class AppViewModel : ViewModel() {
     fun restoreSession(userId: String) {
         currentUserId = userId
         isLoggedIn = true
+        refreshPendingViews()
     }
 
     fun logout() {
@@ -132,6 +230,7 @@ class AppViewModel : ViewModel() {
         cart.clear()
         currentUserId = null
         notifications.clear()
+        refreshPendingViews()
     }
 
     fun isWishlisted(productId: String) = wishlist.contains(productId)
@@ -340,8 +439,10 @@ class AppViewModel : ViewModel() {
     fun loadMaterials(repository: MaterialRepository) {
         viewModelScope.launch {
             val feed = repository.load()
+            materialsLive = feed.isLive
+            materialsUpdatedAtMillis = feed.updatedAtMillis
             allProducts.removeAll { it.id in loadedMaterialIds }
-            allProducts.addAll(0, feed.products)
+            allProducts.addAll(allProducts.count { it.pendingSync != null }, feed.products)
             loadedMaterialIds = feed.products.map { it.id }.toSet()
         }
     }
@@ -360,7 +461,20 @@ class AppViewModel : ViewModel() {
         meetingProposals[productId] = proposal
     }
 
-    fun publishListing(draft: SellDraft): Product {
+    /**
+     * Signed-in users publish through the outbox, so the listing survives having no signal and is
+     * sent by WorkManager when possible. Demo access keeps the listing on the phone only.
+     */
+    suspend fun publishListing(draft: SellDraft): Product {
+        val queue = outbox
+        val userId = sessionUserId()
+        if (queue != null && userId != null) {
+            val product = queue.queueListing(draft, userId).toProduct()
+            logListingPublished(draft, product.price)
+            // Room's Flow adds it to the feed too; adding it now means the listing can be opened right away.
+            if (allProducts.none { it.id == product.id }) allProducts.add(0, product)
+            return product
+        }
         val product = Product(
             id = "local-${allProducts.size + 1}",
             title = draft.title.trim(),
@@ -375,17 +489,21 @@ class AppViewModel : ViewModel() {
             imageSeed = (allProducts.size + 1),
         )
         allProducts.add(0, product)
+        logListingPublished(draft, product.price)
+        return product
+    }
+
+    private fun logListingPublished(draft: SellDraft, price: Double) {
         Analytics.log(
             Events.LISTING_PUBLISHED,
             "category" to draft.category.name,
-            "price" to product.price,
+            "price" to price,
             "photo_count" to draft.photoCount,
             "course_empty" to (draft.course == null),
             "condition_empty" to (draft.condition == null),
             "description_length" to draft.description.length,
         )
         publishMatchNotifications()
-        return product
     }
 
     init {
@@ -397,6 +515,8 @@ data class FeaturedSeller(
     val seller: Seller,
     val itemCount: Int,
 )
+
+fun pendingProductId(localId: Long) = "pending-$localId"
 
 const val DEMO_USERNAME = "uwu"
 const val DEMO_PASSWORD = "uwu123"
@@ -418,6 +538,10 @@ data class SellDraft(
             InputValidation.titleError(title) == null &&
             InputValidation.descriptionError(description) == null &&
             InputValidation.priceError(price) == null
+
+    val isDirty: Boolean
+        get() = title.isNotBlank() || description.isNotBlank() || photoCount > 0 ||
+            course != null || condition != null || price.isNotBlank()
 
     val isCourseConditionValid: Boolean
         get() = (notAssociatedWithCourse || course != null) && condition != null

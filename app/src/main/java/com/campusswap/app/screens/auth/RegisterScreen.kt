@@ -201,7 +201,7 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
                 Button(
                     onClick = { attemptRegister() },
                     enabled = !isLoading,
-                    modifier = Modifier.fillMaxWidth().height(60.dp).padding(top = 8.dp),
+                    modifier = Modifier.padding(top = 16.dp).fillMaxWidth().height(52.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
                 ) {
                     if (isLoading) {

@@ -17,6 +17,8 @@ import com.campusswap.app.data.MessageStatus
 import com.campusswap.app.data.ProposalResult
 import com.campusswap.app.data.ProposalStatus
 import com.campusswap.app.data.SendResult
+import com.campusswap.app.data.local.PendingMessageEntity
+import com.campusswap.app.data.sync.OutboxRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -43,19 +45,29 @@ class ChatViewModel(
     private val productId: String,
     private val chat: ChatRepository,
     private val proposals: MeetingProposalRepository,
+    private val outbox: OutboxRepository,
+    private val currentUserId: () -> String?,
+    private val isOnline: () -> Boolean,
     private val onProposalChanged: (String, MeetingProposal) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
 
     private var pollJob: Job? = null
-    private var pending: List<ChatMessage> = emptyList()
+    private var delivered: List<ChatMessage> = emptyList()
+    private var queued: List<PendingMessageEntity> = emptyList()
     private var lastProposalStatus: ProposalStatus? = null
     private var firstContact = true
     private var counterpart: String? = null
 
     init {
         startPolling()
+        viewModelScope.launch {
+            outbox.pendingMessages.collect { rows ->
+                queued = rows.filter { it.materialId == productId && it.ownerId == currentUserId() }
+                republish()
+            }
+        }
     }
 
     private fun startPolling() {
@@ -82,22 +94,39 @@ class ChatViewModel(
     }
 
     private fun publish(messages: List<ChatMessage>) {
-        val confirmed = messages.mapTo(mutableSetOf()) { it.text }
-        pending = pending.filterNot { it.text in confirmed }
-        val proposal = chat.latestProposal(messages)
+        delivered = messages
         if (messages.any { it.author == MessageAuthor.ME }) firstContact = false
-        reportConfirmation(messages, proposal)
+        reportConfirmation(messages, chat.latestProposal(messages))
+        republish()
+        viewModelScope.launch { chat.markRead(productId) }
+    }
+
+    /** The thread is what the server has, followed by whatever is still waiting in the outbox. */
+    private fun republish() {
+        val proposal = chat.latestProposal(delivered)
         _state.value = ChatUiState(
             availability = ChatAvailability.READY,
-            messages = messages + pending,
+            messages = delivered + queued.map(::toPendingMessage),
             proposal = proposal,
-            isSending = pending.isNotEmpty(),
+            isSending = queued.isNotEmpty(),
             error = _state.value.error,
             counterpartName = counterpart,
         )
         proposal?.let { onProposalChanged(productId, it) }
-        viewModelScope.launch { chat.markRead(productId) }
     }
+
+    private fun toPendingMessage(row: PendingMessageEntity) = ChatMessage(
+        id = row.localId,
+        author = MessageAuthor.ME,
+        text = row.content,
+        time = "",
+        status = when {
+            row.failedReason != null -> MessageStatus.FAILED
+            isOnline() -> MessageStatus.SENDING
+            else -> MessageStatus.QUEUED
+        },
+        sentAt = Instant.ofEpochMilli(row.createdAtMillis),
+    )
 
     private fun reportConfirmation(messages: List<ChatMessage>, proposal: MeetingProposal?) {
         val status = proposal?.status
@@ -118,45 +147,25 @@ class ChatViewModel(
         return stamps.last().toEpochMilli() - stamps.first().toEpochMilli()
     }
 
+    /**
+     * The message goes to the outbox, so it survives having no signal and is sent by the
+     * background sync. It appears in the thread right away as queued or sending.
+     */
     fun send(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty() || !_state.value.canSend) return
-        val optimistic = ChatMessage(
-            id = "pending-${System.currentTimeMillis()}",
-            author = MessageAuthor.ME,
-            text = trimmed,
-            time = "",
-            status = MessageStatus.SENDING,
-            sentAt = Instant.now(),
-        )
-        pending = pending + optimistic
-        _state.update { it.copy(messages = it.messages + optimistic, isSending = true, error = null) }
+        val userId = currentUserId() ?: return
 
         viewModelScope.launch {
-            when (val result = chat.send(productId, trimmed)) {
-                is SendResult.Success -> {
-                    val mine = _state.value.messages.count { it.author == MessageAuthor.ME }
-                    if (firstContact) {
-                        firstContact = false
-                        Analytics.log(Events.CONTACT_SELLER, "product_id" to productId)
-                    }
-                    Analytics.log(Events.CHAT_MESSAGE_SENT, "product_id" to productId, "my_messages" to mine)
-                    refresh()
-                }
-                SendResult.Offline -> failSend("No connection. Your message wasn't sent.")
-                SendResult.NotSynced -> failSend("This listing isn't on the server, so the chat can't be opened.")
-                is SendResult.Rejected -> failSend(result.message ?: "The server couldn't save your message.")
+            outbox.queueMessage("pending-${System.currentTimeMillis()}", userId, productId, trimmed)
+            if (firstContact) {
+                firstContact = false
+                Analytics.log(Events.CONTACT_SELLER, "product_id" to productId)
             }
-        }
-    }
-
-    private fun failSend(reason: String) {
-        pending = emptyList()
-        _state.update { state ->
-            state.copy(
-                messages = state.messages.filterNot { it.status == MessageStatus.SENDING },
-                isSending = false,
-                error = reason,
+            Analytics.log(
+                Events.CHAT_MESSAGE_SENT,
+                "product_id" to productId,
+                "my_messages" to _state.value.messages.count { it.author == MessageAuthor.ME },
             )
         }
     }
@@ -180,16 +189,23 @@ class ChatViewModel(
     companion object {
         const val POLL_INTERVAL_MS = 5_000L
 
-        fun factory(container: AppContainer, productId: String, onProposalChanged: (String, MeetingProposal) -> Unit) =
-            viewModelFactory {
-                initializer {
-                    ChatViewModel(
-                        productId = productId,
-                        chat = container.chatRepository,
-                        proposals = container.meetingProposalRepository,
-                        onProposalChanged = onProposalChanged,
-                    )
-                }
+        fun factory(
+            container: AppContainer,
+            productId: String,
+            isOnline: () -> Boolean,
+            onProposalChanged: (String, MeetingProposal) -> Unit,
+        ) = viewModelFactory {
+            initializer {
+                ChatViewModel(
+                    productId = productId,
+                    chat = container.chatRepository,
+                    proposals = container.meetingProposalRepository,
+                    outbox = container.outboxRepository,
+                    currentUserId = { container.sessionManager.validSession()?.userId },
+                    isOnline = isOnline,
+                    onProposalChanged = onProposalChanged,
+                )
             }
+        }
     }
 }
