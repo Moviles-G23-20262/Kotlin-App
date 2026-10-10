@@ -44,6 +44,7 @@ object Events {
     const val CRASH = "crash"                                   // BQ1
     const val LISTING_OPENED = "listing_opened"                 // BQ2, BQ6
     const val CHAT_MESSAGE_SENT = "chat_message_sent"           // BQ4
+    const val CONTACT_SELLER = "contact_seller"                 // BQ2
     const val MEETING_PROPOSED = "meeting_proposed"             // BQ4
     const val MEETING_CONFIRMED = "meeting_confirmed"           // BQ4
     const val LISTING_PUBLISHED = "listing_published"           // BQ3, BQ6, BQ8, BQ9

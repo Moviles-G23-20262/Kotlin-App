@@ -50,6 +50,7 @@ class ChatViewModel(
     private var pollJob: Job? = null
     private var pending: List<ChatMessage> = emptyList()
     private var lastProposalStatus: ProposalStatus? = null
+    private var firstContact = true
 
     init {
         startPolling()
@@ -79,6 +80,7 @@ class ChatViewModel(
         val confirmed = messages.mapTo(mutableSetOf()) { it.text }
         pending = pending.filterNot { it.text in confirmed }
         val proposal = chat.latestProposal(messages)
+        if (messages.any { it.author == MessageAuthor.ME }) firstContact = false
         reportConfirmation(messages, proposal)
         _state.value = ChatUiState(
             availability = ChatAvailability.READY,
@@ -127,11 +129,12 @@ class ChatViewModel(
         viewModelScope.launch {
             when (val result = chat.send(productId, trimmed)) {
                 is SendResult.Success -> {
-                    Analytics.log(
-                        Events.CHAT_MESSAGE_SENT,
-                        "product_id" to productId,
-                        "my_messages" to _state.value.messages.count { it.author == MessageAuthor.ME },
-                    )
+                    val mine = _state.value.messages.count { it.author == MessageAuthor.ME }
+                    if (firstContact) {
+                        firstContact = false
+                        Analytics.log(Events.CONTACT_SELLER, "product_id" to productId)
+                    }
+                    Analytics.log(Events.CHAT_MESSAGE_SENT, "product_id" to productId, "my_messages" to mine)
                     refresh()
                 }
                 SendResult.Offline -> failSend("No connection. Your message wasn't sent.")
