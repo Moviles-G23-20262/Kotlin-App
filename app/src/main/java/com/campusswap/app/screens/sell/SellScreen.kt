@@ -87,6 +87,17 @@ import com.campusswap.app.ui.theme.SecondaryBlue
 import com.campusswap.app.ui.theme.SuccessGreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.clip
+import com.campusswap.app.components.RemoteImage
 
 private enum class SellStep(val title: String) {
     PRODUCT_INFO("Photos & Info"),
@@ -109,6 +120,7 @@ fun SellScreen(
     var draftRestored by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val draftStore = (LocalContext.current.applicationContext as CampusSwapApplication).container.draftStore
+    val photoStore = (LocalContext.current.applicationContext as CampusSwapApplication).container.listingPhotos
 
     val isDirty = draft.isDirty
 
@@ -225,6 +237,7 @@ fun SellScreen(
                 TextButton(
                     onClick = {
                         showDiscardDialog = false
+                        photoStore.delete(draft.photoPaths)
                         draft = SellDraft()
                         step = SellStep.PRODUCT_INFO
                         scope.launch { draftStore.clear() }
@@ -252,7 +265,7 @@ private fun StepIndicator(step: SellStep, modifier: Modifier = Modifier) {
         }
     }
 }
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProductInfoStep(
     draft: SellDraft,
@@ -265,6 +278,48 @@ private fun ProductInfoStep(
     val showTitleError = draft.title.isNotEmpty() && InputValidation.titleError(draft.title) != null
     val showDescriptionError = draft.description.isNotEmpty() && InputValidation.descriptionError(draft.description) != null
     val showPriceError = draft.price.isNotEmpty() && InputValidation.priceError(draft.price) != null
+
+    val context = LocalContext.current
+    val photoStore = (context.applicationContext as CampusSwapApplication).container.listingPhotos
+    val scope = rememberCoroutineScope()
+    var showPhotoOptions by remember { mutableStateOf(false) }
+    // rememberSaveable: Android puede destruir la pantalla mientras la cámara está abierta
+    var cameraPath by rememberSaveable { mutableStateOf<String?>(null) }
+
+    fun addPhoto(path: String?) {
+        if (path != null) onDraftChange(draft.copy(photoPaths = draft.photoPaths + path))
+    }
+
+    val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
+        val path = cameraPath
+        if (taken && path != null) scope.launch { addPhoto(photoStore.finishCameraPhoto(path)) }
+    }
+    val pickFromGallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) scope.launch { addPhoto(photoStore.importFromGallery(uri)) }
+    }
+
+    if (showPhotoOptions) {
+        ModalBottomSheet(onDismissRequest = { showPhotoOptions = false }) {
+            ListItem(
+                headlineContent = { Text("Take a photo") },
+                leadingContent = { Icon(Icons.Outlined.PhotoCamera, contentDescription = null, tint = AccentBlue) },
+                modifier = Modifier.clickable {
+                    showPhotoOptions = false
+                    val (uri, path) = photoStore.newCameraTarget()
+                    cameraPath = path
+                    takePhoto.launch(uri)
+                },
+            )
+            ListItem(
+                headlineContent = { Text("Choose from gallery") },
+                leadingContent = { Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, tint = AccentBlue) },
+                modifier = Modifier.clickable {
+                    showPhotoOptions = false
+                    pickFromGallery.launch("image/*")
+                }.padding(bottom = 24.dp),
+            )
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -295,12 +350,12 @@ private fun ProductInfoStep(
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            items(draft.photoCount) { index ->
+            itemsIndexed(draft.photoPaths) { index, path ->
                 Box(modifier = Modifier.size(84.dp)) {
-                    ProductPlaceholderImage(
-                        category = draft.category,
-                        seed = index,
-                        modifier = Modifier.fillMaxSize(),
+                    RemoteImage(
+                        url = "file://$path",
+                        contentDescription = "Photo ${index + 1}",
+                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
                     )
                     if (index == 0) {
                         Icon(
@@ -314,8 +369,10 @@ private fun ProductInfoStep(
                         )
                     }
                     IconButton(
-                        onClick = { onDraftChange(draft.copy(photoCount = draft.photoCount - 1)) },
-                        modifier = Modifier.align(Alignment.TopEnd).size(24.dp),
+                        onClick = {
+                            photoStore.delete(listOf(path))
+                            onDraftChange(draft.copy(photoPaths = draft.photoPaths - path))
+                        },                        modifier = Modifier.align(Alignment.TopEnd).size(24.dp),
                     ) {
                         Icon(
                             Icons.Filled.Close,
@@ -334,7 +391,7 @@ private fun ProductInfoStep(
                         .size(84.dp)
                         .background(SecondaryBlue.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
                         .clickable(enabled = draft.photoCount < 6) {
-                            onDraftChange(draft.copy(photoCount = draft.photoCount + 1))
+                            showPhotoOptions = true
                         },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -563,10 +620,10 @@ private fun ReviewStep(
         }
 
         if (draft.photoCount > 0) {
-            ProductPlaceholderImage(
-                category = draft.category,
-                seed = 0,
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(top = 8.dp),
+            RemoteImage(
+                url = "file://${draft.photoPaths.first()}",
+                contentDescription = "Cover photo",
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).padding(top = 8.dp).clip(RoundedCornerShape(12.dp)),
             )
         }
         Text(draft.title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(top = 14.dp))

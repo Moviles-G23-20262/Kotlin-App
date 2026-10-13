@@ -37,7 +37,7 @@ fun WishlistScreen(
     onBack: () -> Unit,
 ) {
     val c = CampusSwapTheme.colors
-    val saved = vm.allProducts.filter { vm.isWishlisted(it.id) }
+    val saved = vm.wishlistProducts.toList()
     val matchCount = vm.alertMatches.size
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {

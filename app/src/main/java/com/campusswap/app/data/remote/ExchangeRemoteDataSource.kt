@@ -5,6 +5,8 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
+import com.campusswap.app.data.materials.MaterialDto
+import com.campusswap.app.data.materials.MaterialSellerDto
 
 interface ExchangesApi {
     @GET("exchanges")
@@ -17,7 +19,19 @@ interface ExchangesApi {
     suspend fun complete(@Path("id") id: String, @Body body: CompleteExchangeRequest): ExchangeDto
 }
 
-data class ExchangeDto(val id: String, val buyerId: String, val status: String)
+data class ExchangeDto(
+    val id: String,
+    val buyerId: String,
+    val status: String,
+    val orderNumber: Int? = null,
+    val materialId: String? = null,
+    val sellerId: String? = null,
+    val createdAt: String? = null,
+    val material: MaterialDto? = null,
+    val seller: MaterialSellerDto? = null,
+    val buyer: MaterialSellerDto? = null,
+    val completedAt: String? = null,
+)
 
 data class PlaceOrderRequest(val materialId: String)
 
@@ -34,4 +48,5 @@ class RetrofitExchangeRemoteDataSource(private val api: ExchangesApi) : Exchange
     override suspend fun placeOrder(materialId: String) = api.placeOrder(PlaceOrderRequest(materialId))
     override suspend fun complete(exchangeId: String, lat: Double?, lng: Double?) =
         api.complete(exchangeId, CompleteExchangeRequest(lat, lng))
+
 }

@@ -27,6 +27,7 @@ class OutboxSync(
     private val materials: MaterialRemoteDataSource,
     private val rooms: ChatRoomRepository,
     private val messages: MessageRemoteDataSource,
+    private val photos: ListingPhotoUploader = ListingPhotoUploader.None,
 ) {
     private sealed interface Attempt {
         data object Sent : Attempt
@@ -36,8 +37,15 @@ class OutboxSync(
 
     suspend fun flush(ownerId: String): SyncOutcome {
         for (listing in outbox.listingsToSend(ownerId)) {
-            when (val result = attempt { materials.create(listing.toRequest()) }) {
-                Attempt.Sent -> outbox.deleteListing(listing.localId)
+            val result = attempt {
+                val imageUrls = listing.photoPathList().mapNotNull { photos.upload(it) }
+                materials.create(listing.toRequest(imageUrls))
+            }
+            when (result) {
+                Attempt.Sent -> {
+                    outbox.deleteListing(listing.localId)
+                    photos.discard(listing.photoPathList())
+                }
                 Attempt.Retry -> {
                     outbox.markListingAttempt(listing.localId, null)
                     return SyncOutcome.RETRY_LATER
@@ -84,11 +92,15 @@ class OutboxSync(
     }.getOrNull()
 }
 
-private fun PendingListingEntity.toRequest() = CreateMaterialRequest(
+private fun PendingListingEntity.photoPathList(): List<String> =
+    photoPaths?.split("\n")?.filter { it.isNotBlank() }.orEmpty()
+
+private fun PendingListingEntity.toRequest(imageUrls: List<String>) = CreateMaterialRequest(
     title = title,
     description = description,
     courseCode = courseCode,
     price = price,
     condition = (Condition.entries.firstOrNull { it.name == condition } ?: Condition.GOOD).toServerCondition(),
     category = (Category.entries.firstOrNull { it.name == category } ?: Category.SUPPLIES).toServerCategory(),
+    imageUrls = imageUrls,
 )

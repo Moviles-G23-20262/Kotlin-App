@@ -7,6 +7,7 @@ import com.campusswap.app.data.Product
 import com.campusswap.app.data.Seller
 import com.campusswap.app.data.local.CachedMaterialEntity
 import kotlin.math.abs
+import java.time.Instant
 
 fun MaterialDto.toProduct(): Product = Product(
     id = id,
@@ -25,8 +26,14 @@ fun MaterialDto.toProduct(): Product = Product(
         rating = seller?.rating?.takeIf { it > 0 },
         reviewCount = 0,
         maskedEmail = seller?.email?.let(::maskEmail).orEmpty(),
+        major = seller?.major,
     ),
     imageSeed = abs(id.hashCode()) % 12,
+    imageUrls = imageUrls.orEmpty(),
+    edition = edition,
+    model = model,
+    createdAtMillis = createdAt?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() },
+    status = status,
 )
 
 private fun String.toAppCategory(): Category = when (this) {
@@ -37,12 +44,13 @@ private fun String.toAppCategory(): Category = when (this) {
 }
 
 private fun String?.toAppCondition(): Condition = when (this) {
-    "NEW", "LIKE_NEW" -> Condition.LIKE_NEW
+    "NEW" -> Condition.NEW
+    "LIKE_NEW" -> Condition.LIKE_NEW
     "FAIR" -> Condition.FAIR
     else -> Condition.GOOD
 }
 
-private fun maskEmail(email: String): String {
+fun maskEmail(email: String): String {
     val (user, domain) = email.split("@", limit = 2).let { it[0] to it.getOrElse(1) { "" } }
     return "${user.take(2)}***@$domain"
 }
@@ -59,6 +67,11 @@ fun MaterialDto.toCachedEntity(position: Int, cachedAtMillis: Long) = CachedMate
     sellerName = seller?.fullName,
     sellerEmail = seller?.email,
     sellerRating = seller?.rating,
+    sellerMajor = seller?.major,
+    imageUrls = imageUrls?.joinToString("\n"),
+    edition = edition,
+    model = model,
+    createdAt = createdAt,
     position = position,
     cachedAtMillis = cachedAtMillis,
 )
@@ -73,7 +86,11 @@ fun CachedMaterialEntity.toDto() = MaterialDto(
     status = status,
     category = category,
     sellerId = sellerId,
-    seller = if (sellerName != null && sellerEmail != null) MaterialSellerDto(sellerId, sellerEmail, sellerName, sellerRating) else null,
+    seller = if (sellerName != null) MaterialSellerDto(sellerId, sellerEmail, sellerName, sellerRating, major = sellerMajor) else null,
+    edition = edition,
+    model = model,
+    imageUrls = imageUrls?.split("\n")?.filter { it.isNotBlank() },
+    createdAt = createdAt,
 )
 
 /** Server enums for a listing written in the app. */

@@ -6,9 +6,11 @@ import retrofit2.http.POST
 
 data class MaterialSellerDto(
     val id: String,
-    val email: String,
+    val email: String?,
     val fullName: String,
     val rating: Double?,
+    val major: String? = null,
+    val faculty: String? = null,
 )
 
 data class MaterialDto(
@@ -22,6 +24,10 @@ data class MaterialDto(
     val category: String,
     val sellerId: String,
     val seller: MaterialSellerDto? = null,
+    val edition: String? = null,
+    val model: String? = null,
+    val imageUrls: List<String>? = null,
+    val createdAt: String? = null,
 )
 
 data class CreateMaterialRequest(

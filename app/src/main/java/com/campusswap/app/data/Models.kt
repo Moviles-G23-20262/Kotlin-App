@@ -4,6 +4,7 @@ import com.campusswap.app.domain.GeoPoint
 import java.time.Instant
 
 enum class Condition(val label: String) {
+    NEW("New"),
     LIKE_NEW("Like New"),
     GOOD("Good"),
     FAIR("Fair"),
@@ -38,6 +39,7 @@ data class Seller(
     val rating: Double?,
     val reviewCount: Int,
     val maskedEmail: String,
+    val major: String? = null,
 )
 
 data class Product(
@@ -54,7 +56,14 @@ data class Product(
     val imageSeed: Int,
     /** Set while the listing only exists on this phone, waiting in the outbox to reach the server. */
     val pendingSync: PendingSync? = null,
+    val imageUrls: List<String> = emptyList(),
+    val edition: String? = null,
+    val model: String? = null,
+    val createdAtMillis: Long? = null,
+    /** AVAILABLE, RESERVED o SOLD */
+    val status: String = "AVAILABLE",
 )
+
 
 /** [failedReason] is null while the listing is still queued, and the server's answer once it was refused. */
 data class PendingSync(val localId: Long, val failedReason: String?)
@@ -105,7 +114,8 @@ data class Conversation(
     val time: String,
     val unread: Int,
     val sellingThis: Boolean,
-)
+    val roomId: String = productId,
+   )
 
 // ---- Dynamic safe meeting points (View 10, "Campus Guardian" CAS) ----
 

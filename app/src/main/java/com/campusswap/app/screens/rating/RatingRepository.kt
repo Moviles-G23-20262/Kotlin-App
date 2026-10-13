@@ -12,6 +12,8 @@ sealed interface RatingResult {
     data class Rejected(val httpCode: Int) : RatingResult
 }
 
+data class ExchangeRatings(val mine: RatingDto?, val theirs: RatingDto?)
+
 class RatingRepository(private val remote: RatingRemoteDataSource) {
 
     suspend fun submit(
@@ -34,5 +36,30 @@ class RatingRepository(private val remote: RatingRemoteDataSource) {
         RatingResult.Offline
     } catch (e: HttpException) {
         RatingResult.Rejected(e.code())
+    }
+
+    /** Lo que dice el backend sobre este intercambio; null si aún no está completado o no hay red. */
+    suspend fun exchangeRatings(productId: String, myUserId: String): ExchangeRatings? = try {
+        val exchangeId = remote.getExchanges(SeedIds.material(productId) ?: productId).firstOrNull()?.id
+        exchangeId?.let { id ->
+            val both = remote.getRatings(exchangeId = id)
+            ExchangeRatings(
+                mine = both.firstOrNull { it.raterId == myUserId },
+                theirs = both.firstOrNull { it.raterId != myUserId },
+            )
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
+    }
+
+    /** Calificaciones que recibió el usuario (para su perfil), de la más nueva a la más vieja; null sin red. */
+    suspend fun received(userId: String): List<RatingDto>? = try {
+        remote.getRatings(userId = userId)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        null
     }
 }

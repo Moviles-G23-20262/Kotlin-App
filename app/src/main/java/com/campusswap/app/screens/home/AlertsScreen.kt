@@ -46,7 +46,7 @@ import com.campusswap.app.components.MonoText
 import com.campusswap.app.components.Pill
 import com.campusswap.app.components.PriceText
 import com.campusswap.app.components.PrimaryButton
-import com.campusswap.app.components.ProductPlaceholderImage
+import com.campusswap.app.components.ProductPhoto
 import com.campusswap.app.components.SectionTitle
 import com.campusswap.app.components.campusCard
 import com.campusswap.app.components.formatPrice
@@ -160,9 +160,8 @@ private fun MatchCard(match: AlertMatch, onOpen: () -> Unit, onReserve: () -> Un
             .padding(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ProductPlaceholderImage(
-                category = match.product.category,
-                seed = match.product.imageSeed,
+            ProductPhoto(
+                product = match.product,
                 modifier = Modifier.size(68.dp),
                 cornerRadius = 10,
             )

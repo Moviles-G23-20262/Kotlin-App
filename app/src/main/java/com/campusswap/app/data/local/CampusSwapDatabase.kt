@@ -11,6 +11,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 /** Last listings fetched from the server, so Home still has content without a connection. */
 @Entity(tableName = "cached_materials")
@@ -27,6 +29,12 @@ data class CachedMaterialEntity(
     val sellerName: String?,
     val sellerEmail: String?,
     val sellerRating: Double?,
+    val sellerMajor: String? = null,
+    /** URLs separadas por salto de linea */
+    val imageUrls: String? = null,
+    val edition: String? = null,
+    val model: String? = null,
+    val createdAt: String? = null,
     /** Position in the server response, so the offline feed keeps the same order. */
     val position: Int,
     val cachedAtMillis: Long,
@@ -49,6 +57,7 @@ data class PendingListingEntity(
     val attempts: Int = 0,
     /** Set when the server refused the listing; it stays visible so the user knows it wasn't published. */
     val failedReason: String? = null,
+    val photoPaths: String? = null,
 )
 
 /** A chat message waiting to be delivered to the server. */
@@ -117,7 +126,7 @@ interface OutboxDao {
 
 @Database(
     entities = [CachedMaterialEntity::class, PendingListingEntity::class, PendingMessageEntity::class],
-    version = 1,
+    version = 3,
     exportSchema = false,
 )
 abstract class CampusSwapDatabase : RoomDatabase() {
@@ -125,8 +134,23 @@ abstract class CampusSwapDatabase : RoomDatabase() {
     abstract fun outbox(): OutboxDao
 
     companion object {
+        // v2: columnas nuevas de GET /materials (fotos, edición, modelo, fecha y carrera del vendedor)
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                listOf("sellerMajor", "imageUrls", "edition", "model", "createdAt").forEach { column ->
+                    db.execSQL("ALTER TABLE cached_materials ADD COLUMN $column TEXT")
+                }
+            }
+        }
+        // v3: fotos de las publicaciones pendientes del Outbox
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pending_listings ADD COLUMN photoPaths TEXT")
+            }
+        }
         fun create(context: Context): CampusSwapDatabase =
             Room.databaseBuilder(context, CampusSwapDatabase::class.java, "campusswap.db")
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
     }

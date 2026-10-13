@@ -56,6 +56,7 @@ class ConversationsRepository(
             time = sentAt?.let(::label).orEmpty(),
             unread = room.count?.messages ?: 0,
             sellingThis = selling,
+            roomId = room.id,
         )
     }
 
