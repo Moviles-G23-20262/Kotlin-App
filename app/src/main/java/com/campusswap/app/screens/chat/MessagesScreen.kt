@@ -71,7 +71,7 @@ fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit) {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(state.conversations, key = { it.productId }) { conversation ->
+                items(state.conversations, key = { it.roomId }) { conversation ->
                     ConversationRow(conversation) { onOpenChat(conversation.productId) }
                 }
             }

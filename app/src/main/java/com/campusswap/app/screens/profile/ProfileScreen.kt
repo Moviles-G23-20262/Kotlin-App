@@ -41,9 +41,17 @@ import com.campusswap.app.data.AppViewModel
 import com.campusswap.app.data.Product
 import com.campusswap.app.ui.theme.CampusSwapTheme
 import com.campusswap.app.ui.theme.CampusType
-
-private data class BuyerMessage(val from: String, val product: Product, val message: String, val time: String)
-
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.campusswap.app.CampusSwapApplication
+import com.campusswap.app.data.orders.Sale
+import com.campusswap.app.screens.chat.ConversationsViewModel
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun ProfileScreen(
@@ -57,17 +65,14 @@ fun ProfileScreen(
     val c = CampusSwapTheme.colors
     val user = vm.currentUser
     val listings = vm.myListings
-    val others = vm.allProducts.filter { it.seller.id != user.id }
-    val purchases = vm.pendingExchanges
-    val recentSales = others.take(2)
-    val messages = others.drop(2).take(3).mapIndexed { index, product ->
-        BuyerMessage(
-            from = listOf("Maria Gomez", "Juan Restrepo", "Luisa Fernandez")[index % 3],
-            product = product,
-            message = listOf("Is this still available?", "Can we meet at the library?", "Does it include the case?")[index % 3],
-            time = listOf("2m ago", "1h ago", "3h ago")[index % 3],
-        )
-    }
+        val purchases = vm.pendingExchanges
+    val recentSales = vm.sales.take(5)
+
+    // Conversaciones reales (las mismas de la bandeja de Carla) donde tú eres el vendedor
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    val inbox: ConversationsViewModel = viewModel(factory = ConversationsViewModel.factory(container))
+    val inboxState by inbox.state.collectAsState()
+    val buyerMessages = inboxState.conversations.filter { it.sellingThis }.take(3)
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
         CampusHeader {
@@ -105,8 +110,43 @@ fun ProfileScreen(
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         StatCard(CampusIcons.Package, listings.size.toString(), "Active Listings", Modifier.weight(1f))
-                        StatCard(CampusIcons.Wallet, formatCompact(recentSales.sumOf { it.price }), "Earned This Month", Modifier.weight(1f))
-                        StatCard(CampusIcons.TrendingUp, user.rating?.let { formatRating(it) } ?: "New", "Your Rating", Modifier.weight(1f))
+                        StatCard(CampusIcons.Wallet, formatCompact(vm.earnedThisMonth), "Earned This Month", Modifier.weight(1f))
+                        StatCard(
+                            CampusIcons.TrendingUp,
+                            vm.myRating?.let { "${formatRating(it)} (${vm.myReviews.size})" } ?: "New",
+                            "Your Rating",
+                            Modifier.weight(1f),
+                        )                    }
+                }
+            }
+
+            if (vm.myReviews.isNotEmpty()) {
+                item { SectionTitle("Reviews about you", icon = CampusIcons.Star, iconTint = c.text) }
+                items(vm.myReviews.take(5), key = { "review-${it.id}" }) { review ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .campusCard()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            InitialsAvatar(review.rater?.fullName ?: "Student", size = 32.dp)
+                            BodyText(
+                                review.rater?.fullName ?: "A student",
+                                color = c.text,
+                                weight = FontWeight.SemiBold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            MonoText("${review.stars}.0 ★")
+                        }
+                        review.review?.takeIf { it.isNotBlank() }?.let {
+                            BodyText(it, modifier = Modifier.padding(top = 8.dp))
+                        }
+                        if (review.tags.orEmpty().isNotEmpty()) {
+                            Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                review.tags.orEmpty().take(3).forEach { Badge(it) }
+                            }
+                        }
                     }
                 }
             }
@@ -196,8 +236,6 @@ fun ProfileScreen(
                             modifier = Modifier.padding(bottom = 8.dp),
                         ) {
                             Badge(product.condition.label)
-                            Icon(CampusIcons.Eye, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(15.dp))
-                            MonoText("${18 + product.imageSeed * 3} views")
                         }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -223,46 +261,55 @@ fun ProfileScreen(
 
             // Recent sales
             item { SectionTitle("Recent Sales", icon = CampusIcons.TrendingUp, iconTint = c.text) }
-            items(recentSales, key = { "sale-${it.id}" }) { product ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .campusCard()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                        BodyText(product.title, color = c.text, weight = FontWeight.SemiBold, maxLines = 1)
-                        BodyText("Sold to Ana Cruz · 2 days ago", size = CampusType.size2xs, color = c.textMuted)
+            if (recentSales.isEmpty()) {
+                item { BodyText("No sales yet. When someone buys one of your listings, it shows up here.", color = c.textMuted) }
+            } else {
+                items(recentSales, key = { "sale-${it.product.id}" }) { sale ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .campusCard()
+                            .clickable { onOpenChat(sale.product.id) }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                            BodyText(sale.product.title, color = c.text, weight = FontWeight.SemiBold, maxLines = 1)
+                            BodyText(saleLabel(sale), size = CampusType.size2xs, color = c.textMuted)
+                        }
+                        MonoText(formatPrice(sale.product.price), size = CampusType.sizeXs, color = c.accentHi, weight = FontWeight.Medium)
                     }
-                    MonoText(formatPrice(product.price), size = CampusType.sizeXs, color = c.accentHi, weight = FontWeight.Medium)
                 }
             }
 
             // Buyer messages
             item { SectionTitle("Buyer Messages", icon = CampusIcons.Message, iconTint = c.text) }
-            items(messages, key = { "msg-${it.product.id}" }) { msg ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .campusCard()
-                        .clickable { onOpenChat(msg.product.id) }
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
+            if (buyerMessages.isEmpty()) {
+                item { BodyText("No one has asked about your listings yet.", color = c.textMuted) }
+            } else {
+                items(buyerMessages, key = { "msg-${it.roomId}" }) { msg ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .campusCard()
+                            .clickable { onOpenChat(msg.productId) }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            InitialsAvatar(msg.from, size = 28.dp, fontSize = CampusType.size2xs)
-                            BodyText(msg.from, color = c.text, weight = FontWeight.SemiBold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                InitialsAvatar(msg.counterpartName, size = 28.dp, fontSize = CampusType.size2xs)
+                                BodyText(msg.counterpartName, color = c.text, weight = FontWeight.SemiBold)
+                            }
+                            MonoText(msg.time)
                         }
-                        MonoText(msg.time)
+                        BodyText("Re: ${msg.productTitle}", size = CampusType.size2xs, color = c.textMuted, maxLines = 1, modifier = Modifier.padding(bottom = 2.dp))
+                        BodyText(msg.lastMessage ?: "No messages yet")
                     }
-                    BodyText("Re: ${msg.product.title}", size = CampusType.size2xs, color = c.textMuted, maxLines = 1, modifier = Modifier.padding(bottom = 2.dp))
-                    BodyText(msg.message)
                 }
             }
         }
@@ -290,3 +337,13 @@ private fun formatCompact(amount: Double): String = when {
     amount >= 1_000 -> "$" + (amount / 1_000).toInt() + "k"
     else -> "$" + amount.toInt()
 }
+
+private val saleDay = DateTimeFormatter.ofPattern("d MMM", Locale.US)
+
+private fun saleLabel(sale: Sale): String =
+    if (sale.status == "COMPLETED") {
+        "Sold to ${sale.buyerName}" +
+            (sale.completedAtMillis?.let { " · " + saleDay.format(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())) } ?: "")
+    } else {
+        "Reserved by ${sale.buyerName} · meetup pending"
+    }

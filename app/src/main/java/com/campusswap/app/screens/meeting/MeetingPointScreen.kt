@@ -110,7 +110,7 @@ fun MeetingPointScreen(
     onBack: () -> Unit,
     onProposed: () -> Unit,
 ) {
-    val product = remember(productId, vm.allProducts.size) { vm.allProducts.find { it.id == productId } }
+    val product = remember(productId, vm.allProducts.size, vm.orders.size) { vm.findProduct(productId) }    
     if (product == null) {
         EmptyState(
             icon = Icons.AutoMirrored.Filled.ArrowBack,

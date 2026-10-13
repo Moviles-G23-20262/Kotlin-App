@@ -35,9 +35,8 @@ fun ProductCard(
             .campusCard(radius = 14.dp)
             .clickable(onClick = onClick),
     ) {
-        ProductPlaceholderImage(
-            category = product.category,
-            seed = product.imageSeed,
+        ProductPhoto(
+            product = product,
             modifier = Modifier.fillMaxWidth().height(imageHeight),
             cornerRadius = 0,
         )
@@ -69,7 +68,13 @@ fun ProductCard(
                 val ratingText = product.rating?.let { "${formatRating(it)} (${product.reviewCount})" } ?: "New"
                 RatingLabel(ratingText, modifier = Modifier.padding(bottom = 8.dp))
             }
-            Badge(product.condition.label, modifier = Modifier.padding(bottom = 6.dp))
+            // Vendido o reservado
+            val available = product.status == "AVAILABLE"
+            Badge(
+                text = if (available) product.condition.label else product.status,
+                highlighted = !available,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
             PriceText(product.price)
             product.pendingSync?.let { PendingSyncLabel(it, modifier = Modifier.padding(top = 6.dp)) }
         }
@@ -94,9 +99,8 @@ fun ProductRowCard(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ProductPlaceholderImage(
-            category = product.category,
-            seed = product.imageSeed,
+        ProductPhoto(
+            product = product,
             modifier = Modifier.size(thumbSize),
             cornerRadius = 10,
         )

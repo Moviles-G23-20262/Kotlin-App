@@ -27,24 +27,33 @@ import java.util.Collections
 private val cache = Collections.synchronizedMap(mutableMapOf<String, ImageBitmap>())
 
 @Composable
-fun RemoteImage(url: String, contentDescription: String?, modifier: Modifier = Modifier) {
+fun RemoteImage(
+    url: String,
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    fallback: (@Composable () -> Unit)? = null,
+) {
     var image by remember(url) { mutableStateOf(cache[url]) }
+    var failed by remember(url) { mutableStateOf(false) }
 
     LaunchedEffect(url) {
-        if (image == null) image = load(url)?.also { cache[url] = it }
+        if (image == null) {
+            image = load(url)?.also { cache[url] = it }
+            failed = image == null
+        }
     }
 
     Box(modifier = modifier.background(Color.Black.copy(alpha = 0.25f)), contentAlignment = Alignment.Center) {
         val loaded = image
-        if (loaded == null) {
-            CircularProgressIndicator(strokeWidth = 2.dp)
-        } else {
-            Image(
+        when {
+            loaded != null -> Image(
                 bitmap = loaded,
                 contentDescription = contentDescription,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop,
             )
+            failed && fallback != null -> fallback()
+            else -> CircularProgressIndicator(strokeWidth = 2.dp)
         }
     }
 }

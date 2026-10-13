@@ -48,7 +48,7 @@ import com.campusswap.app.components.InitialsAvatar
 import com.campusswap.app.components.PriceText
 import com.campusswap.app.components.PendingSyncLabel
 import com.campusswap.app.components.PrimaryButton
-import com.campusswap.app.components.ProductPlaceholderImage
+import com.campusswap.app.components.ProductPhoto
 import com.campusswap.app.components.RatingLabel
 import com.campusswap.app.components.SecondaryButton
 import com.campusswap.app.components.SectionTitle
@@ -75,8 +75,7 @@ fun ProductDetailScreen(
 ) {
     val c = CampusSwapTheme.colors
     // Not remembered by list size: a queued listing changes state (queued → refused) without the list growing.
-    val product = vm.allProducts.find { it.id == productId }
-
+    val product = vm.findProduct(productId)
     if (product == null) {
         Box(Modifier.fillMaxSize().background(c.bg), contentAlignment = Alignment.Center) {
             EmptyState(
@@ -109,11 +108,12 @@ fun ProductDetailScreen(
     ) {
         // Image carousel
         Box(modifier = Modifier.fillMaxWidth().height(290.dp).background(c.elevated)) {
-            val pagerState = rememberPagerState(pageCount = { 3 })
+            val pageCount = product.imageUrls.size.coerceAtLeast(1)
+            val pagerState = rememberPagerState(pageCount = { pageCount })
             HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                ProductPlaceholderImage(
-                    category = product.category,
-                    seed = product.imageSeed + page,
+                ProductPhoto(
+                    product = product,
+                    index = page,
                     modifier = Modifier.fillMaxSize(),
                     cornerRadius = 0,
                 )
@@ -143,7 +143,7 @@ fun ProductDetailScreen(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
             ) {
-                repeat(3) { index ->
+                if (pageCount > 1) repeat(pageCount) { index ->
                     Box(Modifier.pagerDot(active = index == pagerState.currentPage, activeColor = c.accentHi))
                 }
             }
@@ -231,10 +231,11 @@ fun ProductDetailScreen(
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 24.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
+            if (product.status == "AVAILABLE") Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                )
+             {
                 SecondaryButton(
                     text = if (addedTick > 0) "Added!" else "Add to Cart",
                     onClick = {
@@ -322,9 +323,8 @@ private fun RelatedCard(product: Product, onClick: () -> Unit) {
             .campusCard(radius = 14.dp)
             .clickable(onClick = onClick),
     ) {
-        ProductPlaceholderImage(
-            category = product.category,
-            seed = product.imageSeed,
+        ProductPhoto(
+            product = product,
             modifier = Modifier.fillMaxWidth().height(85.dp),
             cornerRadius = 0,
         )

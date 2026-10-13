@@ -168,14 +168,19 @@ fun CheckoutScreen(
             }
         }
 
+        vm.checkoutMessage?.let { message ->
+            BodyText(message, color = c.error, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        }
+
         BottomActionBar {
             PrimaryButton(
                 text = if (placing) "Placing Order..." else "Place Order",
                 onClick = {
                     placing = true
                     scope.launch {
-                        delay(1200)
-                        onOrderPlaced(vm.placeOrder(meetOnCampus = delivery == DeliveryMethod.CAMPUS))
+                        val number = vm.placeOrder(meetOnCampus = delivery == DeliveryMethod.CAMPUS)
+                        placing = false
+                        if (number != null) onOrderPlaced(number)
                     }
                 },
                 enabled = !placing && vm.cart.isNotEmpty() &&

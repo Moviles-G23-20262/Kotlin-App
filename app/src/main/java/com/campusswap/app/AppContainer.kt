@@ -60,6 +60,14 @@ import com.campusswap.app.data.local.DraftStore
 import com.campusswap.app.data.sync.OutboxRepository
 import com.campusswap.app.data.sync.OutboxSync
 import com.campusswap.app.data.sync.OutboxWorker
+import com.campusswap.app.data.local.ListingPhotoStore
+import com.campusswap.app.data.sync.RemoteListingPhotoUploader
+import com.campusswap.app.data.wishlist.RetrofitWishlistRemoteDataSource
+import com.campusswap.app.data.wishlist.WishlistApi
+import com.campusswap.app.data.wishlist.WishlistRepository
+import com.campusswap.app.data.orders.OrderRepository
+import com.campusswap.app.data.orders.OrdersApi
+import com.campusswap.app.data.orders.RetrofitOrdersRemoteDataSource
 
 class AppContainer(context: Context) {
     val clock: Clock = Clock.systemDefaultZone()
@@ -136,14 +144,25 @@ class AppContainer(context: Context) {
 
     val draftStore: DraftStore = DataStoreDraftStore(context)
 
+    val listingPhotos = ListingPhotoStore(context)
+
     val outboxSync = OutboxSync(
         database.outbox(),
         materialRemote,
         chatRoomRepository,
         messageRemote,
+        RemoteListingPhotoUploader(listingPhotos, uploadRemote),
     )
 
     val outboxRepository = OutboxRepository(database.outbox(), clock) { OutboxWorker.schedule(context) }
 
     val ratingRepository = RatingRepository(RetrofitRatingRemoteDataSource(ratingsApi))
+
+    private val wishlistApi = ApiClient.create<WishlistApi>(BuildConfig.BASE_URL, backendClient)
+
+    val wishlistRepository = WishlistRepository(RetrofitWishlistRemoteDataSource(wishlistApi))
+
+    private val ordersApi = ApiClient.create<OrdersApi>(BuildConfig.BASE_URL, backendClient)
+
+    val orderRepository = OrderRepository(RetrofitOrdersRemoteDataSource(ordersApi))
 }

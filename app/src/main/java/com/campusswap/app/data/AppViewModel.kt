@@ -24,6 +24,16 @@ import com.campusswap.app.data.local.PendingMessageEntity
 import com.campusswap.app.data.sync.OutboxRepository
 import com.campusswap.app.data.ratings.RatingRepository
 import com.campusswap.app.data.ratings.RatingResult
+import com.campusswap.app.data.auth.Session
+import com.campusswap.app.data.materials.maskEmail
+import com.campusswap.app.data.wishlist.WishlistRepository
+import com.campusswap.app.data.orders.OrderRepository
+import com.campusswap.app.data.orders.PlaceOrderResult
+import com.campusswap.app.data.ratings.RatingDto
+import com.campusswap.app.data.orders.Sale
+import java.time.Instant
+import java.time.YearMonth
+import java.time.ZoneId
 
 /**
  * Single in-memory state holder for the whole prototype. There is no backend:
@@ -40,9 +50,10 @@ class AppViewModel : ViewModel() {
     var currentUserId by mutableStateOf<String?>(null)
         private set    
 
-    val currentUser = SampleData.currentSeller
+    var currentUser by mutableStateOf(SampleData.currentSeller)
+        private set
 
-    val allProducts = mutableStateListOf<Product>().apply { addAll(SampleData.products) }
+    val allProducts = mutableStateListOf<Product>()
 
     // ---- Eventual connectivity ----
 
@@ -98,6 +109,8 @@ class AppViewModel : ViewModel() {
         if (sessionUserId() != null) {
             materialRepository?.let(::loadMaterials)
             outbox?.syncNow()
+            wishlistRepository?.let(::loadWishlist)
+            orderRepository?.let(::loadOrders)
         }
     }
 
@@ -126,6 +139,7 @@ class AppViewModel : ViewModel() {
         seller = currentUser,
         imageSeed = (localId % 12).toInt(),
         pendingSync = PendingSync(localId, failedReason),
+        imageUrls = photoPaths?.split("\n")?.filter { it.isNotBlank() }?.map { "file://$it" }.orEmpty(),
     )
 
     fun discardPendingListing(product: Product) {
@@ -136,6 +150,23 @@ class AppViewModel : ViewModel() {
     val cart = mutableStateListOf<CartLine>()
 
     val wishlist = mutableStateListOf<String>()
+
+    /** Productos guardados en el backend incluye vendidos/reservados, que no salen en el feed */
+    val wishlistProducts = mutableStateListOf<Product>()
+
+    private var wishlistRepository: WishlistRepository? = null
+
+    fun loadWishlist(repository: WishlistRepository) {
+        wishlistRepository = repository
+        viewModelScope.launch {
+            // null = sin red: se quedan los corazones que ya había en pantalla
+            val saved = repository.load() ?: return@launch
+            wishlist.clear()
+            wishlist.addAll(saved.map { it.id })
+            wishlistProducts.clear()
+            wishlistProducts.addAll(saved)
+        }
+    }
 
     val notifications = mutableStateListOf<AppNotification>()
 
@@ -175,10 +206,68 @@ class AppViewModel : ViewModel() {
 
     val orders = mutableStateListOf<Order>()
 
+    private var orderRepository: OrderRepository? = null
 
-    fun placeOrder(meetOnCampus: Boolean = true): Int {
-        val number = (1000..9999).random()
-        val order = Order(number = number, lines = cart.toList(), meetOnCampus = meetOnCampus)
+
+    /** Tus ventas del backend lo que compraron (reservado o vendido) */
+    val sales = mutableStateListOf<Sale>()
+
+    /** Lo que ganaste en ventas completadas este mes */
+    val earnedThisMonth: Double
+        get() {
+            val thisMonth = YearMonth.now()
+            return sales
+                .filter { it.status == "COMPLETED" }
+                .filter { sale ->
+                    sale.completedAtMillis?.let { YearMonth.from(Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault())) } == thisMonth
+                }
+                .sumOf { it.product.price }
+        }
+
+    /** Por qué no se pudo hacer el pedido (null = sin problema); lo muestra el checkout. */
+    var checkoutMessage by mutableStateOf<String?>(null)
+        private set
+
+    /** Compras del usuario guardadas en el backend: sobreviven a cerrar la app. */
+    fun loadOrders(repository: OrderRepository) {
+        orderRepository = repository
+        val userId = currentUserId ?: return
+        viewModelScope.launch {
+            val loaded = repository.load(userId) ?: return@launch
+            orders.clear()
+            orders.addAll(loaded.purchases)
+            sales.clear()
+            sales.addAll(loaded.sales)
+        }
+    }
+
+    fun findProduct(id: String): Product? =
+        allProducts.find { it.id == id }
+            ?: orders.firstNotNullOfOrNull { order -> order.products.find { it.id == id } }
+            ?: wishlistProducts.find { it.id == id }
+            ?: sales.firstNotNullOfOrNull { sale -> sale.product.takeIf { it.id == id } }
+
+    /** Pide al backend los productos del carrito; devuelve # de orden */
+    suspend fun placeOrder(meetOnCampus: Boolean = true): Int? {
+        checkoutMessage = null
+        val repository = orderRepository
+        val order = if (repository == null) {
+            // Acceso demo (sin sesión): la orden solo existe en el teléfono, como antes
+            Order(number = (1000..9999).random(), lines = cart.toList(), meetOnCampus = meetOnCampus)
+        } else {
+            when (val result = repository.place(cart.toList(), meetOnCampus)) {
+                PlaceOrderResult.Offline -> {
+                    checkoutMessage = "You're offline. Your cart is saved: place the order when you're back online."
+                    return null
+                }
+                is PlaceOrderResult.Rejected -> {
+                    cart.removeAll { line -> result.unavailable.any { it.id == line.product.id } }
+                    checkoutMessage = "No longer available: ${result.unavailable.joinToString { it.title }}"
+                    return null
+                }
+                is PlaceOrderResult.Placed -> result.order
+            }
+        }
         orders.add(0, order)
         cart.clear()
         order.products.forEach { product ->
@@ -198,7 +287,7 @@ class AppViewModel : ViewModel() {
                 productId = product.id,
             )
         }
-        return number
+        return order.number
     }
 
     val pendingExchanges: List<PendingExchange>
@@ -225,12 +314,35 @@ class AppViewModel : ViewModel() {
         refreshPendingViews()
     }
 
+    // Usa los datos reales no el usuario de ejemplo
+    fun useSession(session: Session) {
+        currentUserId = session.userId
+        currentUser = Seller(
+            id = session.userId,
+            name = session.fullName,
+            isVerified = true,
+            rating = null,
+            reviewCount = 0,
+            maskedEmail = maskEmail(session.email),
+        )
+    }    
+
     fun logout() {
         isLoggedIn = false
         cart.clear()
         currentUserId = null
+        currentUser = SampleData.currentSeller
         notifications.clear()
         refreshPendingViews()
+        wishlist.clear()
+        wishlistProducts.clear()
+        wishlistRepository?.clear()
+        orders.clear()
+        ratings.clear()
+        ratingSync.clear()
+        receivedRatings.clear()
+        myReviews.clear()
+        sales.clear()
     }
 
     fun isWishlisted(productId: String) = wishlist.contains(productId)
@@ -238,7 +350,18 @@ class AppViewModel : ViewModel() {
     fun toggleWishlist(productId: String) {
         val added = !wishlist.remove(productId)
         if (added) wishlist.add(productId)
-        Analytics.log(Events.WISHLIST_TOGGLED, "product_id" to productId, "added" to added)
+        viewModelScope.launch {
+            // Sin repositorio (acceso demo) se queda solo en el teléfono, como antes
+            val repository = wishlistRepository
+            val saved = repository == null || (if (added) repository.add(productId) else repository.remove(productId))
+            if (saved) {
+                Analytics.log(Events.WISHLIST_TOGGLED, "product_id" to productId, "added" to added)
+                if (added) findProduct(productId)?.let { wishlistProducts.add(0, it) }
+                else wishlistProducts.removeAll { it.id == productId }
+            } else {
+                if (added) wishlist.remove(productId) else wishlist.add(productId)
+            }
+        }
     }
 
     fun addToCart(product: Product) {
@@ -353,26 +476,54 @@ class AppViewModel : ViewModel() {
     fun submitRating(rating: TransactionRating) {
         ratings[rating.productId] = rating
         Analytics.log(Events.EXCHANGE_RATED, "product_id" to rating.productId)
-        val product = allProducts.find { it.id == rating.productId }
-        viewModelScope.launch {
-            delay(2500)
-            ratings[rating.productId] = rating.copy(revealed = true)
-            if (product != null) {
-                notify(
-                    id = "rated-${rating.productId}",
-                    title = "${product.seller.name.substringBefore(' ')} rated you back",
-                    message = "Both ratings for \"${product.title}\" are now public.",
-                    kind = NotificationKind.PRODUCT,
-                    productId = product.id,
-                )
-            }
-        }
     }
 
     val ratingSync = mutableStateMapOf<String, RatingResult>()
 
+    val receivedRatings = mutableStateMapOf<String, RatingDto>()
+
+    /** Calificaciones que de usuario  */
+    val myReviews = mutableStateListOf<RatingDto>()
+
+    /** Promedio real de estrellas recibidas */
+    val myRating: Double?
+        get() = myReviews.takeIf { it.isNotEmpty() }?.map { it.stars }?.average()
+
+    fun loadMyReviews(repository: RatingRepository) {
+        val userId = currentUserId ?: return
+        viewModelScope.launch {
+            val reviews = repository.received(userId) ?: return@launch
+            myReviews.clear()
+            myReviews.addAll(reviews)
+        }
+    }
+
+    /**ya califique este intercambio? la otra persona ya me califico? */
+    fun loadExchangeRatings(repository: RatingRepository, product: Product) {
+        val userId = currentUserId ?: return
+        viewModelScope.launch {
+            val found = repository.exchangeRatings(product.id, userId) ?: return@launch
+            found.mine?.let { mine ->
+                // Ya estaba guardada en el backend: se muestra como enviada, sin volver a pedirla
+                if (ratings[product.id] == null) ratings[product.id] = mine.toTransactionRating(product)
+                ratingSync[product.id] = RatingResult.Saved
+            }
+            found.theirs?.let { receivedRatings[product.id] = it }
+        }
+    }
+
+    private fun RatingDto.toTransactionRating(product: Product) = TransactionRating(
+        productId = product.id,
+        stars = stars,
+        confirmedCondition = product.condition,
+        // El backend guarda los tags como texto ("Punctual"); se vuelven a convertir en FeedbackTag
+        tags = tags.orEmpty().mapNotNull { label -> FeedbackTag.entries.firstOrNull { it.label == label } }.toSet(),
+        review = review.orEmpty(),
+    )
+
     fun sendRating(repository: RatingRepository, ratedUserId: String, rating: TransactionRating) {
         if (currentUserId == null) return
+        ratingSync.remove(rating.productId)
         viewModelScope.launch {
             ratingSync[rating.productId] = repository.submit(
                 productId = rating.productId,
@@ -487,6 +638,7 @@ class AppViewModel : ViewModel() {
             reviewCount = 0,
             seller = currentUser,
             imageSeed = (allProducts.size + 1),
+            imageUrls = draft.photoPaths.map { "file://$it" },
         )
         allProducts.add(0, product)
         logListingPublished(draft, product.price)
@@ -524,7 +676,8 @@ const val SERVICE_FEE = 2000.0
 const val HOME_DELIVERY_FEE = 10000.0
 
 data class SellDraft(
-    val photoCount: Int = 0,
+    /** Rutas de las fotos guardadas por ListingPhotoStore*/
+    val photoPaths: List<String> = emptyList(),
     val title: String = "",
     val description: String = "",
     val category: Category = Category.TEXTBOOKS,
@@ -533,6 +686,7 @@ data class SellDraft(
     val notAssociatedWithCourse: Boolean = false,
     val condition: Condition? = null,
 ) {
+    val photoCount: Int get() = photoPaths.size
     val isProductInfoValid: Boolean
         get() = photoCount > 0 &&
             InputValidation.titleError(title) == null &&

@@ -68,7 +68,10 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
 
     LaunchedEffect(session) {
         when (val current = session) {
-            is SessionState.SignedIn -> if (!appViewModel.isLoggedIn) appViewModel.restoreSession(current.session.userId)
+            is SessionState.SignedIn -> {
+                appViewModel.useSession(current.session)
+                if (!appViewModel.isLoggedIn) appViewModel.restoreSession(current.session.userId)
+            }
             is SessionState.SignedOut -> if (current.expired) {
                 appViewModel.logout()
                 navController.navigate(Routes.LOGIN) {
@@ -93,6 +96,9 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
         // Demo access has no token: the server would answer 401 and Home would wrongly look offline.
         if (appViewModel.isLoggedIn && container.sessionManager.token != null) {
             appViewModel.loadMaterials(container.materialRepository)
+            appViewModel.loadWishlist(container.wishlistRepository)
+            appViewModel.loadOrders(container.orderRepository)
+            appViewModel.loadMyReviews(container.ratingRepository)
             // Anything queued before a log-out or an expired session goes out with the new one.
             container.outboxRepository.syncNow()
         }
@@ -111,7 +117,7 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
         Analytics.screen(route)
         if (route == Routes.PRODUCT_DETAIL) {
             val id = backStackEntry?.arguments?.getString("productId")
-            val product = appViewModel.allProducts.find { it.id == id }
+            val product = id?.let(appViewModel::findProduct)
             Analytics.log(Events.LISTING_OPENED, "product_id" to id, "category" to product?.category?.name)
         }
     }

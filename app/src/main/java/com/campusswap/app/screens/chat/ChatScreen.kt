@@ -75,7 +75,7 @@ import com.campusswap.app.components.ConditionBadge
 import com.campusswap.app.components.EmptyState
 import com.campusswap.app.components.RemoteImage
 import com.campusswap.app.components.plainClickable
-import com.campusswap.app.components.ProductPlaceholderImage
+import com.campusswap.app.components.ProductPhoto
 import com.campusswap.app.components.VerifiedBadge
 import com.campusswap.app.components.formatPrice
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -110,7 +110,7 @@ fun ChatScreen(
     onProposeMeeting: () -> Unit,
     onCompleteExchange: () -> Unit,
 ) {
-    val product = remember(productId, vm.allProducts.size) { vm.allProducts.find { it.id == productId } }
+    val product = remember(productId, vm.allProducts.size, vm.orders.size) { vm.findProduct(productId) }    
     if (product == null) {
         EmptyState(
             icon = Icons.AutoMirrored.Filled.ArrowBack,
@@ -363,9 +363,8 @@ private fun TransactionHeader(product: Product, onViewListing: () -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ProductPlaceholderImage(
-                category = product.category,
-                seed = product.imageSeed,
+            ProductPhoto(
+                product = product,
                 modifier = Modifier.size(52.dp),
                 cornerRadius = 10,
             )

@@ -48,7 +48,7 @@ import com.campusswap.app.components.MonoText
 import com.campusswap.app.components.Pill
 import com.campusswap.app.components.PriceText
 import com.campusswap.app.components.PrimaryButton
-import com.campusswap.app.components.ProductPlaceholderImage
+import com.campusswap.app.components.ProductPhoto
 import com.campusswap.app.components.SecondaryButton
 import com.campusswap.app.components.campusCard
 import com.campusswap.app.components.plainClickable
@@ -61,6 +61,10 @@ import com.campusswap.app.data.TransactionRating
 import com.campusswap.app.domain.ExchangeTarget
 import com.campusswap.app.ui.theme.CampusSwapTheme
 import com.campusswap.app.ui.theme.CampusType
+import androidx.compose.runtime.LaunchedEffect
+import com.campusswap.app.data.ratings.RatingDto
+import com.campusswap.app.data.ratings.RatingResult
+
 
 /**
  * View 12 — Transaction Completion & Mutual Rating.
@@ -75,8 +79,7 @@ fun CompletionScreen(
     onClose: () -> Unit,
 ) {
     val c = CampusSwapTheme.colors
-    val product = remember(productId, vm.allProducts.size) { vm.allProducts.find { it.id == productId } }
-
+    val product = remember(productId, vm.allProducts.size, vm.orders.size) { vm.findProduct(productId) }
     if (product == null) {
         Box(Modifier.fillMaxSize().background(c.bg), contentAlignment = Alignment.Center) {
             EmptyState(
@@ -103,6 +106,7 @@ fun CompletionScreen(
     var review by remember { mutableStateOf("") }
 
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    LaunchedEffect(productId) { vm.loadExchangeRatings(container.ratingRepository, product) }    
     val target = ExchangeTarget(
         productId = product.id,
         buyerId = vm.currentUserId ?: vm.currentUser.id,
@@ -132,8 +136,14 @@ fun CompletionScreen(
         }
 
         if (existing != null) {
-            RatingSent(rating = existing, product = product, onClose = onClose)
-        } else {
+            RatingSent(
+                rating = existing,
+                product = product,
+                theirs = vm.receivedRatings[productId],
+                sync = vm.ratingSync[productId],
+                onRetry = { vm.sendRating(container.ratingRepository, product.seller.id, existing) },
+                onClose = onClose,
+            )        } else {
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -144,9 +154,8 @@ fun CompletionScreen(
             // Transaction summary
             Column(modifier = Modifier.fillMaxWidth().campusCard().padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ProductPlaceholderImage(
-                        category = product.category,
-                        seed = product.imageSeed,
+                    ProductPhoto(
+                        product = product,
                         modifier = Modifier.size(56.dp),
                         cornerRadius = 10,
                     )
@@ -329,7 +338,14 @@ fun CompletionScreen(
 }
 
 @Composable
-private fun RatingSent(rating: TransactionRating, product: Product, onClose: () -> Unit) {
+private fun RatingSent(
+    rating: TransactionRating,
+    product: Product,
+    theirs: RatingDto?,
+    sync: RatingResult?,
+    onRetry: () -> Unit,
+    onClose: () -> Unit,
+) {
     val c = CampusSwapTheme.colors
     Column(
         modifier = Modifier
@@ -356,18 +372,27 @@ private fun RatingSent(rating: TransactionRating, product: Product, onClose: () 
             modifier = Modifier.padding(bottom = 20.dp),
         )
 
+        BodyText(
+            syncMessage(sync),
+            color = if (sync == RatingResult.Saved) c.success else c.textMuted,
+            modifier = Modifier.padding(bottom = 12.dp),
+        )
+        if (sync != null && sync != RatingResult.Saved && sync != RatingResult.Rejected(409)) {
+            SecondaryButton(text = "Retry", onClick = onRetry, modifier = Modifier.padding(bottom = 16.dp))
+        }
+
         Column(modifier = Modifier.fillMaxWidth().campusCard().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 InitialsAvatar(product.seller.name, size = 40.dp)
                 Column(modifier = Modifier.weight(1f)) {
                     BodyText(product.seller.name, color = c.text, weight = FontWeight.SemiBold)
                     BodyText(
-                        if (rating.revealed) "Rated you 5.0 · Punctual" else "Hasn't rated you yet",
-                        size = CampusType.size2xs,
+                        theirs?.let { "Rated you ${it.stars}.0" + (it.tags.orEmpty().firstOrNull()?.let { tag -> " · $tag" } ?: "") }
+                            ?: "Hasn't rated you yet",                        size = CampusType.size2xs,
                         color = c.textMuted,
                     )
                 }
-                if (rating.revealed) {
+                if (theirs != null) {
                     Icon(CampusIcons.Star, contentDescription = null, tint = c.accentHi, modifier = Modifier.size(16.dp))
                 }
             }
@@ -447,4 +472,13 @@ private fun starLabel(stars: Int): String = when (stars) {
     3 -> "Fine"
     4 -> "Good"
     else -> "Excellent"
+}
+
+private fun syncMessage(sync: RatingResult?): String = when (sync) {
+    null -> "Sending your rating…"
+    RatingResult.Saved -> "Saved — it now counts toward their rating."
+    RatingResult.Offline -> "You're offline, so your rating wasn't sent yet."
+    RatingResult.ExchangeNotRecorded -> "This exchange isn't completed on the server yet, so the rating wasn't saved."
+    is RatingResult.Rejected ->
+        if (sync.httpCode == 409) "You already rated this exchange." else "The server didn't accept it (${sync.httpCode})."
 }

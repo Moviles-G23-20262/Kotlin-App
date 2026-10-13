@@ -27,6 +27,7 @@ class OutboxRepository(
             condition = (draft.condition ?: Condition.GOOD).name,
             category = draft.category.name,
             createdAtMillis = clock.millis(),
+            photoPaths = draft.photoPaths.joinToString("\n").ifEmpty { null },
         )
         val saved = listing.copy(localId = outbox.insertListing(listing))
         scheduleSync()
