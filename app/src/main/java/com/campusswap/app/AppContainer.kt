@@ -147,7 +147,7 @@ class AppContainer(context: Context) {
 
     val rankingStrategySelector: RankingStrategySelector = TimeOfDayStrategySelector()
 
-    val notificationRepository = NotificationRepository(RetrofitNotificationRemoteDataSource(notificationsApi))
+    val notificationRepository = NotificationRepository(RetrofitNotificationRemoteDataSource(notificationsApi), cache = responseCache)
 
     private val materialRemote = RetrofitMaterialRemoteDataSource(materialsApi)
 
@@ -176,7 +176,7 @@ class AppContainer(context: Context) {
 
     private val wishlistApi = ApiClient.create<WishlistApi>(BuildConfig.BASE_URL, backendClient)
 
-    val wishlistRepository = WishlistRepository(RetrofitWishlistRemoteDataSource(wishlistApi))
+    val wishlistRepository = WishlistRepository(RetrofitWishlistRemoteDataSource(wishlistApi), signedInUserId, responseCache)
 
     private val ordersApi = ApiClient.create<OrdersApi>(BuildConfig.BASE_URL, backendClient)
 
