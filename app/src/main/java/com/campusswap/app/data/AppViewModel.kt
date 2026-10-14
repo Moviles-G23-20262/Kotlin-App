@@ -16,6 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import com.campusswap.app.data.alerts.SmartAlertRepository
 import com.campusswap.app.data.notifications.NotificationRepository
 import com.campusswap.app.data.materials.MaterialRepository
 import com.campusswap.app.data.connectivity.ConnectivityObserver
@@ -117,6 +118,8 @@ class AppViewModel : ViewModel() {
             outbox?.syncNow()
             wishlistRepository?.let(::loadWishlist)
             orderRepository?.let(::loadOrders)
+            smartAlertRepository?.let(::loadAlerts)
+            notificationRepository?.let { loadNotifications(it, markRead = false) }
         }
     }
 
@@ -339,6 +342,10 @@ class AppViewModel : ViewModel() {
         currentUserId = null
         currentUser = SampleData.currentSeller
         notifications.clear()
+        smartAlertRepository = null
+        alerts.clear()
+        alerts.addAll(SampleData.alerts)
+        alertsLive = true
         refreshPendingViews()
         wishlist.clear()
         wishlistProducts.clear()
@@ -427,10 +434,40 @@ class AppViewModel : ViewModel() {
         get() = notifications.count { it.kind == NotificationKind.ALERT_MATCH && !it.isRead }
 
 
+    private var smartAlertRepository: SmartAlertRepository? = null
+
+    /** False while the alerts shown are the copy saved on the phone. */
+    var alertsLive by mutableStateOf(true)
+        private set
+
+    var alertError by mutableStateOf<String?>(null)
+        private set
+
+    fun dismissAlertError() {
+        alertError = null
+    }
+
+    /**
+     * Signed-in students keep their alerts on the server, which notifies them when a matching
+     * listing is published. Demo access keeps the sample alerts and matches them on the phone.
+     */
+    fun loadAlerts(repository: SmartAlertRepository) {
+        smartAlertRepository = repository
+        // From now on the server sends the match notifications; drop the ones made on the phone.
+        notifications.removeAll { it.id.startsWith(LOCAL_MATCH_PREFIX) }
+        viewModelScope.launch {
+            val feed = repository.load() ?: return@launch
+            alerts.clear()
+            alerts.addAll(feed.alerts)
+            alertsLive = feed.isLive
+        }
+    }
+
     fun publishMatchNotifications() {
+        if (smartAlertRepository != null) return
         alertMatches.forEach { match ->
             val isNew = notify(
-                id = "match-${match.product.id}",
+                id = "$LOCAL_MATCH_PREFIX${match.product.id}",
                 title = "Alert match · ${match.alert.keyword.ifBlank { match.alert.course?.code ?: match.alert.category.label }}",
                 message = "${match.product.title} — ${match.savingPercent}% below your limit.",
                 kind = NotificationKind.ALERT_MATCH,
@@ -440,19 +477,51 @@ class AppViewModel : ViewModel() {
         }
     }
 
+    /** Shown right away; if the server can't save it, it's taken back and [alertError] says why. */
     fun addAlert(alert: SmartAlert) {
         alerts.add(0, alert)
-        Analytics.log(Events.ALERT_CREATED, "alert_id" to alert.id)
-        publishMatchNotifications()
+        val repository = smartAlertRepository
+        if (repository == null) {
+            Analytics.log(Events.ALERT_CREATED, "alert_id" to alert.id)
+            publishMatchNotifications()
+            return
+        }
+        viewModelScope.launch {
+            val saved = repository.create(alert)
+            val index = alerts.indexOfFirst { it.id == alert.id }
+            if (saved != null) {
+                if (index >= 0) alerts[index] = saved
+                Analytics.log(Events.ALERT_CREATED, "alert_id" to saved.id)
+            } else {
+                if (index >= 0) alerts.removeAt(index)
+                alertError = ALERT_NOT_SAVED
+            }
+        }
     }
 
     fun toggleAlert(id: String) {
         val index = alerts.indexOfFirst { it.id == id }
-        if (index >= 0) alerts[index] = alerts[index].copy(enabled = !alerts[index].enabled)
+        if (index < 0) return
+        val toggled = alerts[index].copy(enabled = !alerts[index].enabled)
+        alerts[index] = toggled
+        val repository = smartAlertRepository ?: return
+        viewModelScope.launch {
+            if (repository.setEnabled(id, toggled.enabled)) return@launch
+            alerts.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { alerts[it] = toggled.copy(enabled = !toggled.enabled) }
+            alertError = ALERT_NOT_SAVED
+        }
     }
 
     fun removeAlert(id: String) {
-        alerts.removeAll { it.id == id }
+        val index = alerts.indexOfFirst { it.id == id }
+        if (index < 0) return
+        val removed = alerts.removeAt(index)
+        val repository = smartAlertRepository ?: return
+        viewModelScope.launch {
+            if (repository.remove(id)) return@launch
+            alerts.add(index.coerceAtMost(alerts.size), removed)
+            alertError = ALERT_NOT_SAVED
+        }
     }
 
     fun isReserved(productId: String) = reservedMatches.contains(productId)
@@ -604,7 +673,8 @@ class AppViewModel : ViewModel() {
     var notificationsLive by mutableStateOf(true)
         private set
 
-    fun loadNotifications(repository: NotificationRepository) {
+    /** [markRead] is for the notifications screen; a background refresh keeps the unread badge. */
+    fun loadNotifications(repository: NotificationRepository, markRead: Boolean = true) {
         notificationRepository = repository
         val userId = currentUserId ?: return
         viewModelScope.launch {
@@ -613,7 +683,7 @@ class AppViewModel : ViewModel() {
             notifications.removeAll { it.id in loadedNotificationIds }
             notifications.addAll(0, feed.items)
             loadedNotificationIds = feed.items.map { it.id }.toSet()
-            markNotificationsRead()
+            if (markRead) markNotificationsRead()
         }
     }
 
@@ -704,6 +774,11 @@ class AppViewModel : ViewModel() {
 
     init {
         publishMatchNotifications()
+    }
+
+    private companion object {
+        const val LOCAL_MATCH_PREFIX = "match-"
+        const val ALERT_NOT_SAVED = "We couldn't save that change to your alerts. Check your connection and try again."
     }
 }
 

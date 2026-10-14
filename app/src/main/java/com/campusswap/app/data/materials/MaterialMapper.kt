@@ -36,7 +36,7 @@ fun MaterialDto.toProduct(): Product = Product(
     status = status,
 )
 
-private fun String.toAppCategory(): Category = when (this) {
+internal fun String.toAppCategory(): Category = when (this) {
     "BOOKS" -> Category.TEXTBOOKS
     "CALCULATORS" -> Category.CALCULATORS
     "LAB_EQUIPMENT" -> Category.LAB_SUPPLIES

@@ -55,6 +55,9 @@ import com.campusswap.app.data.ratings.RatingsApi
 import com.campusswap.app.data.ratings.RetrofitRatingRemoteDataSource
 import com.campusswap.app.data.connectivity.ConnectivityObserver
 import com.campusswap.app.data.connectivity.NetworkConnectivityObserver
+import com.campusswap.app.data.alerts.RetrofitSmartAlertRemoteDataSource
+import com.campusswap.app.data.alerts.SmartAlertRepository
+import com.campusswap.app.data.alerts.SmartAlertsApi
 import com.campusswap.app.data.local.CampusSwapDatabase
 import com.campusswap.app.data.local.DataStoreDraftStore
 import com.campusswap.app.data.local.DraftStore
@@ -178,4 +181,10 @@ class AppContainer(context: Context) {
     private val ordersApi = ApiClient.create<OrdersApi>(BuildConfig.BASE_URL, backendClient)
 
     val orderRepository = OrderRepository(RetrofitOrdersRemoteDataSource(ordersApi))
+
+    val smartAlertRepository = SmartAlertRepository(
+        RetrofitSmartAlertRemoteDataSource(ApiClient.create<SmartAlertsApi>(BuildConfig.BASE_URL, backendClient)),
+        signedInUserId,
+        responseCache,
+    )
 }

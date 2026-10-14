@@ -1,5 +1,7 @@
 package com.campusswap.app.screens.home
 
+import kotlinx.coroutines.delay
+import com.campusswap.app.components.OfflineBanner
 import com.campusswap.app.domain.InputLimits
 import com.campusswap.app.domain.InputValidation
 import androidx.compose.animation.AnimatedVisibility
@@ -76,8 +78,28 @@ fun AlertsScreen(
     var showNewAlert by remember { mutableStateOf(false) }
     val matches = vm.alertMatches
 
+    val alertError = vm.alertError
+    LaunchedEffect(alertError) {
+        if (alertError != null) {
+            delay(4_000)
+            vm.dismissAlertError()
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
         BackHeader(title = "Alerts", onBack = onBack)
+        OfflineBanner(
+            visible = !vm.alertsLive,
+            message = "You're offline. These are the alerts saved on this phone; changes need a connection.",
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
+        )
+        if (alertError != null) {
+            BodyText(
+                alertError,
+                color = c.error,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp).clickable { vm.dismissAlertError() },
+            )
+        }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
