@@ -1,6 +1,5 @@
 package com.campusswap.app.components
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -15,16 +14,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.net.URL
-import java.util.Collections
-
-private val cache = Collections.synchronizedMap(mutableMapOf<String, ImageBitmap>())
+import com.campusswap.app.CampusSwapApplication
 
 @Composable
 fun RemoteImage(
@@ -33,12 +26,13 @@ fun RemoteImage(
     modifier: Modifier = Modifier,
     fallback: (@Composable () -> Unit)? = null,
 ) {
-    var image by remember(url) { mutableStateOf(cache[url]) }
+    val imageCache = (LocalContext.current.applicationContext as CampusSwapApplication).container.imageCache
+    var image by remember(url) { mutableStateOf(imageCache.cached(url)) }
     var failed by remember(url) { mutableStateOf(false) }
 
     LaunchedEffect(url) {
         if (image == null) {
-            image = load(url)?.also { cache[url] = it }
+            image = imageCache.load(url)
             failed = image == null
         }
     }
@@ -56,10 +50,4 @@ fun RemoteImage(
             else -> CircularProgressIndicator(strokeWidth = 2.dp)
         }
     }
-}
-
-private suspend fun load(url: String): ImageBitmap? = withContext(Dispatchers.IO) {
-    runCatching {
-        URL(url).openStream().use { BitmapFactory.decodeStream(it) }?.asImageBitmap()
-    }.getOrNull()
 }

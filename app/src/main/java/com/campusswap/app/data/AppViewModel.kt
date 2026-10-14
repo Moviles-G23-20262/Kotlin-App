@@ -19,9 +19,13 @@ import java.time.format.DateTimeFormatter
 import com.campusswap.app.data.notifications.NotificationRepository
 import com.campusswap.app.data.materials.MaterialRepository
 import com.campusswap.app.data.connectivity.ConnectivityObserver
+import com.campusswap.app.data.local.PendingActionEntity
 import com.campusswap.app.data.local.PendingListingEntity
 import com.campusswap.app.data.local.PendingMessageEntity
 import com.campusswap.app.data.sync.OutboxRepository
+import com.campusswap.app.data.sync.PendingActionKind
+import com.campusswap.app.data.sync.RatingPayload
+import com.campusswap.app.data.sync.payloadAs
 import com.campusswap.app.data.ratings.RatingRepository
 import com.campusswap.app.data.ratings.RatingResult
 import com.campusswap.app.data.auth.Session
@@ -95,6 +99,7 @@ class AppViewModel : ViewModel() {
             }
         }
         viewModelScope.launch { outbox.pendingListings.collect { allPendingListings = it; showPendingListings() } }
+        viewModelScope.launch { outbox.pendingActions.collect { allPendingActions = it; showPendingRatings() } }
         if (sessionUserId() != null) outbox.syncNow()
     }
 
@@ -103,6 +108,7 @@ class AppViewModel : ViewModel() {
     /** The outbox may hold another account's items; each user only sees their own. */
     private fun refreshPendingViews() {
         showPendingListings()
+        showPendingRatings()
     }
 
     private fun onBackOnline() {
@@ -522,18 +528,56 @@ class AppViewModel : ViewModel() {
     )
 
     fun sendRating(repository: RatingRepository, ratedUserId: String, rating: TransactionRating) {
-        if (currentUserId == null) return
+        val userId = currentUserId ?: return
         ratingSync.remove(rating.productId)
         viewModelScope.launch {
-            ratingSync[rating.productId] = repository.submit(
+            // A rating the outbox couldn't deliver is replaced by this new attempt.
+            pendingRatings[rating.productId]?.let { outbox?.discardAction(it.localId) }
+            val result = repository.submit(
                 productId = rating.productId,
                 ratedId = ratedUserId,
                 stars = rating.stars,
                 tags = rating.tags.map { it.label },
                 review = rating.review.ifBlank { null },
             )
+            val queue = outbox
+            ratingSync[rating.productId] = if (result == RatingResult.Offline && queue != null) {
+                queue.queueRating(userId, ratedUserId, rating)
+                RatingResult.Queued
+            } else {
+                result
+            }
         }
     }
+
+    private var allPendingActions: List<PendingActionEntity> = emptyList()
+    private var pendingRatings: Map<String, PendingActionEntity> = emptyMap()
+
+    /**
+     * Mirrors the ratings waiting in the outbox: still queued, refused by the server, or gone
+     * (delivered). After a restart it also brings back the rating the user wrote.
+     */
+    private fun showPendingRatings() {
+        val mine = allPendingActions
+            .filter { it.kind == PendingActionKind.RATING.name && it.ownerId == currentUserId }
+            .associateBy { it.productId }
+        (pendingRatings.keys - mine.keys).forEach { productId ->
+            if (ratingSync[productId] == RatingResult.Queued) ratingSync[productId] = RatingResult.Saved
+        }
+        mine.forEach { (productId, row) ->
+            ratingSync[productId] = row.failedReason?.let { RatingResult.Refused(it) } ?: RatingResult.Queued
+            if (ratings[productId] == null) row.payloadAs<RatingPayload>()?.let { ratings[productId] = it.toTransactionRating(productId) }
+        }
+        pendingRatings = mine
+    }
+
+    private fun RatingPayload.toTransactionRating(productId: String) = TransactionRating(
+        productId = productId,
+        stars = stars,
+        confirmedCondition = Condition.entries.firstOrNull { it.name == condition } ?: Condition.GOOD,
+        tags = tags.mapNotNull { label -> FeedbackTag.entries.firstOrNull { it.label == label } }.toSet(),
+        review = review.orEmpty(),
+    )
     
     fun canCompleteExchange(productId: String) =
         meetingProposals[productId]?.status == ProposalStatus.ACCEPTED

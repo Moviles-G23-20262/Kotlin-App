@@ -32,8 +32,10 @@ import com.campusswap.app.components.BodyText
 import com.campusswap.app.components.CampusIcons
 import com.campusswap.app.components.EmptyState
 import com.campusswap.app.components.HeadingText
+import com.campusswap.app.components.OfflineBanner
 import com.campusswap.app.components.campusCard
 import com.campusswap.app.components.plainClickable
+import com.campusswap.app.components.timeAgo
 import com.campusswap.app.data.Conversation
 import com.campusswap.app.ui.theme.CampusSwapTheme
 import com.campusswap.app.ui.theme.CampusType
@@ -71,6 +73,14 @@ fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit) {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                state.savedAtMillis?.let { savedAt ->
+                    item(key = "offline") {
+                        OfflineBanner(
+                            visible = true,
+                            message = "You're offline. Showing your conversations as they were ${timeAgo(savedAt)}.",
+                        )
+                    }
+                }
                 items(state.conversations, key = { it.roomId }) { conversation ->
                     ConversationRow(conversation) { onOpenChat(conversation.productId) }
                 }

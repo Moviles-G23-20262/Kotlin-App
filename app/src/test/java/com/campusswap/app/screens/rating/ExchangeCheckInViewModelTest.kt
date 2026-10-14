@@ -1,6 +1,8 @@
 package com.campusswap.app.screens.rating
 
 import com.campusswap.app.data.ExchangeRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import com.campusswap.app.data.local.PendingActionEntity
 import com.campusswap.app.data.FakeExchangeRemoteDataSource
 import com.campusswap.app.data.location.LocationDataSource
 import com.campusswap.app.data.location.LocationResult
@@ -144,5 +146,46 @@ class ExchangeCheckInViewModelTest {
         viewModel(fixAt(10.0)).checkIn()
 
         assertTrue(events.isEmpty())
+    }
+
+    private class FakeQueue : CheckInQueue {
+        override val pending = MutableStateFlow<PendingActionEntity?>(null)
+        val queued = mutableListOf<GeoPoint?>()
+        val discarded = mutableListOf<Long>()
+        override suspend fun queue(location: GeoPoint?): Boolean {
+            queued += location
+            pending.value = PendingActionEntity(1, "me", "CHECK_IN", "p1", "{\"lat\":${location?.lat}}", 1)
+            return true
+        }
+        override suspend fun discard(localId: Long) {
+            discarded += localId
+            pending.value = null
+        }
+    }
+
+    @Test fun offlineTheCheckInIsSavedAndBecomesConfirmedOnceTheOutboxSendsIt() {
+        val queue = FakeQueue()
+        remote.failure = IOException("airplane mode")
+        val vm = ExchangeCheckInViewModel(target, FakeLocation(fixAt(10.0)), repository, queue) { name, properties -> events += name to properties }
+
+        vm.checkIn()
+
+        assertEquals(CheckInState.Queued(verifiedByGps = true), vm.state.value)
+        assertEquals(north(meetingPoint, 10.0).lat, queue.queued.single()!!.lat, 1e-9)
+        assertEquals(true, events.single().second["queued_offline"])
+
+        queue.pending.value = null // the background sync delivered it
+
+        assertEquals(CheckInState.Confirmed(verifiedByGps = true), vm.state.value)
+    }
+
+    @Test fun aCheckInTheServerRefusedIsShownOnceWithItsReason() {
+        val queue = FakeQueue()
+        val vm = ExchangeCheckInViewModel(target, FakeLocation(fixAt(10.0)), repository, queue) { _, _ -> }
+
+        queue.pending.value = PendingActionEntity(3, "me", "CHECK_IN", "p1", "{}", 1, attempts = 1, failedReason = "Listing sold")
+
+        assertEquals(CheckInState.Failed(FailReason.REJECTED, "Listing sold"), vm.state.value)
+        assertEquals(listOf(3L), queue.discarded)
     }
 }

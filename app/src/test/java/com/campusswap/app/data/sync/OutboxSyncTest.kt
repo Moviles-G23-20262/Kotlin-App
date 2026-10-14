@@ -5,6 +5,7 @@ import com.campusswap.app.data.FakeChatRoomRemoteDataSource
 import com.campusswap.app.data.remote.MessageDto
 import com.campusswap.app.data.remote.MessageRemoteDataSource
 import com.campusswap.app.data.local.OutboxDao
+import com.campusswap.app.data.local.PendingActionEntity
 import com.campusswap.app.data.local.PendingListingEntity
 import com.campusswap.app.data.local.PendingMessageEntity
 import com.campusswap.app.data.materials.CreateMaterialRequest
@@ -42,6 +43,18 @@ class OutboxSyncTest {
         override suspend fun deleteMessage(localId: String) { messages.value = messages.value.filterNot { it.localId == localId } }
         override suspend fun markMessageAttempt(localId: String, reason: String?) {
             messages.value = messages.value.map { if (it.localId == localId) it.copy(attempts = it.attempts + 1, failedReason = reason) else it }
+        }
+        val actions = MutableStateFlow(listOf<PendingActionEntity>())
+        override fun observeActions() = actions
+        override suspend fun actionsToSend(ownerId: String) = actions.value.filter { it.ownerId == ownerId && it.failedReason == null }
+        override suspend fun insertAction(action: PendingActionEntity): Long {
+            val id = actions.value.size + 1L
+            actions.value += action.copy(localId = id)
+            return id
+        }
+        override suspend fun deleteAction(localId: Long) { actions.value = actions.value.filterNot { it.localId == localId } }
+        override suspend fun markActionAttempt(localId: Long, reason: String?) {
+            actions.value = actions.value.map { if (it.localId == localId) it.copy(attempts = it.attempts + 1, failedReason = reason) else it }
         }
     }
 
@@ -157,5 +170,44 @@ class OutboxSyncTest {
         assertEquals(listOf(materialA, materialB), roomRemote.openedMaterials)
         assertEquals(listOf("a", "b", "c"), chat.sent)
         assertTrue(outbox.messages.value.isEmpty())
+    }
+
+    private fun action(kind: PendingActionKind, product: String = materialA) = PendingActionEntity(
+        ownerId = "u1", kind = kind.name, productId = product, payload = "{}", createdAtMillis = 1,
+    )
+
+    @Test fun actionsGoInOrderAndARatingWaitsForItsCheckIn() = runTest {
+        val outbox = FakeOutbox()
+        outbox.insertAction(action(PendingActionKind.CHECK_IN))
+        outbox.insertAction(action(PendingActionKind.RATING))
+        val tried = mutableListOf<String>()
+        var online = false
+        val sender = PendingActionSender { tried += it.kind; if (online) ActionOutcome.Sent else ActionOutcome.Retry }
+
+        val offline = OutboxSync(outbox, FakeMaterials(), chatRooms(), FakeChat(), actions = sender).flush("u1")
+
+        assertEquals(SyncOutcome.RETRY_LATER, offline)
+        assertEquals(listOf("CHECK_IN"), tried)
+        assertEquals(2, outbox.actions.value.size)
+
+        online = true
+        assertEquals(SyncOutcome.DONE, OutboxSync(outbox, FakeMaterials(), chatRooms(), FakeChat(), actions = sender).flush("u1"))
+        assertEquals(listOf("CHECK_IN", "CHECK_IN", "RATING"), tried)
+        assertTrue(outbox.actions.value.isEmpty())
+    }
+
+    @Test fun aRefusedActionKeepsItsReasonAndTheRestStillGoOut() = runTest {
+        val outbox = FakeOutbox()
+        outbox.insertAction(action(PendingActionKind.PROPOSAL))
+        outbox.insertAction(action(PendingActionKind.RATING))
+        val sender = PendingActionSender {
+            if (it.kind == "PROPOSAL") ActionOutcome.Refused("That time already passed") else ActionOutcome.Sent
+        }
+
+        assertEquals(SyncOutcome.DONE, OutboxSync(outbox, FakeMaterials(), chatRooms(), FakeChat(), actions = sender).flush("u1"))
+
+        val left = outbox.actions.value.single()
+        assertEquals("PROPOSAL", left.kind)
+        assertEquals("That time already passed", left.failedReason)
     }
 }

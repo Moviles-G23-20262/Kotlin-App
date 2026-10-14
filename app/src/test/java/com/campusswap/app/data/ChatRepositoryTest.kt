@@ -1,6 +1,7 @@
 package com.campusswap.app.data
 
 import com.campusswap.app.data.FakeMessageRemoteDataSource.Companion.ME
+import com.campusswap.app.data.local.InMemoryResponseCache
 import com.campusswap.app.data.FakeMessageRemoteDataSource.Companion.OTHER
 import com.campusswap.app.data.remote.MeetingPointDto
 import com.campusswap.app.data.remote.MeetingProposalDto
@@ -125,5 +126,35 @@ class ChatRepositoryTest {
     fun `uploading returns the stored url`() = runTest {
         assertEquals("https://blob.campusswap.test/photo-1.jpg", repository.uploadPhoto(ByteArray(4), "image/png"))
         assertEquals(listOf(4 to "image/png"), uploads.uploaded)
+    }
+
+    @Test
+    fun `offline, the conversation saved by an earlier load is shown with its age`() = runTest {
+        val cache = InMemoryResponseCache(now = 42L)
+        val repository = ChatRepository(ChatRoomRepository(rooms), messages, uploads, currentUserId = { ME }, cache = cache)
+        messages.stored += message("m1", OTHER, "Is it still available?")
+        messages.stored += message("m2", ME, "Yes, it is")
+        repository.messages(seededProduct)
+
+        messages.failure = IOException("airplane mode")
+        val saved = repository.messages(seededProduct) as ChatLoad.Success
+
+        assertEquals(listOf("Is it still available?", "Yes, it is"), saved.messages.map { it.text })
+        assertEquals(listOf(MessageAuthor.OTHER, MessageAuthor.ME), saved.messages.map { it.author })
+        assertEquals(42L, saved.savedAtMillis)
+    }
+
+    @Test
+    fun `another account on the phone never sees my saved conversation`() = runTest {
+        val cache = InMemoryResponseCache()
+        var user = ME
+        val repository = ChatRepository(ChatRoomRepository(rooms), messages, uploads, currentUserId = { user }, cache = cache)
+        messages.stored += message("m1", OTHER, "Private")
+        repository.messages(seededProduct)
+
+        user = "someone-else"
+        messages.failure = IOException("airplane mode")
+
+        assertEquals(ChatLoad.Offline, repository.messages(seededProduct))
     }
 }

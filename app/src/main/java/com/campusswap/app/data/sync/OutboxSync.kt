@@ -28,6 +28,7 @@ class OutboxSync(
     private val rooms: ChatRoomRepository,
     private val messages: MessageRemoteDataSource,
     private val photos: ListingPhotoUploader = ListingPhotoUploader.None,
+    private val actions: PendingActionSender = PendingActionSender.None,
 ) {
     private sealed interface Attempt {
         data object Sent : Attempt
@@ -69,6 +70,18 @@ class OutboxSync(
                 is Attempt.Refused -> outbox.markMessageAttempt(message.localId, result.reason)
             }
         }
+
+        for (action in outbox.actionsToSend(ownerId)) {
+            when (val result = actions.send(action)) {
+                ActionOutcome.Sent -> outbox.deleteAction(action.localId)
+                // In order: a rating waits for its check-in.
+                ActionOutcome.Retry -> {
+                    outbox.markActionAttempt(action.localId, null)
+                    return SyncOutcome.RETRY_LATER
+                }
+                is ActionOutcome.Refused -> outbox.markActionAttempt(action.localId, result.reason)
+            }
+        }
         return SyncOutcome.DONE
     }
 
@@ -80,10 +93,8 @@ class OutboxSync(
     } catch (e: IOException) {
         Attempt.Retry
     } catch (e: HttpException) {
-        when (e.code()) {
-            401, 408, 429, in 500..599 -> Attempt.Retry
-            else -> Attempt.Refused(serverMessage(e) ?: "The server rejected it (${e.code()})")
-        }
+        if (isRetryable(e.code())) Attempt.Retry
+        else Attempt.Refused(serverMessage(e) ?: "The server rejected it (${e.code()})")
     }
 
     private fun serverMessage(e: HttpException): String? = runCatching {
@@ -91,6 +102,9 @@ class OutboxSync(
         if (message.isJsonArray) message.asJsonArray.first().asString else message.asString
     }.getOrNull()
 }
+
+/** Session expired, timeout, rate limit or server trouble: worth trying again later. */
+internal fun isRetryable(httpCode: Int) = httpCode == 401 || httpCode == 408 || httpCode == 429 || httpCode in 500..599
 
 private fun PendingListingEntity.photoPathList(): List<String> =
     photoPaths?.split("\n")?.filter { it.isNotBlank() }.orEmpty()

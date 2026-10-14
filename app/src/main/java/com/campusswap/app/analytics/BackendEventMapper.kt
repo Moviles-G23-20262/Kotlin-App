@@ -13,7 +13,7 @@ object BackendEventMapper {
         return AnalyticsEventRequest(
             eventType = eventType,
             materialId = productId?.let { SeedIds.material(it) ?: it.takeIf(UUID_PATTERN::matches) },
-            metadata = event.properties - "product_id" + mapOf(
+            metadata = event.properties - "product_id" - "chat_room_id" + chatRoom(event) + mapOf(
                 "event_name" to event.name,
                 "session_id" to event.sessionId,
                 "screen" to event.screen,
@@ -34,6 +34,11 @@ object BackendEventMapper {
         Events.SMART_MATCH_OPENED -> "SMART_MATCH_OPENED"
         Events.SMART_MATCH_RESERVED -> "SMART_MATCH_RESERVED"
         Events.EXCHANGE_CONFIRMED -> "EXCHANGE_CONFIRMED"
+        Events.MEETING_CONFIRMED -> "MEETING_CONFIRMED"
         else -> null
     }
+
+    /** The analytics back end (BQ4) reads the room as `chatRoomId`. */
+    private fun chatRoom(event: AnalyticsEvent): Map<String, Any?> =
+        (event.properties["chat_room_id"] as? String)?.let { mapOf("chatRoomId" to it) }.orEmpty()
 }

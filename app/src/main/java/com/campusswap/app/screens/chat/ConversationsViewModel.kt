@@ -19,6 +19,8 @@ data class ConversationsUiState(
     val isLoading: Boolean = true,
     val conversations: List<Conversation> = emptyList(),
     val isOffline: Boolean = false,
+    /** Set while the list is the copy saved on the phone because the server can't be reached. */
+    val savedAtMillis: Long? = null,
 )
 
 class ConversationsViewModel(private val repository: ConversationsRepository) : ViewModel() {
@@ -38,8 +40,11 @@ class ConversationsViewModel(private val repository: ConversationsRepository) : 
 
     suspend fun refresh() {
         when (val result = repository.conversations()) {
-            is ConversationsLoad.Success ->
-                _state.value = ConversationsUiState(isLoading = false, conversations = result.conversations)
+            is ConversationsLoad.Success -> _state.value = ConversationsUiState(
+                isLoading = false,
+                conversations = result.conversations,
+                savedAtMillis = result.savedAtMillis,
+            )
             ConversationsLoad.Offline ->
                 _state.value = _state.value.copy(isLoading = false, isOffline = _state.value.conversations.isEmpty())
         }
