@@ -52,8 +52,18 @@ class BackendEventMapperTest {
         assertEquals("b0000000-0000-4000-8000-000000000002", request.materialId)
     }
 
-    @Test fun meetingEventsStayOnTheDeviceUntilTheBackendAcceptsThem() {
+    @Test fun aProposalStaysOnTheDevice() {
         assertNull(BackendEventMapper.toRequest(event(Events.MEETING_PROPOSED, "product_id" to "p1")))
-        assertNull(BackendEventMapper.toRequest(event(Events.MEETING_CONFIRMED, "product_id" to "p1")))
+    }
+
+    @Test fun aConfirmedMeetingCarriesItsChatRoomForBq4() {
+        val request = BackendEventMapper.toRequest(
+            event(Events.MEETING_CONFIRMED, "product_id" to "p1", "chat_room_id" to "room-9", "messages_in_thread" to 6),
+        )!!
+
+        assertEquals("MEETING_CONFIRMED", request.eventType)
+        assertEquals("room-9", request.metadata["chatRoomId"])
+        assertEquals(6, request.metadata["messages_in_thread"])
+        assertNull(request.metadata["chat_room_id"])
     }
 }

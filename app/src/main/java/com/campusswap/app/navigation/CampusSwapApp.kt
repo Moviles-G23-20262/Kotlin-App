@@ -99,6 +99,8 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
             appViewModel.loadWishlist(container.wishlistRepository)
             appViewModel.loadOrders(container.orderRepository)
             appViewModel.loadMyReviews(container.ratingRepository)
+            appViewModel.loadAlerts(container.smartAlertRepository)
+            appViewModel.loadNotifications(container.notificationRepository, markRead = false)
             // Anything queued before a log-out or an expired session goes out with the new one.
             container.outboxRepository.syncNow()
         }

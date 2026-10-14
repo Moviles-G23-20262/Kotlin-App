@@ -10,6 +10,10 @@ sealed interface RatingResult {
     data object ExchangeNotRecorded : RatingResult
     data object Offline : RatingResult
     data class Rejected(val httpCode: Int) : RatingResult
+    /** Saved on the phone; the outbox sends it when there's a connection. */
+    data object Queued : RatingResult
+    /** The outbox tried to send it and the server said no. */
+    data class Refused(val reason: String) : RatingResult
 }
 
 data class ExchangeRatings(val mine: RatingDto?, val theirs: RatingDto?)

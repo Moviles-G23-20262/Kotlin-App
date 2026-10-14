@@ -1,6 +1,7 @@
 package com.campusswap.app.data
 
 import com.campusswap.app.data.materials.MaterialDto
+import com.campusswap.app.data.local.InMemoryResponseCache
 import com.campusswap.app.data.remote.ChatPartyDto
 import com.campusswap.app.data.remote.ChatRoomSummaryDto
 import com.campusswap.app.data.remote.MessageDto
@@ -95,6 +96,20 @@ class ConversationsRepositoryTest {
         remote.failure = IOException("offline")
 
         assertEquals(ConversationsLoad.Offline, repository.conversations())
+        assertEquals(0, repository.unreadCount())
+    }
+
+    @Test
+    fun `offline, the inbox saved earlier is shown but its old unread count is not`() = runTest {
+        val repository = ConversationsRepository(remote, currentUserId = { me }, cache = InMemoryResponseCache(now = 7L))
+        remote.summaries += room("1", me, "A", "x", "2026-10-05T17:00:00Z", 2)
+        repository.conversations()
+
+        remote.failure = IOException("offline")
+        val saved = repository.conversations() as ConversationsLoad.Success
+
+        assertEquals(listOf("A"), saved.conversations.map { it.productTitle })
+        assertEquals(7L, saved.savedAtMillis)
         assertEquals(0, repository.unreadCount())
     }
 }

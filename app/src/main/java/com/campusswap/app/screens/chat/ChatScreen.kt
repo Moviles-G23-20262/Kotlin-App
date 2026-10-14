@@ -86,6 +86,7 @@ import com.campusswap.app.data.MeetingProposal
 import com.campusswap.app.data.MessageAuthor
 import com.campusswap.app.data.MessageStatus
 import com.campusswap.app.components.OfflineBanner
+import com.campusswap.app.components.timeAgo
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ErrorOutline
 import com.campusswap.app.data.Product
@@ -235,8 +236,8 @@ fun ChatScreen(
                         }
                     }
                     OfflineBanner(
-                        visible = !vm.isOnline,
-                        message = "You're offline. Messages will be sent when you reconnect.",
+                        visible = !vm.isOnline || state.savedAtMillis != null,
+                        message = chatOfflineMessage(state.savedAtMillis),
                         modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp),
                     )
                     Row(
@@ -615,3 +616,10 @@ private fun newPhotoUri(context: Context): Uri {
     val file = File(folder, "chat-${System.currentTimeMillis()}.jpg")
     return FileProvider.getUriForFile(context, "${context.packageName}.photos", file)
 }
+
+private fun chatOfflineMessage(savedAtMillis: Long?): String =
+    if (savedAtMillis != null) {
+        "You're offline. Showing this conversation as it was ${timeAgo(savedAtMillis)}. New messages are sent when you reconnect."
+    } else {
+        "You're offline. Messages will be sent when you reconnect."
+    }

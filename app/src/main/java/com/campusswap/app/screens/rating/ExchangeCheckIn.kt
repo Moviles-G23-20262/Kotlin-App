@@ -98,8 +98,12 @@ fun ExchangeCheckIn(viewModel: ExchangeCheckInViewModel, pointName: String?) {
             onOpenSettings = { context.openSettingsFor(s.reason) },
         )
         is CheckInState.Confirmed -> Confirmed(s.verifiedByGps)
+        is CheckInState.Queued -> Hint(
+            if (s.verifiedByGps) "You're at the spot, but offline. The confirmation is saved on your phone and sent as soon as you reconnect."
+            else "You're offline. The confirmation is saved on your phone and sent as soon as you reconnect.",
+        )
         is CheckInState.Failed -> {
-            Hint(failureMessage(s.reason), error = true)
+            Hint(s.detail ?: failureMessage(s.reason), error = true)
             if (s.reason != FailReason.NOT_SYNCED) {
                 PrimaryButton(
                     text = "Retry",

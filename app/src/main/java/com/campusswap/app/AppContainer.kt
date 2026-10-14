@@ -37,6 +37,7 @@ import com.campusswap.app.data.remote.RetrofitMeetingProposalRemoteDataSource
 import com.campusswap.app.data.remote.RetrofitPopularityRemoteDataSource
 import com.campusswap.app.domain.RankingStrategySelector
 import com.campusswap.app.domain.TimeOfDayStrategySelector
+import java.io.File
 import java.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -54,13 +55,20 @@ import com.campusswap.app.data.ratings.RatingsApi
 import com.campusswap.app.data.ratings.RetrofitRatingRemoteDataSource
 import com.campusswap.app.data.connectivity.ConnectivityObserver
 import com.campusswap.app.data.connectivity.NetworkConnectivityObserver
+import com.campusswap.app.data.alerts.RetrofitSmartAlertRemoteDataSource
+import com.campusswap.app.data.alerts.SmartAlertRepository
+import com.campusswap.app.data.alerts.SmartAlertsApi
 import com.campusswap.app.data.local.CampusSwapDatabase
 import com.campusswap.app.data.local.DataStoreDraftStore
 import com.campusswap.app.data.local.DraftStore
 import com.campusswap.app.data.sync.OutboxRepository
 import com.campusswap.app.data.sync.OutboxSync
+import com.campusswap.app.data.sync.RepositoryActionSender
 import com.campusswap.app.data.sync.OutboxWorker
+import com.campusswap.app.data.local.ImageCache
+import com.campusswap.app.data.local.ImageDiskCache
 import com.campusswap.app.data.local.ListingPhotoStore
+import com.campusswap.app.data.local.RoomResponseCache
 import com.campusswap.app.data.sync.RemoteListingPhotoUploader
 import com.campusswap.app.data.wishlist.RetrofitWishlistRemoteDataSource
 import com.campusswap.app.data.wishlist.WishlistApi
@@ -92,13 +100,17 @@ class AppContainer(context: Context) {
 
     val locationDataSource: LocationDataSource = FusedLocationDataSource(context)
 
+    private val database = CampusSwapDatabase.create(context)
+
+    private val responseCache = RoomResponseCache(database.responses(), clock)
+
     val exchangeRepository = ExchangeRepository(
         RetrofitExchangeRemoteDataSource(ApiClient.create<ExchangesApi>(BuildConfig.BASE_URL, backendClient)),
     )
 
     val eventSink = HttpEventSink(ApiClient.create<AnalyticsEventsApi>(BuildConfig.BASE_URL, backendClient)) { sessionManager.token != null }
 
-    val meetingPointRepository = MeetingPointRepository(RetrofitMeetingPointRemoteDataSource(api))
+    val meetingPointRepository = MeetingPointRepository(RetrofitMeetingPointRemoteDataSource(api), responseCache)
 
     private val chatRoomRemote = RetrofitChatRoomRemoteDataSource(
         ApiClient.create<ChatRoomsApi>(BuildConfig.BASE_URL, backendClient),
@@ -112,17 +124,20 @@ class AppContainer(context: Context) {
 
     val chatRoomRepository = ChatRoomRepository(chatRoomRemote)
 
-    val conversationsRepository = ConversationsRepository(chatRoomRemote, signedInUserId)
+    val conversationsRepository = ConversationsRepository(chatRoomRemote, signedInUserId, cache = responseCache)
 
     private val uploadRemote = RetrofitUploadRemoteDataSource(
         ApiClient.create<UploadsApi>(BuildConfig.BASE_URL, backendClient),
     )
 
-    val chatRepository = ChatRepository(chatRoomRepository, messageRemote, uploadRemote, signedInUserId)
+    val chatRepository = ChatRepository(chatRoomRepository, messageRemote, uploadRemote, signedInUserId, cache = responseCache)
 
     val meetingProposalRepository = MeetingProposalRepository(
         rooms = chatRoomRepository,
         remote = RetrofitMeetingProposalRemoteDataSource(ApiClient.create<MeetingProposalApi>(BuildConfig.BASE_URL, backendClient)),
+        cache = responseCache,
+        currentUserId = signedInUserId,
+        clock = clock,
     )
 
     val popularityRepository = MeetingPointPopularityRepository(RetrofitPopularityRemoteDataSource(analyticsApi))
@@ -132,9 +147,7 @@ class AppContainer(context: Context) {
 
     val rankingStrategySelector: RankingStrategySelector = TimeOfDayStrategySelector()
 
-    val notificationRepository = NotificationRepository(RetrofitNotificationRemoteDataSource(notificationsApi))
-
-    private val database = CampusSwapDatabase.create(context)
+    val notificationRepository = NotificationRepository(RetrofitNotificationRemoteDataSource(notificationsApi), cache = responseCache)
 
     private val materialRemote = RetrofitMaterialRemoteDataSource(materialsApi)
 
@@ -146,23 +159,32 @@ class AppContainer(context: Context) {
 
     val listingPhotos = ListingPhotoStore(context)
 
+    val imageCache = ImageCache(ImageDiskCache(File(context.cacheDir, "images"), maxBytes = 50L * 1024 * 1024))
+
+    val ratingRepository = RatingRepository(RetrofitRatingRemoteDataSource(ratingsApi))
+
     val outboxSync = OutboxSync(
         database.outbox(),
         materialRemote,
         chatRoomRepository,
         messageRemote,
         RemoteListingPhotoUploader(listingPhotos, uploadRemote),
+        RepositoryActionSender(exchangeRepository, ratingRepository, meetingProposalRepository, clock),
     )
 
     val outboxRepository = OutboxRepository(database.outbox(), clock) { OutboxWorker.schedule(context) }
 
-    val ratingRepository = RatingRepository(RetrofitRatingRemoteDataSource(ratingsApi))
-
     private val wishlistApi = ApiClient.create<WishlistApi>(BuildConfig.BASE_URL, backendClient)
 
-    val wishlistRepository = WishlistRepository(RetrofitWishlistRemoteDataSource(wishlistApi))
+    val wishlistRepository = WishlistRepository(RetrofitWishlistRemoteDataSource(wishlistApi), signedInUserId, responseCache)
 
     private val ordersApi = ApiClient.create<OrdersApi>(BuildConfig.BASE_URL, backendClient)
 
     val orderRepository = OrderRepository(RetrofitOrdersRemoteDataSource(ordersApi))
+
+    val smartAlertRepository = SmartAlertRepository(
+        RetrofitSmartAlertRemoteDataSource(ApiClient.create<SmartAlertsApi>(BuildConfig.BASE_URL, backendClient)),
+        signedInUserId,
+        responseCache,
+    )
 }

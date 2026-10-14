@@ -1,6 +1,9 @@
 package com.campusswap.app.data
 
 import com.campusswap.app.data.remote.FreeSlotDto
+import java.time.ZoneOffset
+import java.time.Clock
+import com.campusswap.app.data.local.InMemoryResponseCache
 import com.campusswap.app.data.remote.MeetingPointDto
 import com.campusswap.app.data.remote.MeetingProposalDto
 import com.campusswap.app.data.remote.SlotSuggestionsDto
@@ -76,7 +79,7 @@ class MeetingProposalRepositoryTest {
         val body = ResponseBody.create(MediaType.parse("application/json"), """{"message":"The meeting has to be in the future"}""")
         remote.failure = HttpException(Response.error<Any>(400, body))
 
-        assertEquals(ProposalResult.Rejected("The meeting has to be in the future"), repository.propose("p1", point, slot))
+        assertEquals(ProposalResult.Rejected("The meeting has to be in the future", 400), repository.propose("p1", point, slot))
     }
 
     @Test fun listingOnlyOnThisDeviceCannotBeProposed() = runBlocking {
@@ -130,5 +133,17 @@ class MeetingProposalRepositoryTest {
 
         assertEquals(listOf("proposal-9" to true), remote.responses)
         assertEquals(ProposalStatus.ACCEPTED, (result as ProposalResult.Success).proposal.status)
+    }
+
+    @Test fun offlineFreeSlotsComeFromTheLastLoadWithoutTheOnesAlreadyOver() = runBlocking {
+        val cache = InMemoryResponseCache()
+        val betweenTheTwo = Clock.fixed(Instant.parse("2026-10-05T16:00:00Z"), ZoneOffset.UTC)
+        val repository = MeetingProposalRepository(ChatRoomRepository(chatRooms), remote, cache = cache, currentUserId = { "me" }, clock = betweenTheTwo)
+        remote.suggestions = SlotSuggestionsDto(listOf(morning, noon), suggested = noon)
+        repository.freeSlots("p1")
+
+        remote.failure = IOException("offline")
+
+        assertEquals(listOf(noon.startsAt), repository.freeSlots("p1").map { it.id })
     }
 }

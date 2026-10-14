@@ -303,7 +303,9 @@ fun CompletionScreen(
             )
         }
 
-        val confirmed = checkInState is CheckInState.Confirmed || checkInState is CheckInState.Failed
+        // Queued counts: the rating waits in the outbox behind the check-in and is sent right after it.
+        val confirmed = checkInState is CheckInState.Confirmed || checkInState is CheckInState.Failed ||
+            checkInState is CheckInState.Queued
         val ready = confirmed && checks.size == CheckItem.entries.size && stars > 0
         Box(
             modifier = Modifier
@@ -377,7 +379,7 @@ private fun RatingSent(
             color = if (sync == RatingResult.Saved) c.success else c.textMuted,
             modifier = Modifier.padding(bottom = 12.dp),
         )
-        if (sync != null && sync != RatingResult.Saved && sync != RatingResult.Rejected(409)) {
+        if (sync != null && sync != RatingResult.Saved && sync != RatingResult.Queued && sync != RatingResult.Rejected(409)) {
             SecondaryButton(text = "Retry", onClick = onRetry, modifier = Modifier.padding(bottom = 16.dp))
         }
 
@@ -481,4 +483,6 @@ private fun syncMessage(sync: RatingResult?): String = when (sync) {
     RatingResult.ExchangeNotRecorded -> "This exchange isn't completed on the server yet, so the rating wasn't saved."
     is RatingResult.Rejected ->
         if (sync.httpCode == 409) "You already rated this exchange." else "The server didn't accept it (${sync.httpCode})."
+    RatingResult.Queued -> "You're offline. Your rating is saved on your phone and sent as soon as you reconnect."
+    is RatingResult.Refused -> sync.reason
 }

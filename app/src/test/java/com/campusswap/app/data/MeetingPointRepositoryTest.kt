@@ -1,6 +1,7 @@
 package com.campusswap.app.data
 
 import com.campusswap.app.data.remote.MeetingPointDto
+import com.campusswap.app.data.local.InMemoryResponseCache
 import com.campusswap.app.domain.GeoPoint
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -57,5 +58,17 @@ class MeetingPointRepositoryTest {
         remote.failure = IOException("offline from the start")
 
         assertTrue(repository.load().points.all { it.id.startsWith("mp") })
+    }
+
+    @Test fun offlineAfterARestartUsesThePointsSavedByTheLastRun() = runBlocking {
+        val cache = InMemoryResponseCache()
+        remote.points = listOf(MeetingPointDto("c0000000-0000-4000-8000-000000000001", "Library", null, "LIBRARY", true, 4.6, -74.06))
+        MeetingPointRepository(remote, cache).load()
+
+        remote.failure = IOException("airplane mode")
+        val afterRestart = MeetingPointRepository(remote, cache).load()
+
+        assertFalse(afterRestart.isLive)
+        assertEquals(listOf("Library"), afterRestart.points.map { it.name })
     }
 }

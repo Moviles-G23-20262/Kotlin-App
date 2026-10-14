@@ -13,4 +13,9 @@ class CampusSwapApplication : Application() {
         container.sessionManager.launchRestore()
         Analytics.init(this, container.eventSink)
     }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_UI_HIDDEN) container.imageCache.trimMemory()
+    }
 }

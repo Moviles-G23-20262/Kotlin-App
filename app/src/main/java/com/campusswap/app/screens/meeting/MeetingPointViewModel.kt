@@ -10,6 +10,7 @@ import com.campusswap.app.analytics.Events
 import com.campusswap.app.data.MeetingPoint
 import com.campusswap.app.data.MeetingProposal
 import com.campusswap.app.data.ProposalResult
+import com.campusswap.app.data.ProposalStatus
 import com.campusswap.app.data.MeetingPointPopularityRepository
 import com.campusswap.app.data.MeetingProposalRepository
 import com.campusswap.app.data.MeetingPointRepository
@@ -70,6 +71,8 @@ class MeetingPointViewModel(
     private val clock: Clock,
     private val popularity: MeetingPointPopularityRepository,
     private val proposals: MeetingProposalRepository,
+    /** Saves the proposal in the outbox when there's no connection; false if it can't be queued. */
+    private val queueProposal: suspend (MeetingPoint, TimeSlot) -> Boolean = { _, _ -> false },
 ) : ViewModel() {
     private val _state = MutableStateFlow(MeetingPointUiState())
     val state: StateFlow<MeetingPointUiState> = _state.asStateFlow()
@@ -111,7 +114,13 @@ class MeetingPointViewModel(
                     Analytics.log(Events.MEETING_PROPOSED, "product_id" to productId)
                     onResult(result.proposal, null)
                 }
-                ProposalResult.Offline -> onResult(null, "No connection. Your proposal wasn't sent.")
+                ProposalResult.Offline ->
+                    if (queueProposal(point, slot)) {
+                        Analytics.log(Events.MEETING_PROPOSED, "product_id" to productId, "queued_offline" to true)
+                        onResult(MeetingProposal(point, slot, ProposalStatus.PENDING), null)
+                    } else {
+                        onResult(null, "No connection. Your proposal wasn't sent.")
+                    }
                 ProposalResult.NotSynced ->
                     onResult(null, "This listing or meeting point isn't on the server, so the proposal can't be sent.")
                 is ProposalResult.Rejected -> onResult(null, result.message ?: "The server couldn't save the proposal.")
@@ -189,6 +198,10 @@ class MeetingPointViewModel(
                     clock = container.clock,
                     popularity = container.popularityRepository,
                     proposals = container.meetingProposalRepository,
+                    queueProposal = { point, slot ->
+                        val owner = container.sessionManager.validSession()?.userId
+                        owner != null && container.outboxRepository.queueProposal(owner, productId, point, slot)
+                    },
                 )
             }
         }
