@@ -167,20 +167,20 @@ class AppContainer(context: Context) {
 
     val imageCache = ImageCache(ImageDiskCache(File(context.cacheDir, "images"), maxBytes = 50L * 1024 * 1024))
 
+    private val wishlistApi = ApiClient.create<WishlistApi>(BuildConfig.BASE_URL, backendClient)
+
+    val wishlistRepository = WishlistRepository(RetrofitWishlistRemoteDataSource(wishlistApi), signedInUserId, responseCache)
+
     val outboxSync = OutboxSync(
         database.outbox(),
         materialRemote,
         chatRoomRepository,
         messageRemote,
         RemoteListingPhotoUploader(listingPhotos, uploadRemote),
-        RepositoryActionSender(exchangeRepository, ratingRepository, meetingProposalRepository, clock),
+        RepositoryActionSender(exchangeRepository, ratingRepository, meetingProposalRepository, wishlistRepository, clock),
     )
 
     val outboxRepository = OutboxRepository(database.outbox(), clock) { OutboxWorker.schedule(context) }
-
-    private val wishlistApi = ApiClient.create<WishlistApi>(BuildConfig.BASE_URL, backendClient)
-
-    val wishlistRepository = WishlistRepository(RetrofitWishlistRemoteDataSource(wishlistApi), signedInUserId, responseCache)
 
     private val ordersApi = ApiClient.create<OrdersApi>(BuildConfig.BASE_URL, backendClient)
 

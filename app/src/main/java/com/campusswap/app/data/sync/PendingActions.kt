@@ -10,13 +10,18 @@ import com.campusswap.app.data.local.PendingActionEntity
 import com.campusswap.app.data.local.cacheGson
 import com.campusswap.app.data.ratings.RatingRepository
 import com.campusswap.app.data.ratings.RatingResult
+import com.campusswap.app.data.wishlist.WishlistRepository
+import com.campusswap.app.data.wishlist.WishlistResult
 import com.campusswap.app.domain.ExchangeTarget
 import com.campusswap.app.domain.GeoPoint
 import java.time.Clock
 import java.time.Instant
 
 /** What the user can do offline besides publishing and chatting. */
-enum class PendingActionKind { CHECK_IN, RATING, PROPOSAL }
+enum class PendingActionKind { CHECK_IN, RATING, PROPOSAL, WISHLIST_ADD, WISHLIST_REMOVE }
+
+/** Wishlist changes carry no payload: the listing id is the action's productId. */
+val WISHLIST_KINDS = setOf(PendingActionKind.WISHLIST_ADD.name, PendingActionKind.WISHLIST_REMOVE.name)
 
 /** "I'm at the meeting point and got the item": completes the exchange on the server. */
 data class CheckInPayload(
@@ -80,6 +85,7 @@ class RepositoryActionSender(
     private val exchanges: ExchangeRepository,
     private val ratings: RatingRepository,
     private val proposals: MeetingProposalRepository,
+    private val wishlist: WishlistRepository,
     private val clock: Clock,
 ) : PendingActionSender {
 
@@ -89,6 +95,8 @@ class RepositoryActionSender(
             PendingActionKind.CHECK_IN -> action.payloadAs<CheckInPayload>()?.let { checkIn(action.productId, it) }
             PendingActionKind.RATING -> action.payloadAs<RatingPayload>()?.let { rate(action.productId, it) }
             PendingActionKind.PROPOSAL -> action.payloadAs<ProposalPayload>()?.let { propose(action.productId, it) }
+            PendingActionKind.WISHLIST_ADD -> wishlistOutcome(wishlist.add(action.productId))
+            PendingActionKind.WISHLIST_REMOVE -> wishlistOutcome(wishlist.remove(action.productId))
             null -> null
         }
         return outcome ?: ActionOutcome.Refused("This saved action couldn't be read.")
@@ -116,6 +124,13 @@ class RepositoryActionSender(
             }
             RatingResult.Queued, is RatingResult.Refused -> ActionOutcome.Retry
         }
+
+    private fun wishlistOutcome(result: WishlistResult): ActionOutcome = when (result) {
+        WishlistResult.SAVED -> ActionOutcome.Sent
+        WishlistResult.OFFLINE -> ActionOutcome.Retry
+        WishlistResult.NOT_ON_SERVER -> ActionOutcome.Refused("This listing isn't on the server, so it couldn't be saved to your wishlist.")
+        WishlistResult.REFUSED -> ActionOutcome.Refused("The server couldn't update your wishlist.")
+    }
 
     private suspend fun propose(productId: String, payload: ProposalPayload): ActionOutcome {
         val slot = payload.slot()

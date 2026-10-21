@@ -21,6 +21,7 @@ import com.campusswap.app.components.BackHeader
 import com.campusswap.app.components.CampusIconButton
 import com.campusswap.app.components.CampusIcons
 import com.campusswap.app.components.EmptyState
+import com.campusswap.app.components.OfflineBanner
 import com.campusswap.app.components.ProductCard
 import com.campusswap.app.data.AppViewModel
 import com.campusswap.app.ui.theme.CampusSwapTheme
@@ -64,6 +65,12 @@ fun WishlistScreen(
                 }
             }
         }
+
+        OfflineBanner(
+            visible = !vm.isOnline,
+            message = "You're offline. Showing your saved wishlist; changes sync when you're back online.",
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
+        )
 
         if (saved.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

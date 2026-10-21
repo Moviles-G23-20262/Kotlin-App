@@ -26,12 +26,14 @@ import com.campusswap.app.data.local.PendingMessageEntity
 import com.campusswap.app.data.sync.OutboxRepository
 import com.campusswap.app.data.sync.PendingActionKind
 import com.campusswap.app.data.sync.RatingPayload
+import com.campusswap.app.data.sync.WISHLIST_KINDS
 import com.campusswap.app.data.sync.payloadAs
 import com.campusswap.app.data.ratings.RatingRepository
 import com.campusswap.app.data.ratings.RatingResult
 import com.campusswap.app.data.auth.Session
 import com.campusswap.app.data.materials.maskEmail
 import com.campusswap.app.data.wishlist.WishlistRepository
+import com.campusswap.app.data.wishlist.WishlistResult
 import com.campusswap.app.data.orders.OrderRepository
 import com.campusswap.app.data.orders.PlaceOrderResult
 import com.campusswap.app.data.ratings.RatingDto
@@ -107,7 +109,7 @@ class AppViewModel : ViewModel() {
             }
         }
         viewModelScope.launch { outbox.pendingListings.collect { allPendingListings = it; showPendingListings() } }
-        viewModelScope.launch { outbox.pendingActions.collect { allPendingActions = it; showPendingRatings() } }
+        viewModelScope.launch { outbox.pendingActions.collect { allPendingActions = it; showPendingRatings(); showPendingWishlist() } }
         if (sessionUserId() != null) outbox.syncNow()
     }
 
@@ -117,6 +119,7 @@ class AppViewModel : ViewModel() {
     private fun refreshPendingViews() {
         showPendingListings()
         showPendingRatings()
+        showPendingWishlist()
     }
 
     private fun onBackOnline() {
@@ -198,6 +201,44 @@ class AppViewModel : ViewModel() {
             wishlist.addAll(saved.map { it.id })
             wishlistProducts.clear()
             wishlistProducts.addAll(saved)
+            // Lo que se marcó sin red todavía no está en el servidor: se vuelve a aplicar encima
+            showPendingWishlist()
+        }
+    }
+
+    /** Aviso corto sobre un favorito (guardado sin red, rechazado...); la app lo muestra como snackbar. */
+    var wishlistMessage by mutableStateOf<String?>(null)
+        private set
+
+    fun clearWishlistMessage() {
+        wishlistMessage = null
+    }
+
+    /**
+     * Mirrors the wishlist changes waiting in the outbox: hearts tapped offline stay as the user
+     * left them (also after a restart), and a change the server refused is undone with its reason.
+     */
+    private fun showPendingWishlist() {
+        val mine = allPendingActions.filter { it.ownerId == currentUserId && it.kind in WISHLIST_KINDS }
+        mine.forEach { row ->
+            val added = row.kind == PendingActionKind.WISHLIST_ADD.name
+            if (row.failedReason == null) {
+                showWishlistChange(row.productId, added)
+            } else {
+                showWishlistChange(row.productId, !added)
+                wishlistMessage = row.failedReason
+                viewModelScope.launch { outbox?.discardAction(row.localId) }
+            }
+        }
+    }
+
+    private fun showWishlistChange(productId: String, added: Boolean) {
+        if (added) {
+            if (productId !in wishlist) wishlist.add(productId)
+            if (wishlistProducts.none { it.id == productId }) findProduct(productId)?.let { wishlistProducts.add(0, it) }
+        } else {
+            wishlist.remove(productId)
+            wishlistProducts.removeAll { it.id == productId }
         }
     }
 
@@ -261,6 +302,9 @@ class AppViewModel : ViewModel() {
                 }
                 .sumOf { it.product.price }
         }
+
+    /** Signed-in orders are placed on the server, so checkout waits for a connection. */
+    val needsConnectionToOrder: Boolean get() = orderRepository != null && !isOnline
 
     /** Por qué no se pudo hacer el pedido (null = sin problema); lo muestra el checkout. */
     var checkoutMessage by mutableStateOf<String?>(null)
@@ -400,15 +444,40 @@ class AppViewModel : ViewModel() {
         val added = !wishlist.remove(productId)
         if (added) wishlist.add(productId)
         viewModelScope.launch {
+            val queue = outbox
+            val userId = sessionUserId()
+            // Deshace un cambio que aún no salió del teléfono: no hay nada que pedirle al servidor
+            if (queue != null && userId != null && queue.undoPendingWishlist(userId, productId, added)) {
+                showWishlistChange(productId, added)
+                return@launch
+            }
             // Sin repositorio (acceso demo) se queda solo en el teléfono, como antes
             val repository = wishlistRepository
-            val saved = repository == null || (if (added) repository.add(productId) else repository.remove(productId))
-            if (saved) {
-                Analytics.log(Events.WISHLIST_TOGGLED, "product_id" to productId, "added" to added)
-                if (added) findProduct(productId)?.let { wishlistProducts.add(0, it) }
-                else wishlistProducts.removeAll { it.id == productId }
-            } else {
-                if (added) wishlist.remove(productId) else wishlist.add(productId)
+            val result = when {
+                repository == null -> WishlistResult.SAVED
+                added -> repository.add(productId)
+                else -> repository.remove(productId)
+            }
+            when {
+                result == WishlistResult.SAVED -> {
+                    Analytics.log(Events.WISHLIST_TOGGLED, "product_id" to productId, "added" to added)
+                    showWishlistChange(productId, added)
+                }
+                // Sin red: el corazón se queda como lo dejó el usuario y el Outbox lo envía al volver la señal
+                result == WishlistResult.OFFLINE && queue != null && userId != null -> {
+                    queue.queueWishlist(userId, productId, added)
+                    Analytics.log(Events.WISHLIST_TOGGLED, "product_id" to productId, "added" to added, "queued" to true)
+                    showWishlistChange(productId, added)
+                    wishlistMessage = "You're offline. Saved on this phone: it will sync when you're back online."
+                }
+                else -> {
+                    if (added) wishlist.remove(productId) else wishlist.add(productId)
+                    wishlistMessage = when (result) {
+                        WishlistResult.NOT_ON_SERVER -> "You can save this listing once it's published."
+                        WishlistResult.OFFLINE -> "You're offline. Try again when you're back online."
+                        else -> "Couldn't update your wishlist. Try again."
+                    }
+                }
             }
         }
     }

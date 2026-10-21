@@ -70,6 +70,24 @@ class OutboxRepository(
         return true
     }
 
+    suspend fun queueWishlist(ownerId: String, productId: String, added: Boolean) {
+        if (undoPendingWishlist(ownerId, productId, added)) return
+        val kind = if (added) PendingActionKind.WISHLIST_ADD else PendingActionKind.WISHLIST_REMOVE
+        queueAction(ownerId, kind, productId, emptyMap<String, String>())
+    }
+
+    /**
+     * Saving a listing and then removing it before the first change reached the server (or the
+     * other way round) cancels out: the pending change is dropped and nothing needs sending.
+     */
+    suspend fun undoPendingWishlist(ownerId: String, productId: String, added: Boolean): Boolean {
+        val opposite = if (added) PendingActionKind.WISHLIST_REMOVE else PendingActionKind.WISHLIST_ADD
+        val pending = outbox.actionsToSend(ownerId).lastOrNull { it.productId == productId && it.kind == opposite.name }
+            ?: return false
+        outbox.deleteAction(pending.localId)
+        return true
+    }
+
     suspend fun discardAction(localId: Long) = outbox.deleteAction(localId)
 
     private suspend fun queueAction(ownerId: String, kind: PendingActionKind, productId: String, payload: Any) {

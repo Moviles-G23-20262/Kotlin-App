@@ -46,6 +46,7 @@ import com.campusswap.app.components.EmptyState
 import com.campusswap.app.components.HeadingText
 import com.campusswap.app.components.InitialsAvatar
 import com.campusswap.app.components.PriceText
+import com.campusswap.app.components.OfflineBanner
 import com.campusswap.app.components.PendingSyncLabel
 import com.campusswap.app.components.PrimaryButton
 import com.campusswap.app.components.ProductPhoto
@@ -183,6 +184,13 @@ fun ProductDetailScreen(
                     size = CampusType.sizeXs,
                 )
             }
+
+            // Un listing pendiente ya explica su estado con PendingSyncLabel
+            OfflineBanner(
+                visible = !vm.isOnline && product.pendingSync == null,
+                message = "You're offline. These details were saved earlier and may have changed.",
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
 
             product.pendingSync?.let { sync ->
                 Row(
