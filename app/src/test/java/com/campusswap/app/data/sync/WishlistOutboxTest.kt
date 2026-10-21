@@ -122,6 +122,8 @@ class WishlistOutboxTest {
         remote.failure = http(409)
         assertEquals(WishlistResult.SAVED, wishlist.add(listing))
         assertEquals(WishlistResult.NOT_ON_SERVER, wishlist.add("pending-1"))
+        remote.failure = http(404)
+        assertEquals(WishlistResult.SAVED, wishlist.remove(listing))
     }
 
     @Test fun aListingSavedOfflineReachesTheServerWhenTheSignalComesBack() = runTest {
