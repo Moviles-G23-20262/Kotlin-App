@@ -2,6 +2,9 @@ package com.campusswap.app.data.sync
 
 import com.campusswap.app.data.local.ListingPhotoStore
 import com.campusswap.app.data.remote.UploadRemoteDataSource
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 /** Sube las fotos de una publicacion pendiente y borra las copias locales cuando publica*/
 interface ListingPhotoUploader {
@@ -9,6 +12,10 @@ interface ListingPhotoUploader {
     suspend fun upload(path: String): String?
 
     fun discard(paths: List<String>)
+
+    suspend fun uploadAll(paths: List<String>): List<String> = coroutineScope {
+        paths.map { path -> async { upload(path) } }.awaitAll().filterNotNull()
+    }
 
     object None : ListingPhotoUploader {
         override suspend fun upload(path: String): String? = null

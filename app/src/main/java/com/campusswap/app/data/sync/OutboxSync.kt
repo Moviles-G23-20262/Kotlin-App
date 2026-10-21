@@ -39,7 +39,7 @@ class OutboxSync(
     suspend fun flush(ownerId: String): SyncOutcome {
         for (listing in outbox.listingsToSend(ownerId)) {
             val result = attempt {
-                val imageUrls = listing.photoPathList().mapNotNull { photos.upload(it) }
+                val imageUrls = photos.uploadAll(listing.photoPathList())
                 materials.create(listing.toRequest(imageUrls))
             }
             when (result) {
