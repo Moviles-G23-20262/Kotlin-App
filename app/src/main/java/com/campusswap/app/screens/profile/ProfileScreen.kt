@@ -52,6 +52,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import com.campusswap.app.components.OfflineBanner
+import com.campusswap.app.components.timeAgo
 
 @Composable
 fun ProfileScreen(
@@ -92,6 +94,12 @@ fun ProfileScreen(
                 )
                 CampusIconButton(CampusIcons.LogOut, contentDescription = "Log out", onClick = onLogout, iconSize = 18.dp)
             }
+        OfflineBanner(
+            visible = !vm.ordersLive,
+            message = "You're offline. Showing your purchases and sales saved " +
+                (vm.ordersSavedAtMillis?.let { timeAgo(it) } ?: "earlier") + ".",
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
+        )
         }
 
         LazyColumn(
