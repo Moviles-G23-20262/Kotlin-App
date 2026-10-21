@@ -31,6 +31,7 @@ import com.campusswap.app.components.BodyText
 import com.campusswap.app.components.BottomActionBar
 import com.campusswap.app.components.CampusIcons
 import com.campusswap.app.components.EmptyState
+import com.campusswap.app.components.OfflineBanner
 import com.campusswap.app.components.HeadingText
 import com.campusswap.app.components.MonoText
 import com.campusswap.app.components.PriceText
@@ -60,6 +61,12 @@ fun CartScreen(
             title = "Your Cart",
             onBack = onBack,
             subtitle = "($lineCount item${if (lineCount == 1) "" else "s"})",
+        )
+
+        OfflineBanner(
+            visible = !vm.isOnline && vm.cart.isNotEmpty(),
+            message = "You're offline. Your cart is saved on this phone; placing the order needs a connection.",
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
         )
 
         if (vm.cart.isEmpty()) {

@@ -38,6 +38,7 @@ import com.campusswap.app.components.CampusIcons
 import com.campusswap.app.components.CampusSlider
 import com.campusswap.app.components.CampusTextField
 import com.campusswap.app.components.EmptyState
+import com.campusswap.app.components.OfflineBanner
 import com.campusswap.app.components.Pill
 import com.campusswap.app.components.ProductCard
 import com.campusswap.app.components.formatPrice
@@ -165,6 +166,12 @@ fun SearchScreen(
                 color = c.textMuted,
             )
         }
+
+        OfflineBanner(
+            visible = !vm.isOnline,
+            message = "You're offline. Searching the listings saved on this phone.",
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
+        )
 
         if (results.isEmpty()) {
             EmptyState(
