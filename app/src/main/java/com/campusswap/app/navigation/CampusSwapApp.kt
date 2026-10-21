@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -148,9 +150,18 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
         }
     }
 
+    // Favoritos marcados sin red o rechazados: se puede tocar el corazón desde cualquier pantalla
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(appViewModel.wishlistMessage) {
+        val message = appViewModel.wishlistMessage ?: return@LaunchedEffect
+        snackbar.showSnackbar(message)
+        appViewModel.clearWishlistMessage()
+    }
+
     Scaffold(
         containerColor = CampusSwapTheme.colors.bg,
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
+        snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             if (!hideChrome) {
                 CampusSwapBottomBar(
