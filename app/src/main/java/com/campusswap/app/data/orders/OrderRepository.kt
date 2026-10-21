@@ -10,6 +10,9 @@ import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException
 import java.time.Instant
+import com.campusswap.app.data.local.ResponseCache
+import com.campusswap.app.data.local.load
+import com.campusswap.app.data.local.save
 
 sealed interface PlaceOrderResult {
     /** [unavailable]: productos del carrito que no se pudieron pedir */
@@ -27,9 +30,18 @@ data class Sale(
 )
 
 /** Lo que devuelve GET /exchanges, segun el intercambio. */
-data class MyExchanges(val purchases: List<Order>, val sales: List<Sale>)
+data class MyExchanges(
+    val purchases: List<Order>,
+    val sales: List<Sale>,
+    /** false = copia guardada en el tel porque no hubo red */
+    val isLive: Boolean = true,
+    val savedAtMillis: Long? = null,
+)
 
-class OrderRepository(private val remote: OrdersRemoteDataSource) {
+class OrderRepository(
+    private val remote: OrdersRemoteDataSource,
+    private val cache: ResponseCache = ResponseCache.None,
+) {
 
     /** Una orden del backend por producto (POST /exchanges/orders): cada material queda RESERVED. */
     suspend fun place(lines: List<CartLine>, meetOnCampus: Boolean): PlaceOrderResult {
@@ -65,10 +77,22 @@ class OrderRepository(private val remote: OrdersRemoteDataSource) {
         return PlaceOrderResult.Placed(order, unavailable)
     }
 
-    /** Tus compras y tus ventas, o null si no se pudo cargar. */
+    /** Tus compras y ventas. Sin red: la última copia guardada; null solo si nunca se guardó. */
     suspend fun load(userId: String): MyExchanges? = try {
-        val all = remote.mine().filter { it.status != "CANCELLED" }
-        MyExchanges(
+        val fromServer = remote.mine()
+        cache.save(userId, KEY, fromServer)
+        toMyExchanges(fromServer, userId, isLive = true, savedAtMillis = null)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        cache.load<List<ExchangeDto>>(userId, KEY)?.let { saved ->
+            toMyExchanges(saved.value, userId, isLive = false, savedAtMillis = saved.savedAtMillis)
+        }
+    }
+
+    private fun toMyExchanges(exchanges: List<ExchangeDto>, userId: String, isLive: Boolean, savedAtMillis: Long?): MyExchanges {
+        val all = exchanges.filter { it.status != "CANCELLED" }
+        return MyExchanges(
             purchases = all
                 .filter { it.buyerId == userId }
                 .distinctBy { it.materialId }
@@ -88,11 +112,13 @@ class OrderRepository(private val remote: OrdersRemoteDataSource) {
                         )
                     }
                 },
+            isLive = isLive,
+            savedAtMillis = savedAtMillis,
         )
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        null
+    }
+
+    private companion object {
+        const val KEY = "my-exchanges"
     }
 
     /** El material del intercambio no trae su vendedor; el intercambio sí (exchange.seller). */
