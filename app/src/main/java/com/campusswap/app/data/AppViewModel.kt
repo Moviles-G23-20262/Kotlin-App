@@ -39,6 +39,13 @@ import com.campusswap.app.data.orders.Sale
 import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
+import androidx.compose.runtime.snapshotFlow
+import com.campusswap.app.data.local.CartStore
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.drop
 
 /**
  * Single in-memory state holder for the whole prototype. There is no backend:
@@ -158,6 +165,23 @@ class AppViewModel : ViewModel() {
 
     val cart = mutableStateListOf<CartLine>()
 
+
+    private var cartSaver: Job? = null
+
+    @OptIn(FlowPreview::class)
+    fun restoreCart(store: CartStore) {
+        val userId = currentUserId ?: return
+        cartSaver?.cancel()
+        cartSaver = viewModelScope.launch {
+            val saved = store.read(userId)
+            if (cart.isEmpty()) cart.addAll(saved)
+            snapshotFlow { cart.toList() }
+                .drop(1) // la primera emisión es lo que se acaba de leer
+                .debounce(CART_SAVE_DEBOUNCE_MS)
+                .collectLatest { lines -> store.save(userId, lines) }
+        }
+    }
+
     val wishlist = mutableStateListOf<String>()
 
     /** Productos guardados en el backend incluye vendidos/reservados, que no salen en el feed */
@@ -214,8 +238,13 @@ class AppViewModel : ViewModel() {
     val orderTotal: Double get() = cartTotal + serviceFee
 
     val orders = mutableStateListOf<Order>()
-
     private var orderRepository: OrderRepository? = null
+    /** false cuando compras y ventas son la copia guardada en el tel */
+    var ordersLive by mutableStateOf(true)
+        private set
+
+    var ordersSavedAtMillis by mutableStateOf<Long?>(null)
+        private set
 
 
     /** Tus ventas del backend lo que compraron (reservado o vendido) */
@@ -247,6 +276,8 @@ class AppViewModel : ViewModel() {
             orders.addAll(loaded.purchases)
             sales.clear()
             sales.addAll(loaded.sales)
+            ordersLive = loaded.isLive
+            ordersSavedAtMillis = loaded.savedAtMillis
         }
     }
 
@@ -296,6 +327,7 @@ class AppViewModel : ViewModel() {
                 productId = product.id,
             )
         }
+        if (repository != null) loadOrders(repository)
         return order.number
     }
 
@@ -338,6 +370,8 @@ class AppViewModel : ViewModel() {
 
     fun logout() {
         isLoggedIn = false
+        cartSaver?.cancel()
+        cartSaver = null
         cart.clear()
         currentUserId = null
         currentUser = SampleData.currentSeller
@@ -356,6 +390,8 @@ class AppViewModel : ViewModel() {
         receivedRatings.clear()
         myReviews.clear()
         sales.clear()
+        ordersLive = true
+        ordersSavedAtMillis = null
     }
 
     fun isWishlisted(productId: String) = wishlist.contains(productId)
@@ -424,8 +460,7 @@ class AppViewModel : ViewModel() {
                     AlertMatch(
                         alert = alert,
                         product = product,
-                        postedMinutesAgo = 3 + product.imageSeed * 17,
-                        reserved = reservedMatches.contains(product.id),
+                        postedMinutesAgo = product.createdAtMillis?.let { ((System.currentTimeMillis() - it) / 60_000).toInt() } ?: 0,                        reserved = reservedMatches.contains(product.id),
                     )
                 }
         }.distinctBy { it.product.id }.sortedBy { it.postedMinutesAgo }
@@ -779,6 +814,7 @@ class AppViewModel : ViewModel() {
     private companion object {
         const val LOCAL_MATCH_PREFIX = "match-"
         const val ALERT_NOT_SAVED = "We couldn't save that change to your alerts. Check your connection and try again."
+        const val CART_SAVE_DEBOUNCE_MS = 300L    
     }
 }
 

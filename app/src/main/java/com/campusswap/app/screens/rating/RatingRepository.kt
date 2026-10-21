@@ -4,6 +4,9 @@ import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException
 import com.campusswap.app.data.SeedIds
+import com.campusswap.app.data.local.ResponseCache
+import com.campusswap.app.data.local.load
+import com.campusswap.app.data.local.save
 
 sealed interface RatingResult {
     data object Saved : RatingResult
@@ -18,7 +21,10 @@ sealed interface RatingResult {
 
 data class ExchangeRatings(val mine: RatingDto?, val theirs: RatingDto?)
 
-class RatingRepository(private val remote: RatingRemoteDataSource) {
+class RatingRepository(
+    private val remote: RatingRemoteDataSource,
+    private val cache: ResponseCache = ResponseCache.None,
+) {
 
     suspend fun submit(
         productId: String,
@@ -58,12 +64,16 @@ class RatingRepository(private val remote: RatingRemoteDataSource) {
         null
     }
 
-    /** Calificaciones que recibió el usuario (para su perfil), de la más nueva a la más vieja; null sin red. */
+    /** Calificaciones que recibe el usuario. Sin red: ultima copia guardada */
     suspend fun received(userId: String): List<RatingDto>? = try {
-        remote.getRatings(userId = userId)
+        remote.getRatings(userId = userId).also { cache.save(userId, RECEIVED_KEY, it) }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        null
+        cache.load<List<RatingDto>>(userId, RECEIVED_KEY)?.value
+    }
+
+    private companion object {
+        const val RECEIVED_KEY = "ratings-received"
     }
 }

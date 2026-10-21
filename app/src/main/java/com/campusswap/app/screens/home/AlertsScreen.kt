@@ -60,6 +60,7 @@ import com.campusswap.app.data.Condition
 import com.campusswap.app.data.SmartAlert
 import com.campusswap.app.ui.theme.CampusSwapTheme
 import com.campusswap.app.ui.theme.CampusType
+import com.campusswap.app.components.timeAgo
 
 private const val ALERT_PRICE_MAX = 350000f
 
@@ -189,7 +190,7 @@ private fun MatchCard(match: AlertMatch, onOpen: () -> Unit, onReserve: () -> Un
             )
             Column(modifier = Modifier.weight(1f)) {
                 MonoText(
-                    "Posted ${match.postedMinutesAgo} min ago",
+                    match.product.createdAtMillis?.let { "Posted ${timeAgo(it)}" } ?: "Recently posted",
                     color = c.accentHi,
                     modifier = Modifier.padding(bottom = 4.dp),
                 )

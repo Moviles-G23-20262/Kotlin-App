@@ -68,6 +68,8 @@ import com.campusswap.app.data.sync.OutboxWorker
 import com.campusswap.app.data.local.ImageCache
 import com.campusswap.app.data.local.ImageDiskCache
 import com.campusswap.app.data.local.ListingPhotoStore
+import com.campusswap.app.data.local.CartStore
+import com.campusswap.app.data.local.DataStoreCartStore
 import com.campusswap.app.data.local.RoomResponseCache
 import com.campusswap.app.data.sync.RemoteListingPhotoUploader
 import com.campusswap.app.data.wishlist.RetrofitWishlistRemoteDataSource
@@ -157,11 +159,13 @@ class AppContainer(context: Context) {
 
     val draftStore: DraftStore = DataStoreDraftStore(context)
 
+    val cartStore: CartStore = DataStoreCartStore(context)
+
     val listingPhotos = ListingPhotoStore(context)
 
-    val imageCache = ImageCache(ImageDiskCache(File(context.cacheDir, "images"), maxBytes = 50L * 1024 * 1024))
+    val ratingRepository = RatingRepository(RetrofitRatingRemoteDataSource(ratingsApi), responseCache)
 
-    val ratingRepository = RatingRepository(RetrofitRatingRemoteDataSource(ratingsApi))
+    val imageCache = ImageCache(ImageDiskCache(File(context.cacheDir, "images"), maxBytes = 50L * 1024 * 1024))
 
     val outboxSync = OutboxSync(
         database.outbox(),
@@ -180,7 +184,7 @@ class AppContainer(context: Context) {
 
     private val ordersApi = ApiClient.create<OrdersApi>(BuildConfig.BASE_URL, backendClient)
 
-    val orderRepository = OrderRepository(RetrofitOrdersRemoteDataSource(ordersApi))
+    val orderRepository = OrderRepository(RetrofitOrdersRemoteDataSource(ordersApi), responseCache)
 
     val smartAlertRepository = SmartAlertRepository(
         RetrofitSmartAlertRemoteDataSource(ApiClient.create<SmartAlertsApi>(BuildConfig.BASE_URL, backendClient)),

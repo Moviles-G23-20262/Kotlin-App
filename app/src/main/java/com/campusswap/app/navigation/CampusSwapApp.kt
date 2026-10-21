@@ -98,6 +98,7 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
             appViewModel.loadMaterials(container.materialRepository)
             appViewModel.loadWishlist(container.wishlistRepository)
             appViewModel.loadOrders(container.orderRepository)
+            appViewModel.restoreCart(container.cartStore)
             appViewModel.loadMyReviews(container.ratingRepository)
             appViewModel.loadAlerts(container.smartAlertRepository)
             appViewModel.loadNotifications(container.notificationRepository, markRead = false)
