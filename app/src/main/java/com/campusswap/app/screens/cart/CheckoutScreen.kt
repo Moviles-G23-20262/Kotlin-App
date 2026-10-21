@@ -47,6 +47,7 @@ import com.campusswap.app.components.CampusIcons
 import com.campusswap.app.components.CampusTextField
 import com.campusswap.app.components.HeadingText
 import com.campusswap.app.components.MonoText
+import com.campusswap.app.components.OfflineBanner
 import com.campusswap.app.components.PrimaryButton
 import com.campusswap.app.components.RadioOption
 import com.campusswap.app.components.SecondaryButton
@@ -82,6 +83,12 @@ fun CheckoutScreen(
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
         BackHeader(title = "Checkout", onBack = onBack)
+
+        OfflineBanner(
+            visible = vm.needsConnectionToOrder,
+            message = "You're offline. Your cart is saved: you can place the order when you're back online.",
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
+        )
 
         Column(
             modifier = Modifier
@@ -174,7 +181,11 @@ fun CheckoutScreen(
 
         BottomActionBar {
             PrimaryButton(
-                text = if (placing) "Placing Order..." else "Place Order",
+                text = when {
+                    placing -> "Placing Order..."
+                    vm.needsConnectionToOrder -> "Waiting for connection"
+                    else -> "Place Order"
+                },
                 onClick = {
                     placing = true
                     scope.launch {
@@ -183,7 +194,7 @@ fun CheckoutScreen(
                         if (number != null) onOrderPlaced(number)
                     }
                 },
-                enabled = !placing && vm.cart.isNotEmpty() &&
+                enabled = !placing && vm.cart.isNotEmpty() && !vm.needsConnectionToOrder &&
                     (delivery == DeliveryMethod.CAMPUS || address.trim().length >= InputLimits.ADDRESS_MIN),
                 leadingIcon = CampusIcons.Send,
                 contentPadding = PaddingValues(13.dp),
