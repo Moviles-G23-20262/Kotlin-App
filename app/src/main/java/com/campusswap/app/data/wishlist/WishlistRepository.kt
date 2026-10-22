@@ -68,6 +68,9 @@ class WishlistRepository(
             WishlistResult.SAVED
         } catch (e: CancellationException) {
             throw e
+        } catch (e: HttpException) {
+            // 404: el item ya no existe en el servidor, que es justo lo que se pedía
+            if (e.code() == 404) WishlistResult.SAVED.also { itemIds.remove(materialId) } else failure(e)
         } catch (e: Exception) {
             failure(e)
         }
