@@ -510,11 +510,13 @@ private fun CourseConditionStep(
             value = courseQuery,
             onValueChange = {
                 courseQuery = InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX)
-                if (draft.course != null) onDraftChange(draft.copy(course = null))
+                // Typing a course means the listing is about one, so the "not associated" box clears itself.
+                if (draft.course != null || (draft.notAssociatedWithCourse && courseQuery.isNotBlank())) {
+                    onDraftChange(draft.copy(course = null, notAssociatedWithCourse = false))
+                }
             },
             label = { Text("Search course code or name") },
             singleLine = true,
-            enabled = !draft.notAssociatedWithCourse,
             modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
         )
 
