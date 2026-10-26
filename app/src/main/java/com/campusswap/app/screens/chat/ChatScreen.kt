@@ -254,13 +254,9 @@ fun ChatScreen(
                     ) {
                         IconButton(
                             onClick = { showPhotoOptions = true },
-                            enabled = state.availability == ChatAvailability.READY && !state.isUploadingPhoto,
+                            enabled = state.availability == ChatAvailability.READY,
                         ) {
-                            if (state.isUploadingPhoto) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = AccentBlue)
-                            } else {
-                                Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Share a photo securely", tint = AccentBlue)
-                            }
+                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Share a photo securely", tint = AccentBlue)
                         }
                         OutlinedTextField(
                             value = draft,

@@ -1,6 +1,7 @@
 package com.campusswap.app.data.sync
 
 import com.campusswap.app.data.ChatRoomRepository
+import com.campusswap.app.data.FakePhotoUploader
 import com.campusswap.app.data.FakeChatRoomRemoteDataSource
 import com.campusswap.app.data.remote.MessageDto
 import com.campusswap.app.data.remote.MessageRemoteDataSource
@@ -19,6 +20,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import retrofit2.HttpException
 import retrofit2.Response
+import java.io.File
 import java.io.IOException
 
 class OutboxSyncTest {
@@ -172,6 +174,29 @@ class OutboxSyncTest {
         assertEquals(listOf(materialA, materialB), roomRemote.openedMaterials)
         assertEquals(listOf("a", "b", "c"), chat.sent)
         assertTrue(outbox.messages.value.isEmpty())
+    }
+
+    @Test fun aPhotoSentOfflineIsUploadedThenSentAsItsLink() = runTest {
+        val file = File.createTempFile("photo", ".jpg")
+        val outbox = FakeOutbox().apply { insertMessage(message("1", "file://${file.path}")) }
+        val chat = FakeChat()
+        val photos = FakePhotoUploader()
+
+        OutboxSync(outbox, FakeMaterials(), chatRooms(), chat, photos).flush("u1")
+
+        assertEquals(listOf("https://blob.campusswap.test/photo-1.jpg"), chat.sent)
+        assertEquals(listOf(file.path), photos.discarded)
+        assertTrue(outbox.messages.value.isEmpty())
+    }
+
+    @Test fun aPhotoThatLeftThePhoneIsRefusedWithAReason() = runTest {
+        val outbox = FakeOutbox().apply { insertMessage(message("1", "file:///gone/photo.jpg")) }
+        val chat = FakeChat()
+
+        OutboxSync(outbox, FakeMaterials(), chatRooms(), chat, FakePhotoUploader()).flush("u1")
+
+        assertTrue(chat.sent.isEmpty())
+        assertEquals("The photo is no longer on this phone.", outbox.messages.value.single().failedReason)
     }
 
     @Test fun aMessageGoesToTheRoomItWasWrittenIn() = runTest {

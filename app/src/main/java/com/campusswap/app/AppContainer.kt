@@ -136,7 +136,7 @@ class AppContainer(context: Context) {
 
     private val photoUploader = RemoteListingPhotoUploader(listingPhotos, uploadRemote)
 
-    val chatRepository = ChatRepository(chatRoomRepository, messageRemote, photoUploader, signedInUserId, cache = responseCache)
+    val chatRepository = ChatRepository(chatRoomRepository, messageRemote, signedInUserId, cache = responseCache)
 
     val meetingProposalRepository = MeetingProposalRepository(
         rooms = chatRoomRepository,
