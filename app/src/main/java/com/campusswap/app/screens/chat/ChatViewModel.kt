@@ -49,6 +49,7 @@ data class ChatUiState(
 
 class ChatViewModel(
     private val productId: String,
+    private val room: String?,
     private val chat: ChatRepository,
     private val proposals: MeetingProposalRepository,
     private val outbox: OutboxRepository,
@@ -68,10 +69,13 @@ class ChatViewModel(
     private var savedAt: Long? = null
 
     init {
+        room?.let { chat.select(productId, it) }
         startPolling()
         viewModelScope.launch {
             outbox.pendingMessages.collect { rows ->
-                queued = rows.filter { it.materialId == productId && it.ownerId == currentUserId() }
+                queued = rows.filter {
+                    it.materialId == productId && it.ownerId == currentUserId() && (room == null || it.roomId == room)
+                }
                 republish()
             }
         }
@@ -188,33 +192,33 @@ class ChatViewModel(
         return stamps.last().toEpochMilli() - stamps.first().toEpochMilli()
     }
 
-    /**
-     * The message goes to the outbox, so it survives having no signal and is sent by the
-     * background sync. It appears in the thread right away as queued or sending.
-     */
-    fun sendPhoto(bytes: ByteArray, mimeType: String) {
+    fun sendPhoto(path: String) {
         val userId = currentUserId() ?: return
         if (_state.value.availability != ChatAvailability.READY) return
         _state.update { it.copy(isUploadingPhoto = true, error = null) }
         viewModelScope.launch {
-            val url = chat.uploadPhoto(bytes, mimeType)
+            val url = chat.uploadPhoto(path)
             _state.update { it.copy(isUploadingPhoto = false) }
             if (url == null) {
-                _state.update { it.copy(error = "We couldn't send that photo. Check your connection and try again.") }
+                _state.update { it.copy(error = "We couldn't send that photo. Try again.") }
             } else {
-                outbox.queueMessage("pending-${System.currentTimeMillis()}", userId, productId, url)
+                outbox.queueMessage("pending-${System.currentTimeMillis()}", userId, productId, url, room)
                 Analytics.log(Events.CHAT_PHOTO_SENT, "product_id" to productId)
             }
         }
     }
 
+    /**
+     * The message goes to the outbox, so it survives having no signal and is sent by the
+     * background sync. It appears in the thread right away as queued or sending.
+     */
     fun send(text: String) {
         val trimmed = text.trim()
         if (trimmed.isEmpty() || !_state.value.canSend) return
         val userId = currentUserId() ?: return
 
         viewModelScope.launch {
-            outbox.queueMessage("pending-${System.currentTimeMillis()}", userId, productId, trimmed)
+            outbox.queueMessage("pending-${System.currentTimeMillis()}", userId, productId, trimmed, room)
             if (firstContact) {
                 firstContact = false
                 Analytics.log(Events.CONTACT_SELLER, "product_id" to productId)
@@ -252,12 +256,14 @@ class ChatViewModel(
         fun factory(
             container: AppContainer,
             productId: String,
+            room: String?,
             isOnline: () -> Boolean,
             onProposalChanged: (String, MeetingProposal) -> Unit,
         ) = viewModelFactory {
             initializer {
                 ChatViewModel(
                     productId = productId,
+                    room = room,
                     chat = container.chatRepository,
                     proposals = container.meetingProposalRepository,
                     outbox = container.outboxRepository,

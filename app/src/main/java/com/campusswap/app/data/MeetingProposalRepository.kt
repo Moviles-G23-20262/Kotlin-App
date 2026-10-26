@@ -66,13 +66,13 @@ class MeetingProposalRepository(
 
     private fun slotsKey(productId: String) = "free-slots:$productId"
 
-    suspend fun propose(productId: String, point: MeetingPoint, slot: TimeSlot): ProposalResult {
+    suspend fun propose(productId: String, point: MeetingPoint, slot: TimeSlot, room: String? = null): ProposalResult {
         val startsAt = slot.startsAt ?: return ProposalResult.Rejected("Pick one of the free times from the server")
         val endsAt = slot.endsAt ?: return ProposalResult.Rejected("Pick one of the free times from the server")
         val pointId = SeedIds.backendMeetingPoint(point.id) ?: return ProposalResult.NotSynced
         return call {
-            val room = rooms.roomFor(productId) ?: return@call ProposalResult.NotSynced
-            val created = remote.propose(CreateMeetingProposalRequest(room, pointId, startsAt.toString(), endsAt.toString()))
+            val id = room ?: rooms.roomFor(productId) ?: return@call ProposalResult.NotSynced
+            val created = remote.propose(CreateMeetingProposalRequest(id, pointId, startsAt.toString(), endsAt.toString()))
             ProposalResult.Success(MeetingProposalMapper.toProposal(created, point, zone))
         }
     }

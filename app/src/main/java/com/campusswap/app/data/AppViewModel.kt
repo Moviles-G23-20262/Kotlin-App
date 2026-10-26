@@ -658,7 +658,8 @@ class AppViewModel : ViewModel() {
 
     val ratings = mutableStateMapOf<String, TransactionRating>()
 
-    fun ratingFor(productId: String): TransactionRating? = ratings[productId]
+    fun ratingFor(productId: String, otherId: String? = null): TransactionRating? =
+        ratings[productId]?.takeIf { otherId == null || it.ratedId == null || it.ratedId == otherId }
 
     fun submitRating(rating: TransactionRating) {
         ratings[rating.productId] = rating
@@ -686,13 +687,13 @@ class AppViewModel : ViewModel() {
     }
 
     /**ya califique este intercambio? la otra persona ya me califico? */
-    fun loadExchangeRatings(repository: RatingRepository, product: Product) {
+    fun loadExchangeRatings(repository: RatingRepository, product: Product, otherId: String? = null) {
         val userId = currentUserId ?: return
         viewModelScope.launch {
-            val found = repository.exchangeRatings(product.id, userId) ?: return@launch
+            val found = repository.exchangeRatings(product.id, userId, otherId) ?: return@launch
             found.mine?.let { mine ->
                 // Ya estaba guardada en el backend: se muestra como enviada, sin volver a pedirla
-                if (ratings[product.id] == null) ratings[product.id] = mine.toTransactionRating(product)
+                if (ratingFor(product.id, otherId) == null) ratings[product.id] = mine.toTransactionRating(product)
                 ratingSync[product.id] = RatingResult.Saved
             }
             found.theirs?.let { receivedRatings[product.id] = it }
@@ -706,6 +707,7 @@ class AppViewModel : ViewModel() {
         // El backend guarda los tags como texto ("Punctual"); se vuelven a convertir en FeedbackTag
         tags = tags.orEmpty().mapNotNull { label -> FeedbackTag.entries.firstOrNull { it.label == label } }.toSet(),
         review = review.orEmpty(),
+        ratedId = ratedId,
     )
 
     fun sendRating(repository: RatingRepository, ratedUserId: String, rating: TransactionRating) {
@@ -758,6 +760,7 @@ class AppViewModel : ViewModel() {
         confirmedCondition = Condition.entries.firstOrNull { it.name == condition } ?: Condition.GOOD,
         tags = tags.mapNotNull { label -> FeedbackTag.entries.firstOrNull { it.label == label } }.toSet(),
         review = review.orEmpty(),
+        ratedId = ratedId,
     )
     
     fun canCompleteExchange(productId: String) =

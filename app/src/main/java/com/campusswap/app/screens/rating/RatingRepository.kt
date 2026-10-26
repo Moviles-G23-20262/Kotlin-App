@@ -33,7 +33,7 @@ class RatingRepository(
         tags: List<String>,
         review: String?,
     ): RatingResult = try {
-        val exchangeId = remote.getExchanges(SeedIds.material(productId) ?: productId).firstOrNull()?.id
+        val exchangeId = exchangeWith(productId, ratedId)
         if (exchangeId == null) {
             RatingResult.ExchangeNotRecorded
         } else {
@@ -49,8 +49,8 @@ class RatingRepository(
     }
 
     /** Lo que dice el backend sobre este intercambio; null si aún no está completado o no hay red. */
-    suspend fun exchangeRatings(productId: String, myUserId: String): ExchangeRatings? = try {
-        val exchangeId = remote.getExchanges(SeedIds.material(productId) ?: productId).firstOrNull()?.id
+    suspend fun exchangeRatings(productId: String, myUserId: String, otherId: String? = null): ExchangeRatings? = try {
+        val exchangeId = exchangeWith(productId, otherId)
         exchangeId?.let { id ->
             val both = remote.getRatings(exchangeId = id)
             ExchangeRatings(
@@ -63,6 +63,10 @@ class RatingRepository(
     } catch (e: Exception) {
         null
     }
+
+    private suspend fun exchangeWith(productId: String, other: String?): String? =
+        remote.getExchanges(SeedIds.material(productId) ?: productId)
+            .firstOrNull { other == null || it.buyerId == other || it.sellerId == other }?.id
 
     /** Calificaciones que recibe el usuario. Sin red: ultima copia guardada */
     suspend fun received(userId: String): List<RatingDto>? = try {

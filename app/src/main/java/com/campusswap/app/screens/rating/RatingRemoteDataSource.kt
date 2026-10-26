@@ -16,7 +16,7 @@ data class CreateRatingRequest(
 
 data class RatingResponse(val id: String)
 
-data class ExchangeSummaryDto(val id: String, val materialId: String)
+data class ExchangeSummaryDto(val id: String, val materialId: String, val buyerId: String? = null, val sellerId: String? = null)
 
 data class RatingDto(
     val id: String,

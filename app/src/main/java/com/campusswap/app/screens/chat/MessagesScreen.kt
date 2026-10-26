@@ -41,7 +41,7 @@ import com.campusswap.app.ui.theme.CampusSwapTheme
 import com.campusswap.app.ui.theme.CampusType
 
 @Composable
-fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit) {
+fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String, String) -> Unit) {
     val c = CampusSwapTheme.colors
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
     val vm: ConversationsViewModel = viewModel(factory = ConversationsViewModel.factory(container))
@@ -82,7 +82,7 @@ fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String) -> Unit) {
                     }
                 }
                 items(state.conversations, key = { it.roomId }) { conversation ->
-                    ConversationRow(conversation) { onOpenChat(conversation.productId) }
+                    ConversationRow(conversation) { onOpenChat(conversation.productId, conversation.roomId) }
                 }
             }
         }

@@ -93,7 +93,15 @@ fun CompletionScreen(
         return
     }
 
-    val existing = vm.ratingFor(productId)
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    var otherId by remember(productId) { mutableStateOf<String?>(null) }
+    LaunchedEffect(productId) {
+        otherId = container.chatRepository.counterpartId(productId)
+        vm.loadExchangeRatings(container.ratingRepository, product, otherId)
+    }
+    val rated = otherId ?: product.seller.id
+
+    val existing = vm.ratingFor(productId, otherId)
     val proposal = vm.meetingProposals[productId]
     // The exchange can be reached from the chat (Views 9/10) or straight from an
     // order placed at checkout, so the summary reflects whichever one applies.
@@ -105,8 +113,6 @@ fun CompletionScreen(
     var tags by remember { mutableStateOf(setOf<FeedbackTag>()) }
     var review by remember { mutableStateOf("") }
 
-    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
-    LaunchedEffect(productId) { vm.loadExchangeRatings(container.ratingRepository, product) }    
     val target = ExchangeTarget(
         productId = product.id,
         buyerId = vm.currentUserId ?: vm.currentUser.id,
@@ -141,7 +147,7 @@ fun CompletionScreen(
                 product = product,
                 theirs = vm.receivedRatings[productId],
                 sync = vm.ratingSync[productId],
-                onRetry = { vm.sendRating(container.ratingRepository, product.seller.id, existing) },
+                onRetry = { vm.sendRating(container.ratingRepository, rated, existing) },
                 onClose = onClose,
             )        } else {
         Column(
@@ -327,9 +333,10 @@ fun CompletionScreen(
                         confirmedCondition = confirmedCondition,
                         tags = tags,
                         review = review.trim(),
+                        ratedId = rated,
                     )
                     vm.submitRating(rating)
-                    vm.sendRating(container.ratingRepository, product.seller.id, rating)
+                    vm.sendRating(container.ratingRepository, rated, rating)
                 },
                 contentPadding = PaddingValues(13.dp),
                 modifier = Modifier.fillMaxWidth(),

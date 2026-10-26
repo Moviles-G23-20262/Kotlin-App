@@ -57,7 +57,7 @@ class OutboxSync(
 
         for (message in outbox.messagesToSend(ownerId)) {
             val result = attempt {
-                val roomId = rooms.roomFor(message.materialId) ?: error("Listing ${message.materialId} is not on the server")
+                val roomId = message.roomId ?: rooms.roomFor(message.materialId) ?: error("Listing ${message.materialId} is not on the server")
                 messages.send(roomId, message.content)
             }
             when (result) {

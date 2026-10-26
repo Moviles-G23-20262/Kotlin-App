@@ -200,7 +200,8 @@ class MeetingPointViewModel(
                     proposals = container.meetingProposalRepository,
                     queueProposal = { point, slot ->
                         val owner = container.sessionManager.validSession()?.userId
-                        owner != null && container.outboxRepository.queueProposal(owner, productId, point, slot)
+                        val room = container.chatRoomRepository.selected(productId)
+                        owner != null && container.outboxRepository.queueProposal(owner, productId, point, slot, room)
                     },
                 )
             }

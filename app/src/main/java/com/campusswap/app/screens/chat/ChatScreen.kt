@@ -13,11 +13,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import android.content.Context
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.content.FileProvider
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -60,6 +57,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,7 +79,6 @@ import com.campusswap.app.components.VerifiedBadge
 import com.campusswap.app.components.formatPrice
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.data.AppViewModel
-import java.io.File
 import com.campusswap.app.data.ChatMessage
 import com.campusswap.app.data.MeetingProposal
 import com.campusswap.app.data.MessageAuthor
@@ -95,6 +93,7 @@ import com.campusswap.app.ui.theme.AccentBlue
 import com.campusswap.app.ui.theme.JetBrainsMonoFamily
 import com.campusswap.app.ui.theme.SecondaryBlue
 import com.campusswap.app.ui.theme.SuccessGreen
+import kotlinx.coroutines.launch
 
 /**
  * View 09 — Buyer-Seller In-App Chat.
@@ -106,6 +105,7 @@ import com.campusswap.app.ui.theme.SuccessGreen
 fun ChatScreen(
     vm: AppViewModel,
     productId: String,
+    room: String?,
     onBack: () -> Unit,
     onViewListing: (String) -> Unit,
     onProposeMeeting: () -> Unit,
@@ -122,7 +122,7 @@ fun ChatScreen(
     val context = LocalContext.current
     val container = (context.applicationContext as CampusSwapApplication).container
     val chat: ChatViewModel = viewModel(
-        factory = ChatViewModel.factory(container, product.id, isOnline = { vm.isOnline }) { id, proposal ->
+        factory = ChatViewModel.factory(container, product.id, room, isOnline = { vm.isOnline }) { id, proposal ->
             vm.cacheProposal(id, proposal)
         },
     )
@@ -130,19 +130,17 @@ fun ChatScreen(
     val messages = state.messages
     val counterpart = state.counterpartName ?: product.seller.name
 
+    val photoStore = container.listingPhotos
+    val scope = rememberCoroutineScope()
     var showPhotoOptions by remember { mutableStateOf(false) }
-    var cameraTarget by remember { mutableStateOf<Uri?>(null) }
-
-    fun sendFrom(uri: Uri) {
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
-        chat.sendPhoto(bytes, context.contentResolver.getType(uri) ?: "image/jpeg")
-    }
+    var cameraPath by rememberSaveable { mutableStateOf<String?>(null) }
 
     val pickFromGallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        uri?.let(::sendFrom)
+        if (uri != null) scope.launch { photoStore.importFromGallery(uri)?.let(chat::sendPhoto) }
     }
     val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
-        if (taken) cameraTarget?.let(::sendFrom)
+        val path = cameraPath
+        if (taken && path != null) scope.launch { photoStore.finishCameraPhoto(path)?.let(chat::sendPhoto) }
     }
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -152,8 +150,9 @@ fun ChatScreen(
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
                 PhotoOption(Icons.Outlined.PhotoCamera, "Take a photo") {
                     showPhotoOptions = false
-                    cameraTarget = newPhotoUri(context)
-                    cameraTarget?.let(takePhoto::launch)
+                    val (uri, path) = photoStore.newCameraTarget()
+                    cameraPath = path
+                    takePhoto.launch(uri)
                 }
                 PhotoOption(Icons.Outlined.AddPhotoAlternate, "Choose from gallery") {
                     showPhotoOptions = false
@@ -632,12 +631,6 @@ private fun PhotoOption(icon: ImageVector, label: String, onClick: () -> Unit) {
         Icon(icon, contentDescription = null, tint = AccentBlue)
         Text(label, style = MaterialTheme.typography.bodyLarge)
     }
-}
-
-private fun newPhotoUri(context: Context): Uri {
-    val folder = File(context.cacheDir, "photos").apply { mkdirs() }
-    val file = File(folder, "chat-${System.currentTimeMillis()}.jpg")
-    return FileProvider.getUriForFile(context, "${context.packageName}.photos", file)
 }
 
 private fun chatOfflineMessage(savedAtMillis: Long?): String =

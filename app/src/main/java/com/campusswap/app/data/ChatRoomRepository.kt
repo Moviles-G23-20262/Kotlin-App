@@ -6,10 +6,17 @@ import com.campusswap.app.data.remote.ChatRoomSummaryDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
 
 class ChatRoomRepository(private val remote: ChatRoomRemoteDataSource) {
-    private val rooms = mutableMapOf<String, String>()
+    private val rooms = ConcurrentHashMap<String, String>()
     private val lock = Mutex()
+
+    fun select(productId: String, room: String) {
+        rooms[productId] = room
+    }
+
+    fun selected(productId: String): String? = rooms[productId]
 
     /**
      * The room for a listing, from either side. Creating one makes the caller the buyer, and the
@@ -25,7 +32,8 @@ class ChatRoomRepository(private val remote: ChatRoomRemoteDataSource) {
 
     suspend fun summaryFor(productId: String): ChatRoomSummaryDto? = try {
         val materialId = SeedIds.backendMaterial(productId)
-        materialId?.let { id -> remote.rooms().firstOrNull { it.materialId == id } }
+        val all = remote.rooms()
+        all.firstOrNull { it.id == rooms[productId] } ?: all.firstOrNull { it.materialId == materialId }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {

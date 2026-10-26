@@ -60,7 +60,7 @@ fun ProfileScreen(
     vm: AppViewModel,
     onProductClick: (String) -> Unit,
     onAddItem: () -> Unit,
-    onOpenChat: (String) -> Unit,
+    onOpenChat: (String, String?) -> Unit,
     onCompleteExchange: (String) -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -277,7 +277,7 @@ fun ProfileScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .campusCard()
-                            .clickable { onOpenChat(sale.product.id) }
+                            .clickable { onOpenChat(sale.product.id, null) }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
@@ -301,7 +301,7 @@ fun ProfileScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .campusCard()
-                            .clickable { onOpenChat(msg.productId) }
+                            .clickable { onOpenChat(msg.productId, msg.roomId) }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                     ) {
                         Row(

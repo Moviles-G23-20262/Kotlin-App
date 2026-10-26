@@ -132,7 +132,11 @@ class AppContainer(context: Context) {
         ApiClient.create<UploadsApi>(BuildConfig.BASE_URL, backendClient),
     )
 
-    val chatRepository = ChatRepository(chatRoomRepository, messageRemote, uploadRemote, signedInUserId, cache = responseCache)
+    val listingPhotos = ListingPhotoStore(context)
+
+    private val photoUploader = RemoteListingPhotoUploader(listingPhotos, uploadRemote)
+
+    val chatRepository = ChatRepository(chatRoomRepository, messageRemote, photoUploader, signedInUserId, cache = responseCache)
 
     val meetingProposalRepository = MeetingProposalRepository(
         rooms = chatRoomRepository,
@@ -161,8 +165,6 @@ class AppContainer(context: Context) {
 
     val cartStore: CartStore = DataStoreCartStore(context)
 
-    val listingPhotos = ListingPhotoStore(context)
-
     val ratingRepository = RatingRepository(RetrofitRatingRemoteDataSource(ratingsApi), responseCache)
 
     val imageCache = ImageCache(ImageDiskCache(File(context.cacheDir, "images"), maxBytes = 50L * 1024 * 1024))
@@ -176,7 +178,7 @@ class AppContainer(context: Context) {
         materialRemote,
         chatRoomRepository,
         messageRemote,
-        RemoteListingPhotoUploader(listingPhotos, uploadRemote),
+        photoUploader,
         RepositoryActionSender(exchangeRepository, ratingRepository, meetingProposalRepository, wishlistRepository, clock),
     )
 

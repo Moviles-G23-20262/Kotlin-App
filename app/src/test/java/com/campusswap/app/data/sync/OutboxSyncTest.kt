@@ -70,10 +70,12 @@ class OutboxSyncTest {
 
     private class FakeChat(var failOn: String? = null) : MessageRemoteDataSource {
         val sent = mutableListOf<String>()
+        val sentTo = mutableListOf<String>()
         override suspend fun messages(chatRoomId: String): List<MessageDto> = emptyList()
         override suspend fun send(chatRoomId: String, content: String): MessageDto {
             if (content == failOn) throw IOException("signal lost")
             sent += content
+            sentTo += chatRoomId
             return MessageDto("m-${sent.size}", chatRoomId, "u1", content, "TEXT", false, "2026-10-05T17:00:00Z", null, null)
         }
     }
@@ -170,6 +172,19 @@ class OutboxSyncTest {
         assertEquals(listOf(materialA, materialB), roomRemote.openedMaterials)
         assertEquals(listOf("a", "b", "c"), chat.sent)
         assertTrue(outbox.messages.value.isEmpty())
+    }
+
+    @Test fun aMessageGoesToTheRoomItWasWrittenIn() = runTest {
+        val outbox = FakeOutbox().apply {
+            insertMessage(PendingMessageEntity("1", "u1", materialA, "to luis", 1, roomId = "room-luis"))
+        }
+        val chat = FakeChat()
+        val roomRemote = FakeChatRoomRemoteDataSource()
+
+        OutboxSync(outbox, FakeMaterials(), ChatRoomRepository(roomRemote), chat).flush("u1")
+
+        assertEquals(listOf("room-luis"), chat.sentTo)
+        assertEquals(0, roomRemote.openCalls)
     }
 
     private fun action(kind: PendingActionKind, product: String = materialA) = PendingActionEntity(
