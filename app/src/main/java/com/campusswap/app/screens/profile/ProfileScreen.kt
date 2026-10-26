@@ -277,7 +277,12 @@ fun ProfileScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .campusCard()
-                            .clickable { onOpenChat(sale.product.id, null) }
+                            .clickable {
+                                val room = inboxState.conversations.firstOrNull {
+                                    it.productId == sale.product.id && it.counterpartId == sale.buyerId
+                                }
+                                onOpenChat(sale.product.id, room?.roomId)
+                            }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,

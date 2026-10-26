@@ -121,4 +121,13 @@ class ConversationsRepositoryTest {
 
         assertEquals("Photo", loaded.conversations.single().lastMessage)
     }
+
+    @Test
+    fun `on my own listing the other person is the buyer`() = runTest {
+        remote.summaries += room("1", me, "Calculus", "Hi", "2026-10-05T17:00:00Z", 0)
+
+        val loaded = repository.conversations() as ConversationsLoad.Success
+
+        assertEquals(them, loaded.conversations.single().counterpartId)
+    }
 }

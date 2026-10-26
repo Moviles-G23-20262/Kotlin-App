@@ -13,6 +13,7 @@ import com.campusswap.app.data.materials.MaterialRemoteDataSource
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
+import java.io.File
 import java.io.IOException
 
 enum class SyncOutcome { DONE, RETRY_LATER }
@@ -56,12 +57,20 @@ class OutboxSync(
         }
 
         for (message in outbox.messagesToSend(ownerId)) {
-            val result = attempt {
-                val roomId = message.roomId ?: rooms.roomFor(message.materialId) ?: error("Listing ${message.materialId} is not on the server")
-                messages.send(roomId, message.content)
+            val photo = message.content.takeIf { it.startsWith("file://") }?.removePrefix("file://")
+            val result = if (photo != null && !File(photo).exists()) {
+                Attempt.Refused("The photo is no longer on this phone.")
+            } else {
+                attempt {
+                    val roomId = message.roomId ?: rooms.roomFor(message.materialId) ?: error("Listing ${message.materialId} is not on the server")
+                    messages.send(roomId, photo?.let { photos.upload(it) } ?: message.content)
+                }
             }
             when (result) {
-                Attempt.Sent -> outbox.deleteMessage(message.localId)
+                Attempt.Sent -> {
+                    outbox.deleteMessage(message.localId)
+                    photo?.let { photos.discard(listOf(it)) }
+                }
                 // Stop here so later messages never arrive before an earlier one.
                 Attempt.Retry -> {
                     outbox.markMessageAttempt(message.localId, null)

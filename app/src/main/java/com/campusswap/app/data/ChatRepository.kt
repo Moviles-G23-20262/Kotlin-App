@@ -6,7 +6,6 @@ import com.campusswap.app.data.local.save
 import com.campusswap.app.data.remote.ApiErrors
 import com.campusswap.app.data.remote.MessageDto
 import com.campusswap.app.data.remote.MessageRemoteDataSource
-import com.campusswap.app.data.sync.ListingPhotoUploader
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException
@@ -32,7 +31,6 @@ sealed interface SendResult {
 class ChatRepository(
     private val rooms: ChatRoomRepository,
     private val remote: MessageRemoteDataSource,
-    private val photos: ListingPhotoUploader,
     private val currentUserId: () -> String?,
     private val zone: ZoneId = MeetingProposalMapper.CAMPUS_ZONE,
     private val cache: ResponseCache = ResponseCache.None,
@@ -71,16 +69,6 @@ class ChatRepository(
         SendResult.Offline
     } catch (e: HttpException) {
         SendResult.Rejected(ApiErrors.message(e))
-    }
-
-    suspend fun uploadPhoto(path: String): String? = try {
-        photos.upload(path)
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        null
-    } finally {
-        photos.discard(listOf(path))
     }
 
     fun select(productId: String, room: String) = rooms.select(productId, room)

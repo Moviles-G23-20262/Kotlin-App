@@ -16,6 +16,7 @@ import com.campusswap.app.data.MessageAuthor
 import com.campusswap.app.data.MessageStatus
 import com.campusswap.app.data.ProposalResult
 import com.campusswap.app.data.SendResult
+import com.campusswap.app.data.isPhotoUrl
 import com.campusswap.app.data.local.PendingActionEntity
 import com.campusswap.app.data.local.PendingMessageEntity
 import com.campusswap.app.data.sync.OutboxRepository
@@ -40,7 +41,6 @@ data class ChatUiState(
     val isSending: Boolean = false,
     val error: String? = null,
     val counterpartName: String? = null,
-    val isUploadingPhoto: Boolean = false,
     /** Set while the thread shown is the copy saved on the phone because the server can't be reached. */
     val savedAtMillis: Long? = null,
 ) {
@@ -151,6 +151,7 @@ class ChatViewModel(
             else -> MessageStatus.QUEUED
         },
         sentAt = Instant.ofEpochMilli(row.createdAtMillis),
+        imageUrl = row.content.takeIf { it.startsWith("file://") || isPhotoUrl(it) },
     )
 
     /** A proposal made offline, shown as one of my messages until the server has it. */
@@ -195,16 +196,9 @@ class ChatViewModel(
     fun sendPhoto(path: String) {
         val userId = currentUserId() ?: return
         if (_state.value.availability != ChatAvailability.READY) return
-        _state.update { it.copy(isUploadingPhoto = true, error = null) }
         viewModelScope.launch {
-            val url = chat.uploadPhoto(path)
-            _state.update { it.copy(isUploadingPhoto = false) }
-            if (url == null) {
-                _state.update { it.copy(error = "We couldn't send that photo. Try again.") }
-            } else {
-                outbox.queueMessage("pending-${System.currentTimeMillis()}", userId, productId, url, room)
-                Analytics.log(Events.CHAT_PHOTO_SENT, "product_id" to productId)
-            }
+            outbox.queueMessage("pending-${System.currentTimeMillis()}", userId, productId, "file://$path", room)
+            Analytics.log(Events.CHAT_PHOTO_SENT, "product_id" to productId)
         }
     }
 

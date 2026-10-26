@@ -144,6 +144,10 @@ fun ChatScreen(
     }
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val newest = messages.lastOrNull()?.id
+    LaunchedEffect(newest) {
+        if (listState.firstVisibleItemIndex <= 1) listState.animateScrollToItem(0)
+    }
 
     if (showPhotoOptions) {
         ModalBottomSheet(onDismissRequest = { showPhotoOptions = false }) {
@@ -254,13 +258,9 @@ fun ChatScreen(
                     ) {
                         IconButton(
                             onClick = { showPhotoOptions = true },
-                            enabled = state.availability == ChatAvailability.READY && !state.isUploadingPhoto,
+                            enabled = state.availability == ChatAvailability.READY,
                         ) {
-                            if (state.isUploadingPhoto) {
-                                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = AccentBlue)
-                            } else {
-                                Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Share a photo securely", tint = AccentBlue)
-                            }
+                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Share a photo securely", tint = AccentBlue)
                         }
                         OutlinedTextField(
                             value = draft,
