@@ -344,7 +344,12 @@ private fun HomeHeader(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // The title takes whatever space the buttons leave, so the wishlist heart is never clipped.
+            Row(
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 val logoShape = RoundedCornerShape(10.dp)
                 Box(
                     modifier = Modifier
@@ -355,9 +360,14 @@ private fun HomeHeader(
                 ) {
                     Icon(CampusIcons.CampusSwap, contentDescription = null, tint = c.accentText, modifier = Modifier.size(18.dp))
                 }
-                HeadingText("Campus Swap", size = CampusType.sizeMd, letterSpacing = CampusType.sectionTitle.letterSpacing)
+                HeadingText(
+                    "Campus Swap",
+                    size = CampusType.sizeMd,
+                    letterSpacing = CampusType.sectionTitle.letterSpacing,
+                    maxLines = 1,
+                )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 CampusIconButton(
                     icon = if (isDarkTheme) CampusIcons.Sun else CampusIcons.Moon,
                     contentDescription = "Toggle theme",
