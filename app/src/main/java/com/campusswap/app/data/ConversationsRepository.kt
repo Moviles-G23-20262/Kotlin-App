@@ -70,6 +70,7 @@ class ConversationsRepository(
             unread = room.count?.messages ?: 0,
             sellingThis = selling,
             roomId = room.id,
+            counterpartId = if (selling) room.buyerId else room.sellerId,
         )
     }
 

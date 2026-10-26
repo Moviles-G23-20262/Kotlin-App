@@ -115,6 +115,7 @@ data class Conversation(
     val unread: Int,
     val sellingThis: Boolean,
     val roomId: String = productId,
+    val counterpartId: String? = null,
    )
 
 // ---- Dynamic safe meeting points (View 10, "Campus Guardian" CAS) ----

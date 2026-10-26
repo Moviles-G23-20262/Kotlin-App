@@ -27,6 +27,7 @@ data class Sale(
     val buyerName: String,
     val status: String,
     val completedAtMillis: Long?,
+    val buyerId: String? = null,
 )
 
 /** Lo que devuelve GET /exchanges, segun el intercambio. */
@@ -109,6 +110,7 @@ class OrderRepository(
                             buyerName = exchange.buyer?.fullName ?: "A student",
                             status = exchange.status,
                             completedAtMillis = exchange.completedAt?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() },
+                            buyerId = exchange.buyerId,
                         )
                     }
                 },
