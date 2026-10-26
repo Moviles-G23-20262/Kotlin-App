@@ -24,6 +24,8 @@ object InputLimits {
     const val PRICE_MIN = 1_000L
     const val PRICE_MAX = 5_000_000L
     const val PRICE_MAX_DIGITS = 7
+    /** Cash changes hands on campus, so prices go in whole hundreds (no $154.541 COP). */
+    const val PRICE_STEP = 100L
 
     const val SEARCH_MAX = 60
     const val ADDRESS_MAX = 120
@@ -116,6 +118,8 @@ object InputValidation {
         return when {
             amount < InputLimits.PRICE_MIN -> "Minimum price is $${copFormat.format(InputLimits.PRICE_MIN)} COP"
             amount > InputLimits.PRICE_MAX -> "Maximum price is $${copFormat.format(InputLimits.PRICE_MAX)} COP"
+            amount % InputLimits.PRICE_STEP != 0L ->
+                "Use a multiple of $${copFormat.format(InputLimits.PRICE_STEP)} COP"
             else -> null
         }
     }

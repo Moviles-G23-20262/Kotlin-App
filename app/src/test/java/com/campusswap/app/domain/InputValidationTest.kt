@@ -53,6 +53,12 @@ class InputValidationTest {
         assertNull(InputValidation.priceError("5000000"))
     }
 
+    @Test fun priceMustBeWholeHundreds() {
+        assertNotNull(InputValidation.priceError("154541"))
+        assertNotNull(InputValidation.priceError("1050"))
+        assertNull(InputValidation.priceError("154500"))
+    }
+
     @Test fun listingTextHasMinimums() {
         assertNotNull(InputValidation.titleError("ab"))
         assertNotNull(InputValidation.titleError("12345"))
