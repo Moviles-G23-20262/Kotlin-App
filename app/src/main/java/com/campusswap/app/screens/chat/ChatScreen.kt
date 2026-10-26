@@ -144,6 +144,10 @@ fun ChatScreen(
     }
     var draft by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val newest = messages.lastOrNull()?.id
+    LaunchedEffect(newest) {
+        if (listState.firstVisibleItemIndex <= 1) listState.animateScrollToItem(0)
+    }
 
     if (showPhotoOptions) {
         ModalBottomSheet(onDismissRequest = { showPhotoOptions = false }) {
