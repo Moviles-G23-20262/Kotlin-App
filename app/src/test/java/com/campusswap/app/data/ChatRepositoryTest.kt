@@ -5,6 +5,7 @@ import com.campusswap.app.data.local.InMemoryResponseCache
 import com.campusswap.app.data.FakeMessageRemoteDataSource.Companion.OTHER
 import com.campusswap.app.data.remote.MeetingPointDto
 import com.campusswap.app.data.remote.MeetingProposalDto
+import com.campusswap.app.data.remote.ChatRoomSummaryDto
 import com.campusswap.app.data.remote.MessageDto
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -158,4 +159,39 @@ class ChatRepositoryTest {
 
         assertEquals(ChatLoad.Offline, repository.messages(seededProduct))
     }
+
+    @Test
+    fun `the seller's counterpart is the buyer of the room that is open`() = runTest {
+        rooms.summaries += room("room-ana", buyer = "ana")
+        rooms.summaries += room("room-luis", buyer = "luis")
+
+        repository.select(seededProduct, "room-luis")
+
+        assertEquals("luis", repository.counterpartId(seededProduct))
+    }
+
+    @Test
+    fun `offline, one buyer's saved thread never shows up in another buyer's`() = runTest {
+        val repository = ChatRepository(ChatRoomRepository(rooms), messages, photos, currentUserId = { ME }, cache = InMemoryResponseCache())
+        messages.stored += message("m1", OTHER, "Hi, I'm Ana")
+        repository.select(seededProduct, "room-ana")
+        repository.messages(seededProduct)
+
+        repository.select(seededProduct, "room-luis")
+        messages.failure = IOException("airplane mode")
+
+        assertEquals(ChatLoad.Offline, repository.messages(seededProduct))
+    }
+
+    private fun room(id: String, buyer: String) = ChatRoomSummaryDto(
+        id = id,
+        materialId = "b0000000-0000-4000-8000-000000000001",
+        buyerId = buyer,
+        sellerId = ME,
+        material = null,
+        buyer = null,
+        seller = null,
+        messages = null,
+        count = null,
+    )
 }

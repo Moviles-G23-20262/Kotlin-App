@@ -22,10 +22,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.campusswap.app.analytics.Analytics
 import com.campusswap.app.analytics.Events
 import com.campusswap.app.data.AppViewModel
@@ -286,7 +288,7 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                     vm = appViewModel,
                     onProductClick = { id -> navController.navigate(Routes.productDetail(id)) },
                     onAddItem = { navController.navigate(Routes.SELL) },
-                    onOpenChat = { id -> navController.navigate(Routes.chat(id)) },
+                    onOpenChat = { id, room -> navController.navigate(Routes.chat(id, room)) },
                     onCompleteExchange = { id -> navController.navigate(Routes.completion(id)) },
                     onLogout = {
                         container.authRepository.logout()
@@ -314,16 +316,21 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
             composable(Routes.MESSAGES) {
                 MessagesScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenChat = { id -> navController.navigate(Routes.chat(id)) },
+                    onOpenChat = { id, room -> navController.navigate(Routes.chat(id, room)) },
                 )
             }
 
-            composable(Routes.CHAT) { entry ->
+            composable(
+                Routes.CHAT,
+                arguments = listOf(navArgument("room") { type = NavType.StringType; nullable = true }),
+            ) { entry ->
                 val productId = entry.arguments?.getString("productId").orEmpty()
+                val room = entry.arguments?.getString("room")
                 RequireSession(navController, container.sessionManager) {
                     ChatScreen(
                         vm = appViewModel,
                         productId = productId,
+                        room = room,
                         onBack = { navController.popBackStack() },
                         onViewListing = { id -> navController.navigate(Routes.productDetail(id)) },
                         onProposeMeeting = { navController.navigate(Routes.meetingPoint(productId)) },

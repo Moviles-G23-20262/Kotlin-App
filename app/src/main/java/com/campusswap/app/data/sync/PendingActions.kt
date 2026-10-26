@@ -54,6 +54,7 @@ data class ProposalPayload(
     val sharedBreak: Boolean,
     val startsAt: String,
     val endsAt: String,
+    val room: String? = null,
 ) {
     fun slot() = TimeSlot(slotId, slotLabel, slotDay, sharedBreak, Instant.parse(startsAt), Instant.parse(endsAt))
 }
@@ -137,7 +138,7 @@ class RepositoryActionSender(
         if (slot.startsAt?.isBefore(clock.instant()) == true) {
             return ActionOutcome.Refused("That time already passed before you got back online. Propose a new one.")
         }
-        return when (val result = proposals.propose(productId, payload.point, slot)) {
+        return when (val result = proposals.propose(productId, payload.point, slot, payload.room)) {
             is ProposalResult.Success -> ActionOutcome.Sent
             ProposalResult.Offline -> ActionOutcome.Retry
             ProposalResult.NotSynced -> ActionOutcome.Refused("This listing or meeting point isn't on the server.")

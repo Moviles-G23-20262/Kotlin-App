@@ -83,6 +83,8 @@ class ChatRepository(
         photos.discard(listOf(path))
     }
 
+    fun select(productId: String, room: String) = rooms.select(productId, room)
+
     suspend fun markRead(productId: String) = rooms.markRead(productId)
 
     /** The server's chat room for the listing, or null when it can't be reached. */
@@ -92,6 +94,11 @@ class ChatRepository(
         throw e
     } catch (e: Exception) {
         null
+    }
+
+    suspend fun counterpartId(productId: String): String? {
+        val summary = rooms.summaryFor(productId) ?: return null
+        return if (summary.sellerId == currentUserId()) summary.buyerId else summary.sellerId
     }
 
     suspend fun counterpartName(productId: String): String? {
@@ -123,9 +130,9 @@ class ChatRepository(
         )
     }
 
-    private fun threadKey(productId: String) = "chat-thread:$productId"
+    private fun threadKey(productId: String) = "chat-thread:${rooms.selected(productId) ?: productId}"
 
-    private fun counterpartKey(productId: String) = "chat-counterpart:$productId"
+    private fun counterpartKey(productId: String) = "chat-counterpart:${rooms.selected(productId) ?: productId}"
 }
 
 private val photoTypes = listOf(".jpg", ".jpeg", ".png", ".webp")

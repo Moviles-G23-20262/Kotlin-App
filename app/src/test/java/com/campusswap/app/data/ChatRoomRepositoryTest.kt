@@ -54,4 +54,15 @@ class ChatRoomRepositoryTest {
         assertNull(repository.roomFor("local-4"))
         assertEquals(0, remote.openCalls)
     }
+
+    @Test
+    fun `the room opened from the inbox wins over the first room of the listing`() = runTest {
+        remote.summaries += existingRoom()
+        remote.summaries += existingRoom().copy(id = "room-luis", buyerId = "luis", buyer = ChatPartyDto("luis", "Luis"))
+
+        repository.select("p1", "room-luis")
+
+        assertEquals("room-luis", repository.roomFor("p1"))
+        assertEquals("Luis", repository.summaryFor("p1")?.buyer?.fullName)
+    }
 }

@@ -216,6 +216,7 @@ data class TransactionRating(
     val review: String,
     /** Ratings stay hidden until the other party rates */
     val revealed: Boolean = false,
+    val ratedId: String? = null,
 )
 
 

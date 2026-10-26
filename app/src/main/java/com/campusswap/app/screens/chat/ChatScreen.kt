@@ -105,6 +105,7 @@ import kotlinx.coroutines.launch
 fun ChatScreen(
     vm: AppViewModel,
     productId: String,
+    room: String?,
     onBack: () -> Unit,
     onViewListing: (String) -> Unit,
     onProposeMeeting: () -> Unit,
@@ -121,7 +122,7 @@ fun ChatScreen(
     val context = LocalContext.current
     val container = (context.applicationContext as CampusSwapApplication).container
     val chat: ChatViewModel = viewModel(
-        factory = ChatViewModel.factory(container, product.id, isOnline = { vm.isOnline }) { id, proposal ->
+        factory = ChatViewModel.factory(container, product.id, room, isOnline = { vm.isOnline }) { id, proposal ->
             vm.cacheProposal(id, proposal)
         },
     )

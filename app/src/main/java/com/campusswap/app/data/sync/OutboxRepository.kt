@@ -42,8 +42,8 @@ class OutboxRepository(
         return saved
     }
 
-    suspend fun queueMessage(localId: String, ownerId: String, materialId: String, content: String) {
-        outbox.insertMessage(PendingMessageEntity(localId, ownerId, materialId, content, clock.millis()))
+    suspend fun queueMessage(localId: String, ownerId: String, materialId: String, content: String, room: String? = null) {
+        outbox.insertMessage(PendingMessageEntity(localId, ownerId, materialId, content, clock.millis(), roomId = room))
         scheduleSync()
     }
 
@@ -60,12 +60,12 @@ class OutboxRepository(
     )
 
     /** False when the slot has no exact times (they come from the server), so it can't be sent later. */
-    suspend fun queueProposal(ownerId: String, productId: String, point: MeetingPoint, slot: TimeSlot): Boolean {
+    suspend fun queueProposal(ownerId: String, productId: String, point: MeetingPoint, slot: TimeSlot, room: String? = null): Boolean {
         val startsAt = slot.startsAt ?: return false
         val endsAt = slot.endsAt ?: return false
         queueAction(
             ownerId, PendingActionKind.PROPOSAL, productId,
-            ProposalPayload(point, slot.id, slot.label, slot.day, slot.isSharedBreak, startsAt.toString(), endsAt.toString()),
+            ProposalPayload(point, slot.id, slot.label, slot.day, slot.isSharedBreak, startsAt.toString(), endsAt.toString(), room),
         )
         return true
     }
