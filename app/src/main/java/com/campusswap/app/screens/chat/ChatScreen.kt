@@ -111,15 +111,11 @@ fun ChatScreen(
     onProposeMeeting: () -> Unit,
     onCompleteExchange: () -> Unit,
 ) {
-    val product = remember(productId, vm.allProducts.size, vm.orders.size) { vm.findProduct(productId) }    
+    val product = remember(productId, vm.allProducts.size, vm.orders.size, vm.chatProducts.size) {
+        vm.findProduct(productId)
+    }
     if (product == null) {
-        EmptyState(
-            icon = Icons.AutoMirrored.Filled.ArrowBack,
-            title = "Conversation not found",
-            message = "This listing may have been removed.",
-            actionLabel = "Go back",
-            onAction = onBack,
-        )
+        MissingChatProduct(vm, productId, onBack)
         return
     }
 
@@ -351,6 +347,33 @@ fun ChatScreen(
             }
         }
     }
+}
+
+/**
+ * The listing isn't on the phone (reserved or sold listings leave the feed), so it's read from the
+ * chat room before saying the conversation is gone.
+ */
+@Composable
+private fun MissingChatProduct(vm: AppViewModel, productId: String, onBack: () -> Unit) {
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    var lookedUp by remember(productId) { mutableStateOf(false) }
+    LaunchedEffect(productId) {
+        container.chatRoomRepository.productFor(productId)?.let(vm::rememberChatProduct)
+        lookedUp = true
+    }
+    if (!lookedUp) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = AccentBlue)
+        }
+        return
+    }
+    EmptyState(
+        icon = Icons.AutoMirrored.Filled.ArrowBack,
+        title = "Conversation not found",
+        message = "This listing may have been removed.",
+        actionLabel = "Go back",
+        onAction = onBack,
+    )
 }
 
 /** Pinned transaction overview: item photo, title, price and condition stay visible while chatting. */
