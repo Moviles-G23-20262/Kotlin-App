@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <cache-path name="chat_photos" path="photos/" />
     <files-path name="listing_photos" path="listing-photos/" />
 </paths>

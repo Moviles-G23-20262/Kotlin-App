@@ -16,8 +16,8 @@ import java.io.IOException
 class ChatRepositoryTest {
     private val rooms = FakeChatRoomRemoteDataSource()
     private val messages = FakeMessageRemoteDataSource()
-    private val uploads = FakeUploadRemoteDataSource()
-    private val repository = ChatRepository(ChatRoomRepository(rooms), messages, uploads, currentUserId = { ME })
+    private val photos = FakePhotoUploader()
+    private val repository = ChatRepository(ChatRoomRepository(rooms), messages, photos, currentUserId = { ME })
 
     private val seededProduct = "p1"
     private val localOnlyProduct = "local-7"
@@ -117,21 +117,22 @@ class ChatRepositoryTest {
 
     @Test
     fun `a photo that cannot be uploaded reports no url instead of a broken one`() = runTest {
-        uploads.failure = IOException("no network")
+        photos.failure = IOException("no network")
 
-        assertNull(repository.uploadPhoto(ByteArray(10), "image/jpeg"))
+        assertNull(repository.uploadPhoto("/photos/a.jpg"))
+        assertEquals(listOf("/photos/a.jpg"), photos.discarded)
     }
 
     @Test
-    fun `uploading returns the stored url`() = runTest {
-        assertEquals("https://blob.campusswap.test/photo-1.jpg", repository.uploadPhoto(ByteArray(4), "image/png"))
-        assertEquals(listOf(4 to "image/png"), uploads.uploaded)
+    fun `uploading returns the stored url and drops the copy on the phone`() = runTest {
+        assertEquals("https://blob.campusswap.test/photo-1.jpg", repository.uploadPhoto("/photos/a.jpg"))
+        assertEquals(listOf("/photos/a.jpg"), photos.discarded)
     }
 
     @Test
     fun `offline, the conversation saved by an earlier load is shown with its age`() = runTest {
         val cache = InMemoryResponseCache(now = 42L)
-        val repository = ChatRepository(ChatRoomRepository(rooms), messages, uploads, currentUserId = { ME }, cache = cache)
+        val repository = ChatRepository(ChatRoomRepository(rooms), messages, photos, currentUserId = { ME }, cache = cache)
         messages.stored += message("m1", OTHER, "Is it still available?")
         messages.stored += message("m2", ME, "Yes, it is")
         repository.messages(seededProduct)
@@ -148,7 +149,7 @@ class ChatRepositoryTest {
     fun `another account on the phone never sees my saved conversation`() = runTest {
         val cache = InMemoryResponseCache()
         var user = ME
-        val repository = ChatRepository(ChatRoomRepository(rooms), messages, uploads, currentUserId = { user }, cache = cache)
+        val repository = ChatRepository(ChatRoomRepository(rooms), messages, photos, currentUserId = { user }, cache = cache)
         messages.stored += message("m1", OTHER, "Private")
         repository.messages(seededProduct)
 

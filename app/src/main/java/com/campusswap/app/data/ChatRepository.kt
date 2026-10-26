@@ -6,7 +6,7 @@ import com.campusswap.app.data.local.save
 import com.campusswap.app.data.remote.ApiErrors
 import com.campusswap.app.data.remote.MessageDto
 import com.campusswap.app.data.remote.MessageRemoteDataSource
-import com.campusswap.app.data.remote.UploadRemoteDataSource
+import com.campusswap.app.data.sync.ListingPhotoUploader
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException
@@ -32,7 +32,7 @@ sealed interface SendResult {
 class ChatRepository(
     private val rooms: ChatRoomRepository,
     private val remote: MessageRemoteDataSource,
-    private val uploads: UploadRemoteDataSource,
+    private val photos: ListingPhotoUploader,
     private val currentUserId: () -> String?,
     private val zone: ZoneId = MeetingProposalMapper.CAMPUS_ZONE,
     private val cache: ResponseCache = ResponseCache.None,
@@ -73,12 +73,14 @@ class ChatRepository(
         SendResult.Rejected(ApiErrors.message(e))
     }
 
-    suspend fun uploadPhoto(bytes: ByteArray, mimeType: String): String? = try {
-        uploads.upload(bytes, mimeType)
+    suspend fun uploadPhoto(path: String): String? = try {
+        photos.upload(path)
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         null
+    } finally {
+        photos.discard(listOf(path))
     }
 
     suspend fun markRead(productId: String) = rooms.markRead(productId)
@@ -108,7 +110,7 @@ class ChatRepository(
         val proposal = dto.meetingProposal?.let { MeetingProposalMapper.toProposal(it, zone) }
         val mine = dto.senderId == currentUserId()
         val sentAt = runCatching { Instant.parse(dto.createdAt) }.getOrNull()
-        val photo = dto.content.takeIf(::isPhoto)
+        val photo = dto.content.takeIf(::isPhotoUrl)
         return ChatMessage(
             id = dto.id,
             author = if (proposal != null) MessageAuthor.SYSTEM else if (mine) MessageAuthor.ME else MessageAuthor.OTHER,
@@ -121,14 +123,12 @@ class ChatRepository(
         )
     }
 
-    private fun isPhoto(content: String) =
-        content.startsWith("https://") && PHOTO_SUFFIXES.any { content.substringBefore('?').endsWith(it, ignoreCase = true) }
-
     private fun threadKey(productId: String) = "chat-thread:$productId"
 
     private fun counterpartKey(productId: String) = "chat-counterpart:$productId"
-
-    private companion object {
-        val PHOTO_SUFFIXES = listOf(".jpg", ".jpeg", ".png", ".webp")
-    }
 }
+
+private val photoTypes = listOf(".jpg", ".jpeg", ".png", ".webp")
+
+fun isPhotoUrl(text: String) =
+    text.startsWith("https://") && photoTypes.any { text.substringBefore('?').endsWith(it, ignoreCase = true) }

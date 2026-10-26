@@ -112,4 +112,13 @@ class ConversationsRepositoryTest {
         assertEquals(7L, saved.savedAtMillis)
         assertEquals(0, repository.unreadCount())
     }
+
+    @Test
+    fun `a photo shows as a photo in the inbox, not as its link`() = runTest {
+        remote.summaries += room("1", them, "Calculus", "https://blob.campusswap.test/a.jpg", "2026-10-05T17:00:00Z", 0)
+
+        val loaded = repository.conversations() as ConversationsLoad.Success
+
+        assertEquals("Photo", loaded.conversations.single().lastMessage)
+    }
 }

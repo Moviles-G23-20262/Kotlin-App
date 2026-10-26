@@ -64,7 +64,7 @@ class ConversationsRepository(
             productId = room.materialId,
             productTitle = room.material?.title ?: "This listing",
             counterpartName = counterpart?.fullName ?: "A student",
-            lastMessage = last?.content,
+            lastMessage = last?.content?.let { if (isPhotoUrl(it)) "Photo" else it },
             lastMessageAt = sentAt,
             time = sentAt?.let(::label).orEmpty(),
             unread = room.count?.messages ?: 0,
