@@ -1,5 +1,6 @@
 package com.campusswap.app.data
 
+import com.campusswap.app.data.materials.toProduct
 import com.campusswap.app.data.remote.ChatRoomRemoteDataSource
 import com.campusswap.app.data.remote.ChatRoomSummaryDto
 import kotlinx.coroutines.CancellationException
@@ -29,6 +30,14 @@ class ChatRoomRepository(private val remote: ChatRoomRemoteDataSource) {
         throw e
     } catch (e: Exception) {
         null
+    }
+
+    /** The listing as the chat room sees it, for conversations about listings that left the feed (reserved, sold). */
+    suspend fun productFor(productId: String): Product? {
+        val summary = summaryFor(productId) ?: return null
+        val product = summary.material?.toProduct() ?: return null
+        val sellerName = summary.seller?.fullName ?: return product
+        return product.copy(seller = product.seller.copy(name = sellerName))
     }
 
     suspend fun markRead(productId: String) {

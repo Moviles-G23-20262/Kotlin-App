@@ -190,6 +190,13 @@ class AppViewModel : ViewModel() {
     /** Productos guardados en el backend incluye vendidos/reservados, que no salen en el feed */
     val wishlistProducts = mutableStateListOf<Product>()
 
+    /** Listings only reachable through a conversation: they left the feed (reserved, sold) but the chat is still open. */
+    val chatProducts = mutableStateListOf<Product>()
+
+    fun rememberChatProduct(product: Product) {
+        if (chatProducts.none { it.id == product.id }) chatProducts.add(product)
+    }
+
     private var wishlistRepository: WishlistRepository? = null
 
     fun loadWishlist(repository: WishlistRepository) {
@@ -330,6 +337,7 @@ class AppViewModel : ViewModel() {
             ?: orders.firstNotNullOfOrNull { order -> order.products.find { it.id == id } }
             ?: wishlistProducts.find { it.id == id }
             ?: sales.firstNotNullOfOrNull { sale -> sale.product.takeIf { it.id == id } }
+            ?: chatProducts.find { it.id == id }
 
     /** Pide al backend los productos del carrito; devuelve # de orden */
     suspend fun placeOrder(meetOnCampus: Boolean = true): Int? {
