@@ -59,6 +59,7 @@ import com.campusswap.app.data.FeaturedSeller
 import com.campusswap.app.data.Product
 import com.campusswap.app.ui.theme.CampusSwapTheme
 import com.campusswap.app.ui.theme.CampusType
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun HomeScreen(
@@ -125,7 +126,7 @@ fun HomeScreen(
                         }
                         HeadingText(
                             "Save big on course materials",
-                            size = CampusType.sizeMd,
+                            size = 17.sp,
                             color = Color(0xFFF9F9F9),
                             lineHeight = CampusType.sizeMd * 1.2f,
                             modifier = Modifier.padding(bottom = 6.dp),
@@ -362,7 +363,7 @@ private fun HomeHeader(
                 }
                 HeadingText(
                     "Campus Swap",
-                    size = CampusType.sizeMd,
+                    size = 17.sp,
                     letterSpacing = CampusType.sectionTitle.letterSpacing,
                     maxLines = 1,
                 )
@@ -375,7 +376,7 @@ private fun HomeHeader(
                     iconSize = 18.dp,
                 )
                 Box {
-                    CampusIconButton(CampusIcons.Message, contentDescription = "Messages", onClick = onMessagesClick)
+                    CampusIconButton(CampusIcons.Message, contentDescription = "Messages", onClick = onMessagesClick, modifier = Modifier.size(32.dp))
                     if (unreadMessages > 0) {
                         Box(
                             modifier = Modifier
@@ -387,7 +388,7 @@ private fun HomeHeader(
                     }
                 }
                 Box {
-                    CampusIconButton(CampusIcons.Bell, contentDescription = "Notifications", onClick = onNotificationsClick)
+                    CampusIconButton(CampusIcons.Bell, contentDescription = "Notifications", onClick = onNotificationsClick, modifier = Modifier.size(32.dp))
                     if (unreadNotifications > 0) {
                         Box(
                             modifier = Modifier
@@ -398,7 +399,7 @@ private fun HomeHeader(
                         )
                     }
                 }
-                CampusIconButton(CampusIcons.Heart, contentDescription = "Wishlist", onClick = onWishlistClick, iconTint = c.accent)
+                CampusIconButton(CampusIcons.Heart, contentDescription = "Wishlist", onClick = onWishlistClick, iconTint = c.accent, modifier = Modifier.size(32.dp))
             }
         }
         FakeSearchField(placeholder = "Search course materials...", onClick = onSearchClick)
