@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.sell
+package com.campusswap.app.views.screens.sell
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -47,12 +47,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.view.components.CampusSwapChip
-import com.campusswap.app.view.components.ConditionBadge
-import com.campusswap.app.view.components.ProductPlaceholderImage
-import com.campusswap.app.view.components.formatPrice
+import com.campusswap.app.views.components.CampusSwapChip
+import com.campusswap.app.views.components.ConditionBadge
+import com.campusswap.app.views.components.ProductPlaceholderImage
+import com.campusswap.app.views.components.formatPrice
 import com.campusswap.app.CampusSwapApplication
-import com.campusswap.app.view.components.OfflineBanner
+import com.campusswap.app.views.components.OfflineBanner
 import com.campusswap.app.model.Product
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.runtime.LaunchedEffect
@@ -61,8 +61,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
-import com.campusswap.app.view.components.NoClipboard
-import com.campusswap.app.view.components.PriceVisualTransformation
+import com.campusswap.app.views.components.NoClipboard
+import com.campusswap.app.views.components.PriceVisualTransformation
 import com.campusswap.app.model.domain.InputLimits
 import com.campusswap.app.model.domain.InputValidation
 import androidx.compose.foundation.text.KeyboardOptions
@@ -76,15 +76,15 @@ import com.campusswap.app.model.SampleData
 import com.campusswap.app.model.SellDraft
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
-import com.campusswap.app.view.components.CampusHeader
-import com.campusswap.app.view.components.CampusIconButton
-import com.campusswap.app.view.components.CampusIcons
-import com.campusswap.app.view.components.HeadingText
-import com.campusswap.app.view.theme.CampusSwapTheme
-import com.campusswap.app.view.theme.CampusType
-import com.campusswap.app.view.theme.AccentBlue
-import com.campusswap.app.view.theme.SecondaryBlue
-import com.campusswap.app.view.theme.SuccessGreen
+import com.campusswap.app.views.components.CampusHeader
+import com.campusswap.app.views.components.CampusIconButton
+import com.campusswap.app.views.components.CampusIcons
+import com.campusswap.app.views.components.HeadingText
+import com.campusswap.app.views.themes.CampusSwapTheme
+import com.campusswap.app.views.themes.CampusType
+import com.campusswap.app.views.themes.AccentBlue
+import com.campusswap.app.views.themes.SecondaryBlue
+import com.campusswap.app.views.themes.SuccessGreen
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -97,7 +97,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.clip
-import com.campusswap.app.view.components.RemoteImage
+import com.campusswap.app.views.components.RemoteImage
 
 private enum class SellStep(val title: String) {
     PRODUCT_INFO("Photos & Info"),

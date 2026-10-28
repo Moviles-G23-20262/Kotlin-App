@@ -1,7 +1,7 @@
-package com.campusswap.app.view.screens.home
+package com.campusswap.app.views.screens.home
 
 import kotlinx.coroutines.delay
-import com.campusswap.app.view.components.OfflineBanner
+import com.campusswap.app.views.components.OfflineBanner
 import com.campusswap.app.model.domain.InputLimits
 import com.campusswap.app.model.domain.InputValidation
 import androidx.compose.animation.AnimatedVisibility
@@ -37,30 +37,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.view.components.Badge
-import com.campusswap.app.view.components.BackHeader
-import com.campusswap.app.view.components.BodyText
-import com.campusswap.app.view.components.CampusIcons
-import com.campusswap.app.view.components.CampusSlider
-import com.campusswap.app.view.components.CampusTextField
-import com.campusswap.app.view.components.HeadingText
-import com.campusswap.app.view.components.MonoText
-import com.campusswap.app.view.components.Pill
-import com.campusswap.app.view.components.PriceText
-import com.campusswap.app.view.components.PrimaryButton
-import com.campusswap.app.view.components.ProductPhoto
-import com.campusswap.app.view.components.SectionTitle
-import com.campusswap.app.view.components.campusCard
-import com.campusswap.app.view.components.formatPrice
-import com.campusswap.app.view.components.plainClickable
+import com.campusswap.app.views.components.Badge
+import com.campusswap.app.views.components.BackHeader
+import com.campusswap.app.views.components.BodyText
+import com.campusswap.app.views.components.CampusIcons
+import com.campusswap.app.views.components.CampusSlider
+import com.campusswap.app.views.components.CampusTextField
+import com.campusswap.app.views.components.HeadingText
+import com.campusswap.app.views.components.MonoText
+import com.campusswap.app.views.components.Pill
+import com.campusswap.app.views.components.PriceText
+import com.campusswap.app.views.components.PrimaryButton
+import com.campusswap.app.views.components.ProductPhoto
+import com.campusswap.app.views.components.SectionTitle
+import com.campusswap.app.views.components.campusCard
+import com.campusswap.app.views.components.formatPrice
+import com.campusswap.app.views.components.plainClickable
 import com.campusswap.app.model.AlertMatch
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.Category
 import com.campusswap.app.model.Condition
 import com.campusswap.app.model.SmartAlert
-import com.campusswap.app.view.theme.CampusSwapTheme
-import com.campusswap.app.view.theme.CampusType
-import com.campusswap.app.view.components.timeAgo
+import com.campusswap.app.views.themes.CampusSwapTheme
+import com.campusswap.app.views.themes.CampusType
+import com.campusswap.app.views.components.timeAgo
 
 private const val ALERT_PRICE_MAX = 350000f
 

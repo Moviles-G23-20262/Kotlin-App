@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.meeting
+package com.campusswap.app.views.screens.meeting
 
 import android.content.Context
 import com.campusswap.app.R

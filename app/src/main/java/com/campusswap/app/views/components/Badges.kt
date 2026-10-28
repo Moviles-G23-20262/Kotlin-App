@@ -1,4 +1,4 @@
-package com.campusswap.app.view.components
+package com.campusswap.app.views.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.campusswap.app.model.Condition
-import com.campusswap.app.view.theme.CampusSwapTheme
+import com.campusswap.app.views.themes.CampusSwapTheme
 import kotlin.math.floor
 import kotlin.math.roundToInt
 

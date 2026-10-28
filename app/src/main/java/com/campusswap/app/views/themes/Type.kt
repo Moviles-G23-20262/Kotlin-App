@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalTextApi::class)
 
-package com.campusswap.app.view.theme
+package com.campusswap.app.views.themes
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.ExperimentalTextApi

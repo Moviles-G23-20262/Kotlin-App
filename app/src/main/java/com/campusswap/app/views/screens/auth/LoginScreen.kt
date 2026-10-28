@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.auth
+package com.campusswap.app.views.screens.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -32,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,15 +41,16 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.view.theme.AccentBlue
-import com.campusswap.app.view.theme.ErrorRed
+import com.campusswap.app.views.themes.AccentBlue
+import com.campusswap.app.views.themes.ErrorRed
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import com.campusswap.app.CampusSwapApplication
 import com.campusswap.app.model.auth.LoginResult
-import com.campusswap.app.view.components.NoClipboard
-import com.campusswap.app.view.components.typedOnly
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.campusswap.app.viewmodel.AuthViewModel
+import com.campusswap.app.views.components.NoClipboard
+import com.campusswap.app.views.components.typedOnly
 import com.campusswap.app.model.domain.InputLimits
 import com.campusswap.app.model.domain.InputValidation
 
@@ -63,21 +63,18 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
     var emailError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
     var infoMessage by remember { mutableStateOf(if (sessionExpired) "Your session expired. Log in again to continue." else null) }
-    val scope = rememberCoroutineScope()
-    val authRepository = (LocalContext.current.applicationContext as CampusSwapApplication).container.authRepository
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(container))
+    val isLoading = authViewModel.isLoading
 
     fun attemptLogin() {
         emailError = InputValidation.emailError(email)
         passwordError = if (password.length < InputLimits.PASSWORD_MIN) "Password must be at least ${InputLimits.PASSWORD_MIN} characters" else null
         if (emailError == null && passwordError == null) {
-            isLoading = true
-            scope.launch {
-                val result = authRepository.login(email, password)
-                isLoading = false
+            authViewModel.login(email, password) { result ->
                 when (result) {
                     is LoginResult.Success -> onLoginSuccess(result.session.userId)
                     LoginResult.InvalidCredentials -> passwordError = "Incorrect email or password"

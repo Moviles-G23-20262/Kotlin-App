@@ -1,4 +1,4 @@
-package com.campusswap.app.view.components
+package com.campusswap.app.views.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row

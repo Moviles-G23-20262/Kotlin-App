@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.search
+package com.campusswap.app.views.screens.search
 
 import com.campusswap.app.model.domain.InputLimits
 import com.campusswap.app.model.domain.InputValidation
@@ -31,22 +31,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.campusswap.app.model.analytics.Analytics
 import com.campusswap.app.model.analytics.Events
-import com.campusswap.app.view.components.BodyText
-import com.campusswap.app.view.components.CampusHeader
-import com.campusswap.app.view.components.CampusIconButton
-import com.campusswap.app.view.components.CampusIcons
-import com.campusswap.app.view.components.CampusSlider
-import com.campusswap.app.view.components.CampusTextField
-import com.campusswap.app.view.components.EmptyState
-import com.campusswap.app.view.components.OfflineBanner
-import com.campusswap.app.view.components.Pill
-import com.campusswap.app.view.components.ProductCard
-import com.campusswap.app.view.components.formatPrice
+import com.campusswap.app.views.components.BodyText
+import com.campusswap.app.views.components.CampusHeader
+import com.campusswap.app.views.components.CampusIconButton
+import com.campusswap.app.views.components.CampusIcons
+import com.campusswap.app.views.components.CampusSlider
+import com.campusswap.app.views.components.CampusTextField
+import com.campusswap.app.views.components.EmptyState
+import com.campusswap.app.views.components.OfflineBanner
+import com.campusswap.app.views.components.Pill
+import com.campusswap.app.views.components.ProductCard
+import com.campusswap.app.views.components.formatPrice
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.Category
 import com.campusswap.app.model.Condition
 import com.campusswap.app.model.SortOption
-import com.campusswap.app.view.theme.CampusSwapTheme
+import com.campusswap.app.views.themes.CampusSwapTheme
 
 private const val MAX_PRICE_LIMIT = 350000f
 

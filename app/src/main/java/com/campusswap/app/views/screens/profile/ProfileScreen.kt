@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.profile
+package com.campusswap.app.views.screens.profile
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,25 +22,25 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.view.components.Badge
-import com.campusswap.app.view.components.BodyText
-import com.campusswap.app.view.components.CampusHeader
-import com.campusswap.app.view.components.CampusIconButton
-import com.campusswap.app.view.components.CampusIcons
-import com.campusswap.app.view.components.HeadingText
-import com.campusswap.app.view.components.InitialsAvatar
-import com.campusswap.app.view.components.MonoText
-import com.campusswap.app.view.components.PriceText
-import com.campusswap.app.view.components.PrimaryButton
-import com.campusswap.app.view.components.ProductRowCard
-import com.campusswap.app.view.components.SectionTitle
-import com.campusswap.app.view.components.campusCard
-import com.campusswap.app.view.components.formatPrice
-import com.campusswap.app.view.components.formatRating
+import com.campusswap.app.views.components.Badge
+import com.campusswap.app.views.components.BodyText
+import com.campusswap.app.views.components.CampusHeader
+import com.campusswap.app.views.components.CampusIconButton
+import com.campusswap.app.views.components.CampusIcons
+import com.campusswap.app.views.components.HeadingText
+import com.campusswap.app.views.components.InitialsAvatar
+import com.campusswap.app.views.components.MonoText
+import com.campusswap.app.views.components.PriceText
+import com.campusswap.app.views.components.PrimaryButton
+import com.campusswap.app.views.components.ProductRowCard
+import com.campusswap.app.views.components.SectionTitle
+import com.campusswap.app.views.components.campusCard
+import com.campusswap.app.views.components.formatPrice
+import com.campusswap.app.views.components.formatRating
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.Product
-import com.campusswap.app.view.theme.CampusSwapTheme
-import com.campusswap.app.view.theme.CampusType
+import com.campusswap.app.views.themes.CampusSwapTheme
+import com.campusswap.app.views.themes.CampusType
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
@@ -52,8 +52,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import com.campusswap.app.view.components.OfflineBanner
-import com.campusswap.app.view.components.timeAgo
+import com.campusswap.app.views.components.OfflineBanner
+import com.campusswap.app.views.components.timeAgo
 
 @Composable
 fun ProfileScreen(

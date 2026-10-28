@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.product
+package com.campusswap.app.views.screens.product
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -38,29 +38,29 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.view.components.Badge
-import com.campusswap.app.view.components.BodyText
-import com.campusswap.app.view.components.CampusIconButton
-import com.campusswap.app.view.components.CampusIcons
-import com.campusswap.app.view.components.EmptyState
-import com.campusswap.app.view.components.HeadingText
-import com.campusswap.app.view.components.InitialsAvatar
-import com.campusswap.app.view.components.PriceText
-import com.campusswap.app.view.components.OfflineBanner
-import com.campusswap.app.view.components.PendingSyncLabel
-import com.campusswap.app.view.components.PrimaryButton
-import com.campusswap.app.view.components.ProductPhoto
-import com.campusswap.app.view.components.RatingLabel
-import com.campusswap.app.view.components.SecondaryButton
-import com.campusswap.app.view.components.SectionTitle
-import com.campusswap.app.view.components.campusCard
-import com.campusswap.app.view.components.formatRating
-import com.campusswap.app.view.components.pagerDot
-import com.campusswap.app.view.components.plainClickable
+import com.campusswap.app.views.components.Badge
+import com.campusswap.app.views.components.BodyText
+import com.campusswap.app.views.components.CampusIconButton
+import com.campusswap.app.views.components.CampusIcons
+import com.campusswap.app.views.components.EmptyState
+import com.campusswap.app.views.components.HeadingText
+import com.campusswap.app.views.components.InitialsAvatar
+import com.campusswap.app.views.components.PriceText
+import com.campusswap.app.views.components.OfflineBanner
+import com.campusswap.app.views.components.PendingSyncLabel
+import com.campusswap.app.views.components.PrimaryButton
+import com.campusswap.app.views.components.ProductPhoto
+import com.campusswap.app.views.components.RatingLabel
+import com.campusswap.app.views.components.SecondaryButton
+import com.campusswap.app.views.components.SectionTitle
+import com.campusswap.app.views.components.campusCard
+import com.campusswap.app.views.components.formatRating
+import com.campusswap.app.views.components.pagerDot
+import com.campusswap.app.views.components.plainClickable
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.Product
-import com.campusswap.app.view.theme.CampusSwapTheme
-import com.campusswap.app.view.theme.CampusType
+import com.campusswap.app.views.themes.CampusSwapTheme
+import com.campusswap.app.views.themes.CampusType
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalLayoutApi::class)

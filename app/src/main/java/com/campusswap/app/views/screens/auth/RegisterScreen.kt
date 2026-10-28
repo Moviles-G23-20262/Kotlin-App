@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.auth
+package com.campusswap.app.views.screens.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -32,7 +32,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,14 +45,15 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.campusswap.app.CampusSwapApplication
-import com.campusswap.app.view.components.NoClipboard
-import com.campusswap.app.view.components.typedOnly
+import com.campusswap.app.views.components.NoClipboard
+import com.campusswap.app.views.components.typedOnly
 import com.campusswap.app.model.auth.RegisterResult
 import com.campusswap.app.model.domain.InputLimits
 import com.campusswap.app.model.domain.InputValidation
-import com.campusswap.app.view.theme.AccentBlue
-import com.campusswap.app.view.theme.ErrorRed
-import kotlinx.coroutines.launch
+import com.campusswap.app.views.themes.AccentBlue
+import com.campusswap.app.views.themes.ErrorRed
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.campusswap.app.viewmodel.AuthViewModel
 
 @Composable
 fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> Unit) {
@@ -63,7 +63,6 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
     var password by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
 
     var nameError by remember { mutableStateOf<String?>(null) }
     var majorError by remember { mutableStateOf<String?>(null) }
@@ -72,8 +71,9 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
     var confirmError by remember { mutableStateOf<String?>(null) }
     var formError by remember { mutableStateOf<String?>(null) }
 
-    val scope = rememberCoroutineScope()
-    val authRepository = (LocalContext.current.applicationContext as CampusSwapApplication).container.authRepository
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(container))
+    val isLoading = authViewModel.isLoading
 
     fun attemptRegister() {
         nameError = InputValidation.nameError(fullName)
@@ -84,10 +84,7 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
         formError = null
         if (listOf(nameError, majorError, emailError, passwordError, confirmError).any { it != null }) return
 
-        isLoading = true
-        scope.launch {
-            val result = authRepository.register(email, password, fullName, major)
-            isLoading = false
+        authViewModel.register(email, password, fullName, major) { result ->
             when (result) {
                 is RegisterResult.Success -> onRegistered(result.session.userId)
                 RegisterResult.EmailTaken -> emailError = "An account with this email already exists"

@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.rating
+package com.campusswap.app.views.screens.rating
 
 import com.campusswap.app.viewmodel.CheckInState
 import com.campusswap.app.viewmodel.ExchangeCheckInViewModel
@@ -38,14 +38,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.campusswap.app.view.components.BodyText
-import com.campusswap.app.view.components.CampusIcons
-import com.campusswap.app.view.components.PrimaryButton
-import com.campusswap.app.view.components.SecondaryButton
-import com.campusswap.app.view.components.plainClickable
+import com.campusswap.app.views.components.BodyText
+import com.campusswap.app.views.components.CampusIcons
+import com.campusswap.app.views.components.PrimaryButton
+import com.campusswap.app.views.components.SecondaryButton
+import com.campusswap.app.views.components.plainClickable
 import com.campusswap.app.model.domain.Proximity
-import com.campusswap.app.view.theme.CampusSwapTheme
-import com.campusswap.app.view.theme.CampusType
+import com.campusswap.app.views.themes.CampusSwapTheme
+import com.campusswap.app.views.themes.CampusType
 
 private val LOCATION_PERMISSIONS = arrayOf(
     Manifest.permission.ACCESS_FINE_LOCATION,

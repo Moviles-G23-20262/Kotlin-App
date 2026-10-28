@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.meeting
+package com.campusswap.app.views.screens.meeting
 
 import com.campusswap.app.model.domain.CampusMapProjection
 import com.campusswap.app.model.domain.MapPosition
@@ -82,26 +82,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.CampusSwapApplication
-import com.campusswap.app.view.components.EmptyState
+import com.campusswap.app.views.components.EmptyState
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.MeetingZoneType
 import com.campusswap.app.model.TimeSlot
 import com.campusswap.app.model.domain.RankingMode
 import com.campusswap.app.model.domain.TimeOfDayStrategySelector
-import com.campusswap.app.view.theme.AccentBlue
-import com.campusswap.app.view.theme.CampusBlockLabel
-import com.campusswap.app.view.theme.CampusBuildingEdge
-import com.campusswap.app.view.theme.CampusBuildingFill
-import com.campusswap.app.view.theme.CampusGreen
-import com.campusswap.app.view.theme.CampusLand
-import com.campusswap.app.view.theme.CampusPath
-import com.campusswap.app.view.theme.CampusRoadLine
-import com.campusswap.app.view.theme.CampusWater
-import com.campusswap.app.view.theme.JetBrainsMonoFamily
-import com.campusswap.app.view.theme.PrimaryBlue
-import com.campusswap.app.view.theme.SecondaryBlue
-import com.campusswap.app.view.theme.SuccessGreen
-import com.campusswap.app.view.theme.WarningAmber
+import com.campusswap.app.views.themes.AccentBlue
+import com.campusswap.app.views.themes.CampusBlockLabel
+import com.campusswap.app.views.themes.CampusBuildingEdge
+import com.campusswap.app.views.themes.CampusBuildingFill
+import com.campusswap.app.views.themes.CampusGreen
+import com.campusswap.app.views.themes.CampusLand
+import com.campusswap.app.views.themes.CampusPath
+import com.campusswap.app.views.themes.CampusRoadLine
+import com.campusswap.app.views.themes.CampusWater
+import com.campusswap.app.views.themes.JetBrainsMonoFamily
+import com.campusswap.app.views.themes.PrimaryBlue
+import com.campusswap.app.views.themes.SecondaryBlue
+import com.campusswap.app.views.themes.SuccessGreen
+import com.campusswap.app.views.themes.WarningAmber
 
 /**
  * View 10 — Dynamic Safe Meeting Point (Campus Guardian CAS).

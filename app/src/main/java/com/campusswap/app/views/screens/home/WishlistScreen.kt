@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.home
+package com.campusswap.app.views.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -17,14 +17,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.view.components.BackHeader
-import com.campusswap.app.view.components.CampusIconButton
-import com.campusswap.app.view.components.CampusIcons
-import com.campusswap.app.view.components.EmptyState
-import com.campusswap.app.view.components.OfflineBanner
-import com.campusswap.app.view.components.ProductCard
+import com.campusswap.app.views.components.BackHeader
+import com.campusswap.app.views.components.CampusIconButton
+import com.campusswap.app.views.components.CampusIcons
+import com.campusswap.app.views.components.EmptyState
+import com.campusswap.app.views.components.OfflineBanner
+import com.campusswap.app.views.components.ProductCard
 import com.campusswap.app.viewmodel.AppViewModel
-import com.campusswap.app.view.theme.CampusSwapTheme
+import com.campusswap.app.views.themes.CampusSwapTheme
 
 /**
  * Saved items. The bell in the header opens the alerts screen (View 11),

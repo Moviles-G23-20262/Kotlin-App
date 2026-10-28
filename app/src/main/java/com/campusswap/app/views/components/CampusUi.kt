@@ -1,4 +1,4 @@
-package com.campusswap.app.view.components
+package com.campusswap.app.views.components
 
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -63,11 +63,11 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import com.campusswap.app.view.theme.CampusSwapTheme
-import com.campusswap.app.view.theme.CampusType
-import com.campusswap.app.view.theme.frauncesFor
-import com.campusswap.app.view.theme.JetBrainsMonoFamily
-import com.campusswap.app.view.theme.OutfitFamily
+import com.campusswap.app.views.themes.CampusSwapTheme
+import com.campusswap.app.views.themes.CampusType
+import com.campusswap.app.views.themes.frauncesFor
+import com.campusswap.app.views.themes.JetBrainsMonoFamily
+import com.campusswap.app.views.themes.OutfitFamily
 
 /* ------------------------------------------------------------------------------------------
  * Building blocks that reproduce the CSS classes of the Figma prototype:

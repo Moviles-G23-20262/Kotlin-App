@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.cart
+package com.campusswap.app.views.screens.cart
 
 import com.campusswap.app.model.domain.InputLimits
 import com.campusswap.app.model.domain.InputValidation
@@ -40,25 +40,25 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
-import com.campusswap.app.view.components.BackHeader
-import com.campusswap.app.view.components.BodyText
-import com.campusswap.app.view.components.BottomActionBar
-import com.campusswap.app.view.components.CampusIcons
-import com.campusswap.app.view.components.CampusTextField
-import com.campusswap.app.view.components.HeadingText
-import com.campusswap.app.view.components.MonoText
-import com.campusswap.app.view.components.OfflineBanner
-import com.campusswap.app.view.components.PrimaryButton
-import com.campusswap.app.view.components.RadioOption
-import com.campusswap.app.view.components.SecondaryButton
-import com.campusswap.app.view.components.StickyNote
-import com.campusswap.app.view.components.campusCard
-import com.campusswap.app.view.components.formatPrice
+import com.campusswap.app.views.components.BackHeader
+import com.campusswap.app.views.components.BodyText
+import com.campusswap.app.views.components.BottomActionBar
+import com.campusswap.app.views.components.CampusIcons
+import com.campusswap.app.views.components.CampusTextField
+import com.campusswap.app.views.components.HeadingText
+import com.campusswap.app.views.components.MonoText
+import com.campusswap.app.views.components.OfflineBanner
+import com.campusswap.app.views.components.PrimaryButton
+import com.campusswap.app.views.components.RadioOption
+import com.campusswap.app.views.components.SecondaryButton
+import com.campusswap.app.views.components.StickyNote
+import com.campusswap.app.views.components.campusCard
+import com.campusswap.app.views.components.formatPrice
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.viewmodel.HOME_DELIVERY_FEE
 import com.campusswap.app.model.Order
-import com.campusswap.app.view.theme.CampusSwapTheme
-import com.campusswap.app.view.theme.CampusType
+import com.campusswap.app.views.themes.CampusSwapTheme
+import com.campusswap.app.views.themes.CampusType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 

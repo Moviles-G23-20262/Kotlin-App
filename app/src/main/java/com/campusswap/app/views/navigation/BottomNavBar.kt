@@ -1,4 +1,4 @@
-package com.campusswap.app.view.navigation
+package com.campusswap.app.views.navigation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,9 +27,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.campusswap.app.view.components.plainClickable
-import com.campusswap.app.view.theme.CampusSwapTheme
-import com.campusswap.app.view.theme.OutfitFamily
+import com.campusswap.app.views.components.plainClickable
+import com.campusswap.app.views.themes.CampusSwapTheme
+import com.campusswap.app.views.themes.OutfitFamily
 
 
 @Composable

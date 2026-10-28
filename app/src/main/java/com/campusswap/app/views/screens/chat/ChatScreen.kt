@@ -1,4 +1,4 @@
-package com.campusswap.app.view.screens.chat
+package com.campusswap.app.views.screens.chat
 
 import com.campusswap.app.viewmodel.ChatAvailability
 import com.campusswap.app.viewmodel.ChatViewModel
@@ -72,29 +72,29 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.campusswap.app.CampusSwapApplication
-import com.campusswap.app.view.components.ConditionBadge
-import com.campusswap.app.view.components.EmptyState
-import com.campusswap.app.view.components.RemoteImage
-import com.campusswap.app.view.components.plainClickable
-import com.campusswap.app.view.components.ProductPhoto
-import com.campusswap.app.view.components.VerifiedBadge
-import com.campusswap.app.view.components.formatPrice
+import com.campusswap.app.views.components.ConditionBadge
+import com.campusswap.app.views.components.EmptyState
+import com.campusswap.app.views.components.RemoteImage
+import com.campusswap.app.views.components.plainClickable
+import com.campusswap.app.views.components.ProductPhoto
+import com.campusswap.app.views.components.VerifiedBadge
+import com.campusswap.app.views.components.formatPrice
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.ChatMessage
 import com.campusswap.app.model.MeetingProposal
 import com.campusswap.app.model.MessageAuthor
 import com.campusswap.app.model.MessageStatus
-import com.campusswap.app.view.components.OfflineBanner
-import com.campusswap.app.view.components.timeAgo
+import com.campusswap.app.views.components.OfflineBanner
+import com.campusswap.app.views.components.timeAgo
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ErrorOutline
 import com.campusswap.app.model.Product
 import com.campusswap.app.model.ProposalStatus
-import com.campusswap.app.view.theme.AccentBlue
-import com.campusswap.app.view.theme.JetBrainsMonoFamily
-import com.campusswap.app.view.theme.SecondaryBlue
-import com.campusswap.app.view.theme.SuccessGreen
+import com.campusswap.app.views.themes.AccentBlue
+import com.campusswap.app.views.themes.JetBrainsMonoFamily
+import com.campusswap.app.views.themes.SecondaryBlue
+import com.campusswap.app.views.themes.SuccessGreen
 import kotlinx.coroutines.launch
 
 /**

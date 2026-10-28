@@ -1,4 +1,4 @@
-package com.campusswap.app.view.theme
+package com.campusswap.app.views.themes
 
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
