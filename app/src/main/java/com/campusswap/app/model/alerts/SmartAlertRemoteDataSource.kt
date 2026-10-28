@@ -1,4 +1,4 @@
-package com.campusswap.app.data.alerts
+package com.campusswap.app.model.alerts
 
 import retrofit2.http.Body
 import retrofit2.http.DELETE

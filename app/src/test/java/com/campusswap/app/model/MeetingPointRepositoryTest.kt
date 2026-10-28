@@ -1,8 +1,8 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.MeetingPointDto
-import com.campusswap.app.data.local.InMemoryResponseCache
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.remote.MeetingPointDto
+import com.campusswap.app.model.local.InMemoryResponseCache
+import com.campusswap.app.model.domain.GeoPoint
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

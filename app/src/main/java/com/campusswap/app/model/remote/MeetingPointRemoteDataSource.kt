@@ -1,4 +1,4 @@
-package com.campusswap.app.data.remote
+package com.campusswap.app.model.remote
 
 interface MeetingPointRemoteDataSource {
     suspend fun meetingPoints(): List<MeetingPointDto>

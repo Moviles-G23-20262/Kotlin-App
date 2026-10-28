@@ -1,6 +1,6 @@
-package com.campusswap.app.data.wishlist
+package com.campusswap.app.model.wishlist
 
-import com.campusswap.app.data.materials.MaterialDto
+import com.campusswap.app.model.materials.MaterialDto
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET

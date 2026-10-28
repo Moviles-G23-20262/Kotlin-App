@@ -1,4 +1,4 @@
-package com.campusswap.app.components
+package com.campusswap.app.view.components
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -13,14 +13,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.ErrorOutline
-import com.campusswap.app.data.PendingSync
+import com.campusswap.app.model.PendingSync
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.ui.theme.CampusSwapTheme
+import com.campusswap.app.view.theme.CampusSwapTheme
 import java.time.Duration
 
 /** Amber strip that explains what the screen is doing while there's no connection. */

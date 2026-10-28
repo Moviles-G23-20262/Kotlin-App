@@ -1,4 +1,4 @@
-package com.campusswap.app.data.remote
+package com.campusswap.app.model.remote
 
 import com.google.gson.JsonParser
 import retrofit2.HttpException

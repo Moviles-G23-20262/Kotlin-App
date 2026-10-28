@@ -1,4 +1,4 @@
-package com.campusswap.app.data.location
+package com.campusswap.app.model.location
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -7,7 +7,7 @@ import android.content.pm.PackageManager
 import android.location.LocationManager
 import androidx.core.content.ContextCompat
 import androidx.core.location.LocationManagerCompat
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.domain.GeoPoint
 import com.google.android.gms.location.CurrentLocationRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority

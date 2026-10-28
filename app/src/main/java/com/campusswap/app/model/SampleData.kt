@@ -1,6 +1,6 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.domain.GeoPoint
 
 object SampleData {
 

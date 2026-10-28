@@ -1,4 +1,4 @@
-package com.campusswap.app.data.remote
+package com.campusswap.app.model.remote
 
 import retrofit2.http.Body
 import retrofit2.http.GET

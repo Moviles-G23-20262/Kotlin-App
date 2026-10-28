@@ -1,6 +1,6 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.sync.ListingPhotoUploader
+import com.campusswap.app.model.sync.ListingPhotoUploader
 
 class FakePhotoUploader : ListingPhotoUploader {
     var failure: Exception? = null

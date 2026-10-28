@@ -1,7 +1,7 @@
-package com.campusswap.app.data.materials
+package com.campusswap.app.model.materials
 
-import com.campusswap.app.data.local.CachedMaterialDao
-import com.campusswap.app.data.local.CachedMaterialEntity
+import com.campusswap.app.model.local.CachedMaterialDao
+import com.campusswap.app.model.local.CachedMaterialEntity
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

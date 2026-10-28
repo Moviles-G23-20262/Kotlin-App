@@ -1,12 +1,12 @@
-package com.campusswap.app.data.remote
+package com.campusswap.app.model.remote
 
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
-import com.campusswap.app.data.materials.MaterialDto
-import com.campusswap.app.data.materials.MaterialSellerDto
+import com.campusswap.app.model.materials.MaterialDto
+import com.campusswap.app.model.materials.MaterialSellerDto
 
 interface ExchangesApi {
     @GET("exchanges")

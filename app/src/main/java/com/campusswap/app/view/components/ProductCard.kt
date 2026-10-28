@@ -1,4 +1,4 @@
-package com.campusswap.app.components
+package com.campusswap.app.view.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -15,9 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.data.Product
-import com.campusswap.app.ui.theme.CampusSwapTheme
-import com.campusswap.app.ui.theme.CampusType
+import com.campusswap.app.model.Product
+import com.campusswap.app.view.theme.CampusSwapTheme
+import com.campusswap.app.view.theme.CampusType
 
 @Composable
 fun ProductCard(

@@ -1,7 +1,7 @@
-package com.campusswap.app.data.notifications
+package com.campusswap.app.model.notifications
 
-import com.campusswap.app.data.AppNotification
-import com.campusswap.app.data.NotificationKind
+import com.campusswap.app.model.AppNotification
+import com.campusswap.app.model.NotificationKind
 
 fun NotificationDto.toAppNotification(): AppNotification {
     val isMatch = type == "SMART_MATCH"

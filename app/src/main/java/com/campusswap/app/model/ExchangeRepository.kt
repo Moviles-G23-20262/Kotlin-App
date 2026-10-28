@@ -1,8 +1,8 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.ExchangeRemoteDataSource
-import com.campusswap.app.domain.ExchangeTarget
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.remote.ExchangeRemoteDataSource
+import com.campusswap.app.model.domain.ExchangeTarget
+import com.campusswap.app.model.domain.GeoPoint
 import retrofit2.HttpException
 import java.io.IOException
 

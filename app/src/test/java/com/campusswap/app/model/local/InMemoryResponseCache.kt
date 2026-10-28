@@ -1,4 +1,4 @@
-package com.campusswap.app.data.local
+package com.campusswap.app.model.local
 
 /** [ResponseCache] that lives in a map, like Room would between two app runs. */
 class InMemoryResponseCache(var now: Long = 1_000L) : ResponseCache {

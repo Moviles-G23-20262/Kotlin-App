@@ -1,14 +1,14 @@
-package com.campusswap.app.data.alerts
+package com.campusswap.app.model.alerts
 
-import com.campusswap.app.data.Category
-import com.campusswap.app.data.Condition
-import com.campusswap.app.data.Course
-import com.campusswap.app.data.SmartAlert
-import com.campusswap.app.data.local.ResponseCache
-import com.campusswap.app.data.local.load
-import com.campusswap.app.data.local.save
-import com.campusswap.app.data.materials.toAppCategory
-import com.campusswap.app.data.materials.toServerCategory
+import com.campusswap.app.model.Category
+import com.campusswap.app.model.Condition
+import com.campusswap.app.model.Course
+import com.campusswap.app.model.SmartAlert
+import com.campusswap.app.model.local.ResponseCache
+import com.campusswap.app.model.local.load
+import com.campusswap.app.model.local.save
+import com.campusswap.app.model.materials.toAppCategory
+import com.campusswap.app.model.materials.toServerCategory
 import kotlinx.coroutines.CancellationException
 
 /** [isLive] is false when the server couldn't be reached and the alerts are the copy saved on the phone. */

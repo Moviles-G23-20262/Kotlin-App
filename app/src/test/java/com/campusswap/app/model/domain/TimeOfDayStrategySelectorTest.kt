@@ -1,4 +1,4 @@
-package com.campusswap.app.domain
+package com.campusswap.app.model.domain
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

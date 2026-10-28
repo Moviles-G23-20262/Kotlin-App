@@ -1,6 +1,6 @@
-package com.campusswap.app.analytics
+package com.campusswap.app.model.analytics
 
-import com.campusswap.app.data.remote.AnalyticsEventsApi
+import com.campusswap.app.model.remote.AnalyticsEventsApi
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException

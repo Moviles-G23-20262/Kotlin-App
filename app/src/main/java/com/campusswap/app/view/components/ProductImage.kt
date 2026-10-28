@@ -1,4 +1,4 @@
-package com.campusswap.app.components
+package com.campusswap.app.view.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -27,8 +27,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.data.Category
-import com.campusswap.app.ui.theme.CampusSwapTheme
+import com.campusswap.app.model.Category
+import com.campusswap.app.view.theme.CampusSwapTheme
 
 fun categoryIcon(category: Category): ImageVector = when (category) {
     Category.ALL -> Icons.Outlined.Apps

@@ -1,14 +1,14 @@
-package com.campusswap.app.screens.rating
+package com.campusswap.app.viewmodel
 
-import com.campusswap.app.data.ExchangeRepository
+import com.campusswap.app.model.ExchangeRepository
 import kotlinx.coroutines.flow.MutableStateFlow
-import com.campusswap.app.data.local.PendingActionEntity
-import com.campusswap.app.data.FakeExchangeRemoteDataSource
-import com.campusswap.app.data.location.LocationDataSource
-import com.campusswap.app.data.location.LocationResult
-import com.campusswap.app.domain.ExchangeTarget
-import com.campusswap.app.domain.GeoPoint
-import com.campusswap.app.domain.north
+import com.campusswap.app.model.local.PendingActionEntity
+import com.campusswap.app.model.FakeExchangeRemoteDataSource
+import com.campusswap.app.model.location.LocationDataSource
+import com.campusswap.app.model.location.LocationResult
+import com.campusswap.app.model.domain.ExchangeTarget
+import com.campusswap.app.model.domain.GeoPoint
+import com.campusswap.app.model.domain.north
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

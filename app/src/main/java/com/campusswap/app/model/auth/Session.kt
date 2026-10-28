@@ -1,4 +1,4 @@
-package com.campusswap.app.data.auth
+package com.campusswap.app.model.auth
 
 data class Session(
     val token: String,

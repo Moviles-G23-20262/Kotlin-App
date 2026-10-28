@@ -1,6 +1,6 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.domain.GeoPoint
 import java.time.Instant
 
 enum class Condition(val label: String) {

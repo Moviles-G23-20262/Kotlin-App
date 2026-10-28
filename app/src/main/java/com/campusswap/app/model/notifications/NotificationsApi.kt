@@ -1,4 +1,4 @@
-package com.campusswap.app.data.notifications
+package com.campusswap.app.model.notifications
 
 import retrofit2.http.GET
 import retrofit2.http.POST

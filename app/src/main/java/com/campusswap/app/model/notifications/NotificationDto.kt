@@ -1,4 +1,4 @@
-package com.campusswap.app.data.notifications
+package com.campusswap.app.model.notifications
 
 data class NotificationDto(
     val id: String,

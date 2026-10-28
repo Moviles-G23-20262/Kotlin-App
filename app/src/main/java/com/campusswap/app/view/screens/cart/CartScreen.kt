@@ -1,6 +1,6 @@
-package com.campusswap.app.screens.cart
+package com.campusswap.app.view.screens.cart
 
-import com.campusswap.app.domain.InputLimits
+import com.campusswap.app.model.domain.InputLimits
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -25,25 +25,25 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.components.BackHeader
-import com.campusswap.app.components.Badge
-import com.campusswap.app.components.BodyText
-import com.campusswap.app.components.BottomActionBar
-import com.campusswap.app.components.CampusIcons
-import com.campusswap.app.components.EmptyState
-import com.campusswap.app.components.OfflineBanner
-import com.campusswap.app.components.HeadingText
-import com.campusswap.app.components.MonoText
-import com.campusswap.app.components.PriceText
-import com.campusswap.app.components.PrimaryButton
-import com.campusswap.app.components.ProductRowCard
-import com.campusswap.app.components.campusCard
-import com.campusswap.app.components.formatPrice
-import com.campusswap.app.components.plainClickable
-import com.campusswap.app.data.AppViewModel
-import com.campusswap.app.data.CartLine
-import com.campusswap.app.ui.theme.CampusSwapTheme
-import com.campusswap.app.ui.theme.CampusType
+import com.campusswap.app.view.components.BackHeader
+import com.campusswap.app.view.components.Badge
+import com.campusswap.app.view.components.BodyText
+import com.campusswap.app.view.components.BottomActionBar
+import com.campusswap.app.view.components.CampusIcons
+import com.campusswap.app.view.components.EmptyState
+import com.campusswap.app.view.components.OfflineBanner
+import com.campusswap.app.view.components.HeadingText
+import com.campusswap.app.view.components.MonoText
+import com.campusswap.app.view.components.PriceText
+import com.campusswap.app.view.components.PrimaryButton
+import com.campusswap.app.view.components.ProductRowCard
+import com.campusswap.app.view.components.campusCard
+import com.campusswap.app.view.components.formatPrice
+import com.campusswap.app.view.components.plainClickable
+import com.campusswap.app.viewmodel.AppViewModel
+import com.campusswap.app.model.CartLine
+import com.campusswap.app.view.theme.CampusSwapTheme
+import com.campusswap.app.view.theme.CampusType
 
 @Composable
 fun CartScreen(

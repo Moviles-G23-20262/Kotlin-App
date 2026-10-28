@@ -1,4 +1,4 @@
-package com.campusswap.app.data.sync
+package com.campusswap.app.model.sync
 
 import android.content.Context
 import androidx.work.BackoffPolicy
@@ -10,7 +10,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.campusswap.app.CampusSwapApplication
-import com.campusswap.app.data.auth.SessionState
+import com.campusswap.app.model.auth.SessionState
 import kotlinx.coroutines.flow.first
 import java.util.concurrent.TimeUnit
 

@@ -1,9 +1,9 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.CreateMeetingProposalRequest
-import com.campusswap.app.data.remote.MeetingProposalDto
-import com.campusswap.app.data.remote.MeetingProposalRemoteDataSource
-import com.campusswap.app.data.remote.SlotSuggestionsDto
+import com.campusswap.app.model.remote.CreateMeetingProposalRequest
+import com.campusswap.app.model.remote.MeetingProposalDto
+import com.campusswap.app.model.remote.MeetingProposalRemoteDataSource
+import com.campusswap.app.model.remote.SlotSuggestionsDto
 
 class FakeMeetingProposalRemoteDataSource : MeetingProposalRemoteDataSource {
     var suggestions = SlotSuggestionsDto(emptyList(), null)

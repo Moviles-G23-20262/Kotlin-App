@@ -1,7 +1,7 @@
-package com.campusswap.app.analytics
+package com.campusswap.app.model.analytics
 
-import com.campusswap.app.data.SeedIds
-import com.campusswap.app.data.remote.AnalyticsEventRequest
+import com.campusswap.app.model.SeedIds
+import com.campusswap.app.model.remote.AnalyticsEventRequest
 import java.time.Instant
 
 object BackendEventMapper {

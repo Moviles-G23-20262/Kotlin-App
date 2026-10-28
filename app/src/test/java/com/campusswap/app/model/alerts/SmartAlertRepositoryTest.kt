@@ -1,9 +1,9 @@
-package com.campusswap.app.data.alerts
+package com.campusswap.app.model.alerts
 
-import com.campusswap.app.data.Category
-import com.campusswap.app.data.Condition
-import com.campusswap.app.data.SmartAlert
-import com.campusswap.app.data.local.InMemoryResponseCache
+import com.campusswap.app.model.Category
+import com.campusswap.app.model.Condition
+import com.campusswap.app.model.SmartAlert
+import com.campusswap.app.model.local.InMemoryResponseCache
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

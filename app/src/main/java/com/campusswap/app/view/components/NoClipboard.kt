@@ -1,4 +1,4 @@
-package com.campusswap.app.components
+package com.campusswap.app.view.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider

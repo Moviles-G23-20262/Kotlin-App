@@ -1,8 +1,8 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.ExchangeDto
-import com.campusswap.app.domain.ExchangeTarget
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.remote.ExchangeDto
+import com.campusswap.app.model.domain.ExchangeTarget
+import com.campusswap.app.model.domain.GeoPoint
 import kotlinx.coroutines.runBlocking
 import okhttp3.ResponseBody
 import org.junit.Assert.assertEquals

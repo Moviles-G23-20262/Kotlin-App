@@ -1,8 +1,8 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.materials.toProduct
-import com.campusswap.app.data.remote.ChatRoomRemoteDataSource
-import com.campusswap.app.data.remote.ChatRoomSummaryDto
+import com.campusswap.app.model.materials.toProduct
+import com.campusswap.app.model.remote.ChatRoomRemoteDataSource
+import com.campusswap.app.model.remote.ChatRoomSummaryDto
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

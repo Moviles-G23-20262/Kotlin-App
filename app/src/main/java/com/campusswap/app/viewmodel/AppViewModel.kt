@@ -1,7 +1,26 @@
-package com.campusswap.app.data
+package com.campusswap.app.viewmodel
 
-import com.campusswap.app.domain.InputLimits
-import com.campusswap.app.domain.InputValidation
+import com.campusswap.app.model.AlertMatch
+import com.campusswap.app.model.AppNotification
+import com.campusswap.app.model.CartLine
+import com.campusswap.app.model.Category
+import com.campusswap.app.model.Condition
+import com.campusswap.app.model.Course
+import com.campusswap.app.model.FeedbackTag
+import com.campusswap.app.model.MeetingProposal
+import com.campusswap.app.model.NotificationKind
+import com.campusswap.app.model.Order
+import com.campusswap.app.model.PendingExchange
+import com.campusswap.app.model.PendingSync
+import com.campusswap.app.model.Product
+import com.campusswap.app.model.ProposalStatus
+import com.campusswap.app.model.SampleData
+import com.campusswap.app.model.SellDraft
+import com.campusswap.app.model.Seller
+import com.campusswap.app.model.SmartAlert
+import com.campusswap.app.model.TransactionRating
+import com.campusswap.app.model.domain.InputLimits
+import com.campusswap.app.model.domain.InputValidation
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -10,39 +29,39 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.campusswap.app.analytics.Analytics
-import com.campusswap.app.analytics.Events
+import com.campusswap.app.model.analytics.Analytics
+import com.campusswap.app.model.analytics.Events
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import com.campusswap.app.data.alerts.SmartAlertRepository
-import com.campusswap.app.data.notifications.NotificationRepository
-import com.campusswap.app.data.materials.MaterialRepository
-import com.campusswap.app.data.connectivity.ConnectivityObserver
-import com.campusswap.app.data.local.PendingActionEntity
-import com.campusswap.app.data.local.PendingListingEntity
-import com.campusswap.app.data.local.PendingMessageEntity
-import com.campusswap.app.data.sync.OutboxRepository
-import com.campusswap.app.data.sync.PendingActionKind
-import com.campusswap.app.data.sync.RatingPayload
-import com.campusswap.app.data.sync.WISHLIST_KINDS
-import com.campusswap.app.data.sync.payloadAs
-import com.campusswap.app.data.ratings.RatingRepository
-import com.campusswap.app.data.ratings.RatingResult
-import com.campusswap.app.data.auth.Session
-import com.campusswap.app.data.materials.maskEmail
-import com.campusswap.app.data.wishlist.WishlistRepository
-import com.campusswap.app.data.wishlist.WishlistResult
-import com.campusswap.app.data.orders.OrderRepository
-import com.campusswap.app.data.orders.PlaceOrderResult
-import com.campusswap.app.data.ratings.RatingDto
-import com.campusswap.app.data.orders.Sale
+import com.campusswap.app.model.alerts.SmartAlertRepository
+import com.campusswap.app.model.notifications.NotificationRepository
+import com.campusswap.app.model.materials.MaterialRepository
+import com.campusswap.app.model.connectivity.ConnectivityObserver
+import com.campusswap.app.model.local.PendingActionEntity
+import com.campusswap.app.model.local.PendingListingEntity
+import com.campusswap.app.model.local.PendingMessageEntity
+import com.campusswap.app.model.sync.OutboxRepository
+import com.campusswap.app.model.sync.PendingActionKind
+import com.campusswap.app.model.sync.RatingPayload
+import com.campusswap.app.model.sync.WISHLIST_KINDS
+import com.campusswap.app.model.sync.payloadAs
+import com.campusswap.app.model.ratings.RatingRepository
+import com.campusswap.app.model.ratings.RatingResult
+import com.campusswap.app.model.auth.Session
+import com.campusswap.app.model.materials.maskEmail
+import com.campusswap.app.model.wishlist.WishlistRepository
+import com.campusswap.app.model.wishlist.WishlistResult
+import com.campusswap.app.model.orders.OrderRepository
+import com.campusswap.app.model.orders.PlaceOrderResult
+import com.campusswap.app.model.ratings.RatingDto
+import com.campusswap.app.model.orders.Sale
 import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
 import androidx.compose.runtime.snapshotFlow
-import com.campusswap.app.data.local.CartStore
+import com.campusswap.app.model.local.CartStore
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -909,29 +928,3 @@ const val DEMO_USERNAME = "uwu"
 const val DEMO_PASSWORD = "uwu123"
 const val SERVICE_FEE = 2000.0
 const val HOME_DELIVERY_FEE = 10000.0
-
-data class SellDraft(
-    /** Rutas de las fotos guardadas por ListingPhotoStore*/
-    val photoPaths: List<String> = emptyList(),
-    val title: String = "",
-    val description: String = "",
-    val category: Category = Category.TEXTBOOKS,
-    val price: String = "",
-    val course: Course? = null,
-    val notAssociatedWithCourse: Boolean = false,
-    val condition: Condition? = null,
-) {
-    val photoCount: Int get() = photoPaths.size
-    val isProductInfoValid: Boolean
-        get() = photoCount > 0 &&
-            InputValidation.titleError(title) == null &&
-            InputValidation.descriptionError(description) == null &&
-            InputValidation.priceError(price) == null
-
-    val isDirty: Boolean
-        get() = title.isNotBlank() || description.isNotBlank() || photoCount > 0 ||
-            course != null || condition != null || price.isNotBlank()
-
-    val isCourseConditionValid: Boolean
-        get() = (notAssociatedWithCourse || course != null) && condition != null
-}

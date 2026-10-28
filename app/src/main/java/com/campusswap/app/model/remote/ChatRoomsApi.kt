@@ -1,6 +1,6 @@
-package com.campusswap.app.data.remote
+package com.campusswap.app.model.remote
 
-import com.campusswap.app.data.materials.MaterialDto
+import com.campusswap.app.model.materials.MaterialDto
 import com.google.gson.annotations.SerializedName
 import retrofit2.http.Body
 import retrofit2.http.GET

@@ -1,14 +1,14 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.local.InMemoryResponseCache
-import com.campusswap.app.data.materials.MaterialDto
-import com.campusswap.app.data.notifications.MaterialSummaryDto
-import com.campusswap.app.data.notifications.NotificationDto
-import com.campusswap.app.data.notifications.NotificationRemoteDataSource
-import com.campusswap.app.data.notifications.NotificationRepository
-import com.campusswap.app.data.wishlist.WishlistItemDto
-import com.campusswap.app.data.wishlist.WishlistRemoteDataSource
-import com.campusswap.app.data.wishlist.WishlistRepository
+import com.campusswap.app.model.local.InMemoryResponseCache
+import com.campusswap.app.model.materials.MaterialDto
+import com.campusswap.app.model.notifications.MaterialSummaryDto
+import com.campusswap.app.model.notifications.NotificationDto
+import com.campusswap.app.model.notifications.NotificationRemoteDataSource
+import com.campusswap.app.model.notifications.NotificationRepository
+import com.campusswap.app.model.wishlist.WishlistItemDto
+import com.campusswap.app.model.wishlist.WishlistRemoteDataSource
+import com.campusswap.app.model.wishlist.WishlistRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

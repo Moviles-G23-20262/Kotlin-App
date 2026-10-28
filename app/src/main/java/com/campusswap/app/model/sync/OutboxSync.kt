@@ -1,15 +1,15 @@
-package com.campusswap.app.data.sync
+package com.campusswap.app.model.sync
 
-import com.campusswap.app.data.Category
-import com.campusswap.app.data.Condition
-import com.campusswap.app.data.ChatRoomRepository
-import com.campusswap.app.data.remote.MessageRemoteDataSource
-import com.campusswap.app.data.materials.toServerCategory
-import com.campusswap.app.data.materials.toServerCondition
-import com.campusswap.app.data.local.OutboxDao
-import com.campusswap.app.data.local.PendingListingEntity
-import com.campusswap.app.data.materials.CreateMaterialRequest
-import com.campusswap.app.data.materials.MaterialRemoteDataSource
+import com.campusswap.app.model.Category
+import com.campusswap.app.model.Condition
+import com.campusswap.app.model.ChatRoomRepository
+import com.campusswap.app.model.remote.MessageRemoteDataSource
+import com.campusswap.app.model.materials.toServerCategory
+import com.campusswap.app.model.materials.toServerCondition
+import com.campusswap.app.model.local.OutboxDao
+import com.campusswap.app.model.local.PendingListingEntity
+import com.campusswap.app.model.materials.CreateMaterialRequest
+import com.campusswap.app.model.materials.MaterialRemoteDataSource
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException

@@ -1,7 +1,7 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.MeetingPointDto
-import com.campusswap.app.data.remote.MeetingPointRemoteDataSource
+import com.campusswap.app.model.remote.MeetingPointDto
+import com.campusswap.app.model.remote.MeetingPointRemoteDataSource
 
 class FakeMeetingPointRemoteDataSource(var points: List<MeetingPointDto> = emptyList()) : MeetingPointRemoteDataSource {
     var failure: Exception? = null

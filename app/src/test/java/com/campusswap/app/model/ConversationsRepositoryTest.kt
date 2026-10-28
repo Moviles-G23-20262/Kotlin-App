@@ -1,11 +1,11 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.materials.MaterialDto
-import com.campusswap.app.data.local.InMemoryResponseCache
-import com.campusswap.app.data.remote.ChatPartyDto
-import com.campusswap.app.data.remote.ChatRoomSummaryDto
-import com.campusswap.app.data.remote.MessageDto
-import com.campusswap.app.data.remote.UnreadCountDto
+import com.campusswap.app.model.materials.MaterialDto
+import com.campusswap.app.model.local.InMemoryResponseCache
+import com.campusswap.app.model.remote.ChatPartyDto
+import com.campusswap.app.model.remote.ChatRoomSummaryDto
+import com.campusswap.app.model.remote.MessageDto
+import com.campusswap.app.model.remote.UnreadCountDto
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

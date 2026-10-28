@@ -1,4 +1,4 @@
-package com.campusswap.app.data.remote
+package com.campusswap.app.model.remote
 
 import okhttp3.OkHttpClient
 import okhttp3.Request

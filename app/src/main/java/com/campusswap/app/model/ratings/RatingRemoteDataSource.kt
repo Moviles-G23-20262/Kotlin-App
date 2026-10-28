@@ -1,10 +1,10 @@
-package com.campusswap.app.data.ratings
+package com.campusswap.app.model.ratings
 
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Query
-import com.campusswap.app.data.materials.MaterialSellerDto
+import com.campusswap.app.model.materials.MaterialSellerDto
 
 data class CreateRatingRequest(
     val exchangeId: String,

@@ -1,4 +1,4 @@
-package com.campusswap.app.data.local
+package com.campusswap.app.model.local
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

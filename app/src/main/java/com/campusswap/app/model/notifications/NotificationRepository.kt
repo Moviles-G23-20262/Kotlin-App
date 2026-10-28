@@ -1,9 +1,9 @@
-package com.campusswap.app.data.notifications
+package com.campusswap.app.model.notifications
 
-import com.campusswap.app.data.AppNotification
-import com.campusswap.app.data.local.ResponseCache
-import com.campusswap.app.data.local.load
-import com.campusswap.app.data.local.save
+import com.campusswap.app.model.AppNotification
+import com.campusswap.app.model.local.ResponseCache
+import com.campusswap.app.model.local.load
+import com.campusswap.app.model.local.save
 import kotlinx.coroutines.CancellationException
 import java.time.Clock
 import java.time.Instant

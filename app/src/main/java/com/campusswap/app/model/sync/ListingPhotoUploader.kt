@@ -1,7 +1,7 @@
-package com.campusswap.app.data.sync
+package com.campusswap.app.model.sync
 
-import com.campusswap.app.data.local.ListingPhotoStore
-import com.campusswap.app.data.remote.UploadRemoteDataSource
+import com.campusswap.app.model.local.ListingPhotoStore
+import com.campusswap.app.model.remote.UploadRemoteDataSource
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope

@@ -1,17 +1,17 @@
-package com.campusswap.app.data.sync
+package com.campusswap.app.model.sync
 
-import com.campusswap.app.data.Condition
-import com.campusswap.app.data.MeetingPoint
-import com.campusswap.app.data.SellDraft
-import com.campusswap.app.data.TimeSlot
-import com.campusswap.app.data.TransactionRating
-import com.campusswap.app.data.local.OutboxDao
-import com.campusswap.app.data.local.PendingActionEntity
-import com.campusswap.app.data.local.PendingListingEntity
-import com.campusswap.app.data.local.PendingMessageEntity
-import com.campusswap.app.data.local.cacheGson
-import com.campusswap.app.domain.ExchangeTarget
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.Condition
+import com.campusswap.app.model.MeetingPoint
+import com.campusswap.app.model.SellDraft
+import com.campusswap.app.model.TimeSlot
+import com.campusswap.app.model.TransactionRating
+import com.campusswap.app.model.local.OutboxDao
+import com.campusswap.app.model.local.PendingActionEntity
+import com.campusswap.app.model.local.PendingListingEntity
+import com.campusswap.app.model.local.PendingMessageEntity
+import com.campusswap.app.model.local.cacheGson
+import com.campusswap.app.model.domain.ExchangeTarget
+import com.campusswap.app.model.domain.GeoPoint
 import kotlinx.coroutines.flow.Flow
 import java.time.Clock
 

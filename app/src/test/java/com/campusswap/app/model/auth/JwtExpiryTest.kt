@@ -1,4 +1,4 @@
-package com.campusswap.app.data.auth
+package com.campusswap.app.model.auth
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

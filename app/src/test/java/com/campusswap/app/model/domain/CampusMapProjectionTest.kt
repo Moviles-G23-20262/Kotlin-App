@@ -1,10 +1,10 @@
-package com.campusswap.app.screens.meeting
+package com.campusswap.app.model.domain
 
-import com.campusswap.app.domain.GeoPoint
-import com.campusswap.app.screens.meeting.CampusMapProjection.Companion.MAX_LAT
-import com.campusswap.app.screens.meeting.CampusMapProjection.Companion.MAX_LNG
-import com.campusswap.app.screens.meeting.CampusMapProjection.Companion.MIN_LAT
-import com.campusswap.app.screens.meeting.CampusMapProjection.Companion.MIN_LNG
+import com.campusswap.app.model.domain.GeoPoint
+import com.campusswap.app.model.domain.CampusMapProjection.Companion.MAX_LAT
+import com.campusswap.app.model.domain.CampusMapProjection.Companion.MAX_LNG
+import com.campusswap.app.model.domain.CampusMapProjection.Companion.MIN_LAT
+import com.campusswap.app.model.domain.CampusMapProjection.Companion.MIN_LNG
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

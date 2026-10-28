@@ -1,12 +1,12 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.FakeMessageRemoteDataSource.Companion.ME
-import com.campusswap.app.data.local.InMemoryResponseCache
-import com.campusswap.app.data.FakeMessageRemoteDataSource.Companion.OTHER
-import com.campusswap.app.data.remote.MeetingPointDto
-import com.campusswap.app.data.remote.MeetingProposalDto
-import com.campusswap.app.data.remote.ChatRoomSummaryDto
-import com.campusswap.app.data.remote.MessageDto
+import com.campusswap.app.model.FakeMessageRemoteDataSource.Companion.ME
+import com.campusswap.app.model.local.InMemoryResponseCache
+import com.campusswap.app.model.FakeMessageRemoteDataSource.Companion.OTHER
+import com.campusswap.app.model.remote.MeetingPointDto
+import com.campusswap.app.model.remote.MeetingProposalDto
+import com.campusswap.app.model.remote.ChatRoomSummaryDto
+import com.campusswap.app.model.remote.MessageDto
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

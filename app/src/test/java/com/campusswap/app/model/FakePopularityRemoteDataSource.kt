@@ -1,7 +1,7 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.MeetingPointUsageResponse
-import com.campusswap.app.data.remote.PopularityRemoteDataSource
+import com.campusswap.app.model.remote.MeetingPointUsageResponse
+import com.campusswap.app.model.remote.PopularityRemoteDataSource
 
 class FakePopularityRemoteDataSource(var response: MeetingPointUsageResponse = MeetingPointUsageResponse(true, emptyList())) :
     PopularityRemoteDataSource {

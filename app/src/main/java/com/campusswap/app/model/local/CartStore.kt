@@ -1,10 +1,10 @@
-package com.campusswap.app.data.local
+package com.campusswap.app.model.local
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.campusswap.app.data.CartLine
+import com.campusswap.app.model.CartLine
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.flow.first

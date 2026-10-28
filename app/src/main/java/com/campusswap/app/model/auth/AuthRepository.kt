@@ -1,7 +1,7 @@
-package com.campusswap.app.data.auth
+package com.campusswap.app.model.auth
 
-import com.campusswap.app.data.remote.AuthRemoteDataSource
-import com.campusswap.app.data.remote.RegisterRequest
+import com.campusswap.app.model.remote.AuthRemoteDataSource
+import com.campusswap.app.model.remote.RegisterRequest
 import com.google.gson.JsonParser
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException

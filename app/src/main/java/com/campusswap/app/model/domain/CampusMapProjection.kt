@@ -1,6 +1,6 @@
-package com.campusswap.app.screens.meeting
+package com.campusswap.app.model.domain
 
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.domain.GeoPoint
 import kotlin.math.cos
 
 data class MapPosition(val x: Float, val y: Float)

@@ -1,12 +1,12 @@
-package com.campusswap.app.data.wishlist
+package com.campusswap.app.model.wishlist
 
-import com.campusswap.app.data.Product
-import com.campusswap.app.data.SeedIds
-import com.campusswap.app.data.local.ResponseCache
-import com.campusswap.app.data.local.load
-import com.campusswap.app.data.local.save
-import com.campusswap.app.data.materials.toProduct
-import com.campusswap.app.data.sync.isRetryable
+import com.campusswap.app.model.Product
+import com.campusswap.app.model.SeedIds
+import com.campusswap.app.model.local.ResponseCache
+import com.campusswap.app.model.local.load
+import com.campusswap.app.model.local.save
+import com.campusswap.app.model.materials.toProduct
+import com.campusswap.app.model.sync.isRetryable
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException

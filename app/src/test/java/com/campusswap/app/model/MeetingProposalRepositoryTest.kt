@@ -1,13 +1,13 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.FreeSlotDto
+import com.campusswap.app.model.remote.FreeSlotDto
 import java.time.ZoneOffset
 import java.time.Clock
-import com.campusswap.app.data.local.InMemoryResponseCache
-import com.campusswap.app.data.remote.MeetingPointDto
-import com.campusswap.app.data.remote.MeetingProposalDto
-import com.campusswap.app.data.remote.SlotSuggestionsDto
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.local.InMemoryResponseCache
+import com.campusswap.app.model.remote.MeetingPointDto
+import com.campusswap.app.model.remote.MeetingProposalDto
+import com.campusswap.app.model.remote.SlotSuggestionsDto
+import com.campusswap.app.model.domain.GeoPoint
 import kotlinx.coroutines.runBlocking
 import okhttp3.MediaType
 import okhttp3.ResponseBody

@@ -1,4 +1,4 @@
-package com.campusswap.app.screens.auth
+package com.campusswap.app.view.screens.auth
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -46,13 +46,13 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.campusswap.app.CampusSwapApplication
-import com.campusswap.app.components.NoClipboard
-import com.campusswap.app.components.typedOnly
-import com.campusswap.app.data.auth.RegisterResult
-import com.campusswap.app.domain.InputLimits
-import com.campusswap.app.domain.InputValidation
-import com.campusswap.app.ui.theme.AccentBlue
-import com.campusswap.app.ui.theme.ErrorRed
+import com.campusswap.app.view.components.NoClipboard
+import com.campusswap.app.view.components.typedOnly
+import com.campusswap.app.model.auth.RegisterResult
+import com.campusswap.app.model.domain.InputLimits
+import com.campusswap.app.model.domain.InputValidation
+import com.campusswap.app.view.theme.AccentBlue
+import com.campusswap.app.view.theme.ErrorRed
 import kotlinx.coroutines.launch
 
 @Composable

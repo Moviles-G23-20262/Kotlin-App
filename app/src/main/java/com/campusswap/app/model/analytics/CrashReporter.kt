@@ -1,4 +1,4 @@
-package com.campusswap.app.analytics
+package com.campusswap.app.model.analytics
 
 /** Records uncaught exceptions synchronously to the event store, then defers to the system handler. */
 object CrashReporter {

@@ -1,4 +1,4 @@
-package com.campusswap.app.data.remote
+package com.campusswap.app.model.remote
 
 interface PopularityRemoteDataSource {
     suspend fun usageAt(hour: Int): MeetingPointUsageResponse

@@ -1,7 +1,7 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.MeetingPointUsageDto
-import com.campusswap.app.data.remote.MeetingPointUsageResponse
+import com.campusswap.app.model.remote.MeetingPointUsageDto
+import com.campusswap.app.model.remote.MeetingPointUsageResponse
 import com.google.gson.JsonSyntaxException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals

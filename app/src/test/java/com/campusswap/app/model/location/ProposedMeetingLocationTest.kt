@@ -1,12 +1,12 @@
-package com.campusswap.app.data.location
+package com.campusswap.app.model.location
 
-import com.campusswap.app.data.ChatRoomRepository
-import com.campusswap.app.data.FakeChatRoomRemoteDataSource
-import com.campusswap.app.data.FakeMeetingProposalRemoteDataSource
-import com.campusswap.app.data.MeetingProposalRepository
-import com.campusswap.app.data.remote.MeetingPointDto
-import com.campusswap.app.data.remote.MeetingProposalDto
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.ChatRoomRepository
+import com.campusswap.app.model.FakeChatRoomRemoteDataSource
+import com.campusswap.app.model.FakeMeetingProposalRemoteDataSource
+import com.campusswap.app.model.MeetingProposalRepository
+import com.campusswap.app.model.remote.MeetingPointDto
+import com.campusswap.app.model.remote.MeetingProposalDto
+import com.campusswap.app.model.domain.GeoPoint
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

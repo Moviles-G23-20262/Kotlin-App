@@ -1,4 +1,4 @@
-package com.campusswap.app.data.auth
+package com.campusswap.app.model.auth
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher

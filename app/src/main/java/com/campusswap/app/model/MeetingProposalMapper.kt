@@ -1,7 +1,7 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.FreeSlotDto
-import com.campusswap.app.data.remote.MeetingProposalDto
+import com.campusswap.app.model.remote.FreeSlotDto
+import com.campusswap.app.model.remote.MeetingProposalDto
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter

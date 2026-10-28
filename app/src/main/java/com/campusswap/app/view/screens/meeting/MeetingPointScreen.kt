@@ -1,5 +1,11 @@
-package com.campusswap.app.screens.meeting
+package com.campusswap.app.view.screens.meeting
 
+import com.campusswap.app.model.domain.CampusMapProjection
+import com.campusswap.app.model.domain.MapPosition
+import com.campusswap.app.viewmodel.MeetingPointUiState
+import com.campusswap.app.viewmodel.MeetingPointViewModel
+import com.campusswap.app.viewmodel.MyLocationStatus
+import com.campusswap.app.viewmodel.RankedPoint
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -76,26 +82,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.CampusSwapApplication
-import com.campusswap.app.components.EmptyState
-import com.campusswap.app.data.AppViewModel
-import com.campusswap.app.data.MeetingZoneType
-import com.campusswap.app.data.TimeSlot
-import com.campusswap.app.domain.RankingMode
-import com.campusswap.app.domain.TimeOfDayStrategySelector
-import com.campusswap.app.ui.theme.AccentBlue
-import com.campusswap.app.ui.theme.CampusBlockLabel
-import com.campusswap.app.ui.theme.CampusBuildingEdge
-import com.campusswap.app.ui.theme.CampusBuildingFill
-import com.campusswap.app.ui.theme.CampusGreen
-import com.campusswap.app.ui.theme.CampusLand
-import com.campusswap.app.ui.theme.CampusPath
-import com.campusswap.app.ui.theme.CampusRoadLine
-import com.campusswap.app.ui.theme.CampusWater
-import com.campusswap.app.ui.theme.JetBrainsMonoFamily
-import com.campusswap.app.ui.theme.PrimaryBlue
-import com.campusswap.app.ui.theme.SecondaryBlue
-import com.campusswap.app.ui.theme.SuccessGreen
-import com.campusswap.app.ui.theme.WarningAmber
+import com.campusswap.app.view.components.EmptyState
+import com.campusswap.app.viewmodel.AppViewModel
+import com.campusswap.app.model.MeetingZoneType
+import com.campusswap.app.model.TimeSlot
+import com.campusswap.app.model.domain.RankingMode
+import com.campusswap.app.model.domain.TimeOfDayStrategySelector
+import com.campusswap.app.view.theme.AccentBlue
+import com.campusswap.app.view.theme.CampusBlockLabel
+import com.campusswap.app.view.theme.CampusBuildingEdge
+import com.campusswap.app.view.theme.CampusBuildingFill
+import com.campusswap.app.view.theme.CampusGreen
+import com.campusswap.app.view.theme.CampusLand
+import com.campusswap.app.view.theme.CampusPath
+import com.campusswap.app.view.theme.CampusRoadLine
+import com.campusswap.app.view.theme.CampusWater
+import com.campusswap.app.view.theme.JetBrainsMonoFamily
+import com.campusswap.app.view.theme.PrimaryBlue
+import com.campusswap.app.view.theme.SecondaryBlue
+import com.campusswap.app.view.theme.SuccessGreen
+import com.campusswap.app.view.theme.WarningAmber
 
 /**
  * View 10 — Dynamic Safe Meeting Point (Campus Guardian CAS).

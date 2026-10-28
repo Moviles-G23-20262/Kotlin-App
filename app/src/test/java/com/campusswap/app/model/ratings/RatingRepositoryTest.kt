@@ -1,4 +1,4 @@
-package com.campusswap.app.data.ratings
+package com.campusswap.app.model.ratings
 
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals

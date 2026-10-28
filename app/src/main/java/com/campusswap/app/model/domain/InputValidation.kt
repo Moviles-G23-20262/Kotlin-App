@@ -1,4 +1,4 @@
-package com.campusswap.app.domain
+package com.campusswap.app.model.domain
 
 import java.text.NumberFormat
 import java.util.Locale

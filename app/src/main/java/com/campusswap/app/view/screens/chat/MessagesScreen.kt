@@ -1,5 +1,6 @@
-package com.campusswap.app.screens.chat
+package com.campusswap.app.view.screens.chat
 
+import com.campusswap.app.viewmodel.ConversationsViewModel
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,18 +28,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.CampusSwapApplication
-import com.campusswap.app.components.BackHeader
-import com.campusswap.app.components.BodyText
-import com.campusswap.app.components.CampusIcons
-import com.campusswap.app.components.EmptyState
-import com.campusswap.app.components.HeadingText
-import com.campusswap.app.components.OfflineBanner
-import com.campusswap.app.components.campusCard
-import com.campusswap.app.components.plainClickable
-import com.campusswap.app.components.timeAgo
-import com.campusswap.app.data.Conversation
-import com.campusswap.app.ui.theme.CampusSwapTheme
-import com.campusswap.app.ui.theme.CampusType
+import com.campusswap.app.view.components.BackHeader
+import com.campusswap.app.view.components.BodyText
+import com.campusswap.app.view.components.CampusIcons
+import com.campusswap.app.view.components.EmptyState
+import com.campusswap.app.view.components.HeadingText
+import com.campusswap.app.view.components.OfflineBanner
+import com.campusswap.app.view.components.campusCard
+import com.campusswap.app.view.components.plainClickable
+import com.campusswap.app.view.components.timeAgo
+import com.campusswap.app.model.Conversation
+import com.campusswap.app.view.theme.CampusSwapTheme
+import com.campusswap.app.view.theme.CampusType
 
 @Composable
 fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String, String) -> Unit) {

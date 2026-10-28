@@ -1,8 +1,8 @@
-package com.campusswap.app.screens.meeting
+package com.campusswap.app.view.screens.meeting
 
 import android.content.Context
 import com.campusswap.app.R
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.domain.GeoPoint
 import org.json.JSONArray
 import org.json.JSONObject
 

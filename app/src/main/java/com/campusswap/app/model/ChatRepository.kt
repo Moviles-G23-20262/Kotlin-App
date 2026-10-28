@@ -1,11 +1,11 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.local.ResponseCache
-import com.campusswap.app.data.local.load
-import com.campusswap.app.data.local.save
-import com.campusswap.app.data.remote.ApiErrors
-import com.campusswap.app.data.remote.MessageDto
-import com.campusswap.app.data.remote.MessageRemoteDataSource
+import com.campusswap.app.model.local.ResponseCache
+import com.campusswap.app.model.local.load
+import com.campusswap.app.model.local.save
+import com.campusswap.app.model.remote.ApiErrors
+import com.campusswap.app.model.remote.MessageDto
+import com.campusswap.app.model.remote.MessageRemoteDataSource
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException

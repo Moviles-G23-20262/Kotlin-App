@@ -1,5 +1,9 @@
-package com.campusswap.app.screens.rating
+package com.campusswap.app.view.screens.rating
 
+import com.campusswap.app.viewmodel.CheckInState
+import com.campusswap.app.viewmodel.ExchangeCheckInViewModel
+import com.campusswap.app.viewmodel.FailReason
+import com.campusswap.app.viewmodel.ManualReason
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -34,14 +38,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.campusswap.app.components.BodyText
-import com.campusswap.app.components.CampusIcons
-import com.campusswap.app.components.PrimaryButton
-import com.campusswap.app.components.SecondaryButton
-import com.campusswap.app.components.plainClickable
-import com.campusswap.app.domain.Proximity
-import com.campusswap.app.ui.theme.CampusSwapTheme
-import com.campusswap.app.ui.theme.CampusType
+import com.campusswap.app.view.components.BodyText
+import com.campusswap.app.view.components.CampusIcons
+import com.campusswap.app.view.components.PrimaryButton
+import com.campusswap.app.view.components.SecondaryButton
+import com.campusswap.app.view.components.plainClickable
+import com.campusswap.app.model.domain.Proximity
+import com.campusswap.app.view.theme.CampusSwapTheme
+import com.campusswap.app.view.theme.CampusType
 
 private val LOCATION_PERMISSIONS = arrayOf(
     Manifest.permission.ACCESS_FINE_LOCATION,

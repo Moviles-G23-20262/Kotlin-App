@@ -1,10 +1,10 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.local.ResponseCache
-import com.campusswap.app.data.local.load
-import com.campusswap.app.data.local.save
-import com.campusswap.app.data.remote.ChatRoomRemoteDataSource
-import com.campusswap.app.data.remote.ChatRoomSummaryDto
+import com.campusswap.app.model.local.ResponseCache
+import com.campusswap.app.model.local.load
+import com.campusswap.app.model.local.save
+import com.campusswap.app.model.remote.ChatRoomRemoteDataSource
+import com.campusswap.app.model.remote.ChatRoomSummaryDto
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException

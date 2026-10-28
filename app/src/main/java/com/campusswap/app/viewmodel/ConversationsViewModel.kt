@@ -1,13 +1,13 @@
-package com.campusswap.app.screens.chat
+package com.campusswap.app.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.campusswap.app.AppContainer
-import com.campusswap.app.data.Conversation
-import com.campusswap.app.data.ConversationsLoad
-import com.campusswap.app.data.ConversationsRepository
+import com.campusswap.app.model.Conversation
+import com.campusswap.app.model.ConversationsLoad
+import com.campusswap.app.model.ConversationsRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow

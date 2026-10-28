@@ -1,9 +1,9 @@
-package com.campusswap.app.data.location
+package com.campusswap.app.model.location
 
-import com.campusswap.app.data.MeetingProposal
-import com.campusswap.app.data.MeetingProposalRepository
-import com.campusswap.app.data.ProposalStatus
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.MeetingProposal
+import com.campusswap.app.model.MeetingProposalRepository
+import com.campusswap.app.model.ProposalStatus
+import com.campusswap.app.model.domain.GeoPoint
 
 /**
  * Where the other student is expected to be. The backend has no live location

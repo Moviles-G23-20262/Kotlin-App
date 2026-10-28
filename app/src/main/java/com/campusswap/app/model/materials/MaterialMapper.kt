@@ -1,11 +1,11 @@
-package com.campusswap.app.data.materials
+package com.campusswap.app.model.materials
 
-import com.campusswap.app.data.Category
-import com.campusswap.app.data.Condition
-import com.campusswap.app.data.Course
-import com.campusswap.app.data.Product
-import com.campusswap.app.data.Seller
-import com.campusswap.app.data.local.CachedMaterialEntity
+import com.campusswap.app.model.Category
+import com.campusswap.app.model.Condition
+import com.campusswap.app.model.Course
+import com.campusswap.app.model.Product
+import com.campusswap.app.model.Seller
+import com.campusswap.app.model.local.CachedMaterialEntity
 import kotlin.math.abs
 import java.time.Instant
 

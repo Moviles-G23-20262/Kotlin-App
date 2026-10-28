@@ -1,7 +1,7 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.MessageDto
-import com.campusswap.app.data.remote.MessageRemoteDataSource
+import com.campusswap.app.model.remote.MessageDto
+import com.campusswap.app.model.remote.MessageRemoteDataSource
 
 class FakeMessageRemoteDataSource : MessageRemoteDataSource {
     var stored = mutableListOf<MessageDto>()

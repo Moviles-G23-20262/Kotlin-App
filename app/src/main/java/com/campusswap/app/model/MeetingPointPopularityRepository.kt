@@ -1,6 +1,6 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.PopularityRemoteDataSource
+import com.campusswap.app.model.remote.PopularityRemoteDataSource
 import kotlinx.coroutines.CancellationException
 
 class MeetingPointPopularityRepository(private val remote: PopularityRemoteDataSource) {

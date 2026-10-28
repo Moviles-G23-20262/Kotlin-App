@@ -1,7 +1,7 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.ChatRoomRemoteDataSource
-import com.campusswap.app.data.remote.ChatRoomSummaryDto
+import com.campusswap.app.model.remote.ChatRoomRemoteDataSource
+import com.campusswap.app.model.remote.ChatRoomSummaryDto
 
 class FakeChatRoomRemoteDataSource : ChatRoomRemoteDataSource {
     var failure: Exception? = null

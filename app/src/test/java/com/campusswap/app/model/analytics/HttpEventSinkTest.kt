@@ -1,7 +1,7 @@
-package com.campusswap.app.analytics
+package com.campusswap.app.model.analytics
 
-import com.campusswap.app.data.remote.AnalyticsEventRequest
-import com.campusswap.app.data.remote.AnalyticsEventsApi
+import com.campusswap.app.model.remote.AnalyticsEventRequest
+import com.campusswap.app.model.remote.AnalyticsEventsApi
 import kotlinx.coroutines.runBlocking
 import okhttp3.ResponseBody
 import org.junit.Assert.assertEquals

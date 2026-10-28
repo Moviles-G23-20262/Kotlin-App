@@ -1,7 +1,7 @@
-package com.campusswap.app.screens.search
+package com.campusswap.app.view.screens.search
 
-import com.campusswap.app.domain.InputLimits
-import com.campusswap.app.domain.InputValidation
+import com.campusswap.app.model.domain.InputLimits
+import com.campusswap.app.model.domain.InputValidation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,24 +29,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.analytics.Analytics
-import com.campusswap.app.analytics.Events
-import com.campusswap.app.components.BodyText
-import com.campusswap.app.components.CampusHeader
-import com.campusswap.app.components.CampusIconButton
-import com.campusswap.app.components.CampusIcons
-import com.campusswap.app.components.CampusSlider
-import com.campusswap.app.components.CampusTextField
-import com.campusswap.app.components.EmptyState
-import com.campusswap.app.components.OfflineBanner
-import com.campusswap.app.components.Pill
-import com.campusswap.app.components.ProductCard
-import com.campusswap.app.components.formatPrice
-import com.campusswap.app.data.AppViewModel
-import com.campusswap.app.data.Category
-import com.campusswap.app.data.Condition
-import com.campusswap.app.data.SortOption
-import com.campusswap.app.ui.theme.CampusSwapTheme
+import com.campusswap.app.model.analytics.Analytics
+import com.campusswap.app.model.analytics.Events
+import com.campusswap.app.view.components.BodyText
+import com.campusswap.app.view.components.CampusHeader
+import com.campusswap.app.view.components.CampusIconButton
+import com.campusswap.app.view.components.CampusIcons
+import com.campusswap.app.view.components.CampusSlider
+import com.campusswap.app.view.components.CampusTextField
+import com.campusswap.app.view.components.EmptyState
+import com.campusswap.app.view.components.OfflineBanner
+import com.campusswap.app.view.components.Pill
+import com.campusswap.app.view.components.ProductCard
+import com.campusswap.app.view.components.formatPrice
+import com.campusswap.app.viewmodel.AppViewModel
+import com.campusswap.app.model.Category
+import com.campusswap.app.model.Condition
+import com.campusswap.app.model.SortOption
+import com.campusswap.app.view.theme.CampusSwapTheme
 
 private const val MAX_PRICE_LIMIT = 350000f
 

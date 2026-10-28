@@ -1,7 +1,7 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
-import com.campusswap.app.data.remote.ExchangeDto
-import com.campusswap.app.data.remote.ExchangeRemoteDataSource
+import com.campusswap.app.model.remote.ExchangeDto
+import com.campusswap.app.model.remote.ExchangeRemoteDataSource
 
 data class Completion(val exchangeId: String, val lat: Double?, val lng: Double?)
 

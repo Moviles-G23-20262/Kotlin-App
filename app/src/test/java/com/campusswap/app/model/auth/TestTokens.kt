@@ -1,4 +1,4 @@
-package com.campusswap.app.data.auth
+package com.campusswap.app.model.auth
 
 import java.time.Instant
 import java.util.Base64

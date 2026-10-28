@@ -1,4 +1,4 @@
-package com.campusswap.app.data.local
+package com.campusswap.app.model.local
 
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken

@@ -1,7 +1,7 @@
-package com.campusswap.app.data.materials
+package com.campusswap.app.model.materials
 
-import com.campusswap.app.data.Product
-import com.campusswap.app.data.local.CachedMaterialDao
+import com.campusswap.app.model.Product
+import com.campusswap.app.model.local.CachedMaterialDao
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

@@ -1,7 +1,7 @@
-package com.campusswap.app.navigation
+package com.campusswap.app.view.navigation
 
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.campusswap.app.components.CampusIcons
+import com.campusswap.app.view.components.CampusIcons
 
 object Routes {
     const val LOGIN = "login"

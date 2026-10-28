@@ -1,4 +1,4 @@
-package com.campusswap.app.data.auth
+package com.campusswap.app.model.auth
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit

@@ -1,4 +1,4 @@
-package com.campusswap.app.screens.home
+package com.campusswap.app.view.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -21,19 +21,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.campusswap.app.components.BackHeader
-import com.campusswap.app.components.BodyText
-import com.campusswap.app.components.CampusIcons
-import com.campusswap.app.components.EmptyState
-import com.campusswap.app.components.HeadingText
-import com.campusswap.app.components.SecondaryButton
-import com.campusswap.app.components.campusCard
-import com.campusswap.app.components.plainClickable
-import com.campusswap.app.data.AppNotification
-import com.campusswap.app.data.AppViewModel
-import com.campusswap.app.data.NotificationKind
-import com.campusswap.app.ui.theme.CampusSwapTheme
-import com.campusswap.app.ui.theme.CampusType
+import com.campusswap.app.view.components.BackHeader
+import com.campusswap.app.view.components.BodyText
+import com.campusswap.app.view.components.CampusIcons
+import com.campusswap.app.view.components.EmptyState
+import com.campusswap.app.view.components.HeadingText
+import com.campusswap.app.view.components.SecondaryButton
+import com.campusswap.app.view.components.campusCard
+import com.campusswap.app.view.components.plainClickable
+import com.campusswap.app.model.AppNotification
+import com.campusswap.app.viewmodel.AppViewModel
+import com.campusswap.app.model.NotificationKind
+import com.campusswap.app.view.theme.CampusSwapTheme
+import com.campusswap.app.view.theme.CampusType
 import androidx.compose.ui.platform.LocalContext
 import com.campusswap.app.CampusSwapApplication
 

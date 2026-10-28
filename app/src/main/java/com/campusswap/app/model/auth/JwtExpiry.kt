@@ -1,4 +1,4 @@
-package com.campusswap.app.data.auth
+package com.campusswap.app.model.auth
 
 import com.google.gson.JsonParser
 import java.time.Instant

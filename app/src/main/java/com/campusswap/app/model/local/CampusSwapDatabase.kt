@@ -1,4 +1,4 @@
-package com.campusswap.app.data.local
+package com.campusswap.app.model.local
 
 import android.content.Context
 import androidx.room.Dao
@@ -51,7 +51,7 @@ data class PendingListingEntity(
     val description: String,
     val courseCode: String?,
     val price: String,
-    /** App [com.campusswap.app.data.Condition] and [com.campusswap.app.data.Category] names; mapped to server enums when sent. */
+    /** App [com.campusswap.app.model.Condition] and [com.campusswap.app.model.Category] names; mapped to server enums when sent. */
     val condition: String,
     val category: String,
     val createdAtMillis: Long,
@@ -91,7 +91,7 @@ data class CachedResponseEntity(
 data class PendingActionEntity(
     @PrimaryKey(autoGenerate = true) val localId: Long = 0,
     val ownerId: String,
-    /** [com.campusswap.app.data.sync.PendingActionKind] name. */
+    /** [com.campusswap.app.model.sync.PendingActionKind] name. */
     val kind: String,
     val productId: String,
     /** The action's details as JSON; its shape depends on [kind]. */

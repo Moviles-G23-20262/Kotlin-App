@@ -1,4 +1,4 @@
-package com.campusswap.app.data
+package com.campusswap.app.model
 
 object SeedIds {
     private val users = mapOf("me" to 0, "s1" to 1, "s2" to 2, "s3" to 3, "s4" to 4)

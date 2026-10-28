@@ -1,4 +1,4 @@
-package com.campusswap.app.data.notifications
+package com.campusswap.app.model.notifications
 
 interface NotificationRemoteDataSource {
     // suspend sirve para no congelar la app mientras se hace la llamada a la api

@@ -1,4 +1,4 @@
-package com.campusswap.app.analytics
+package com.campusswap.app.model.analytics
 
 import android.content.Context
 import android.os.Build

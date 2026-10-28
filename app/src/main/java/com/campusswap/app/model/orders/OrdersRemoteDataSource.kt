@@ -1,7 +1,7 @@
-package com.campusswap.app.data.orders
+package com.campusswap.app.model.orders
 
-import com.campusswap.app.data.remote.ExchangeDto
-import com.campusswap.app.data.remote.PlaceOrderRequest
+import com.campusswap.app.model.remote.ExchangeDto
+import com.campusswap.app.model.remote.PlaceOrderRequest
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST

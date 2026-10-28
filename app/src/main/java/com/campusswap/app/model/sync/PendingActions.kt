@@ -1,19 +1,19 @@
-package com.campusswap.app.data.sync
+package com.campusswap.app.model.sync
 
-import com.campusswap.app.data.ConfirmResult
-import com.campusswap.app.data.ExchangeRepository
-import com.campusswap.app.data.MeetingPoint
-import com.campusswap.app.data.MeetingProposalRepository
-import com.campusswap.app.data.ProposalResult
-import com.campusswap.app.data.TimeSlot
-import com.campusswap.app.data.local.PendingActionEntity
-import com.campusswap.app.data.local.cacheGson
-import com.campusswap.app.data.ratings.RatingRepository
-import com.campusswap.app.data.ratings.RatingResult
-import com.campusswap.app.data.wishlist.WishlistRepository
-import com.campusswap.app.data.wishlist.WishlistResult
-import com.campusswap.app.domain.ExchangeTarget
-import com.campusswap.app.domain.GeoPoint
+import com.campusswap.app.model.ConfirmResult
+import com.campusswap.app.model.ExchangeRepository
+import com.campusswap.app.model.MeetingPoint
+import com.campusswap.app.model.MeetingProposalRepository
+import com.campusswap.app.model.ProposalResult
+import com.campusswap.app.model.TimeSlot
+import com.campusswap.app.model.local.PendingActionEntity
+import com.campusswap.app.model.local.cacheGson
+import com.campusswap.app.model.ratings.RatingRepository
+import com.campusswap.app.model.ratings.RatingResult
+import com.campusswap.app.model.wishlist.WishlistRepository
+import com.campusswap.app.model.wishlist.WishlistResult
+import com.campusswap.app.model.domain.ExchangeTarget
+import com.campusswap.app.model.domain.GeoPoint
 import java.time.Clock
 import java.time.Instant
 
@@ -41,7 +41,7 @@ data class RatingPayload(
     val stars: Int,
     val tags: List<String>,
     val review: String?,
-    /** [com.campusswap.app.data.Condition] name the buyer confirmed, to show the rating again after a restart. */
+    /** [com.campusswap.app.model.Condition] name the buyer confirmed, to show the rating again after a restart. */
     val condition: String,
 )
 

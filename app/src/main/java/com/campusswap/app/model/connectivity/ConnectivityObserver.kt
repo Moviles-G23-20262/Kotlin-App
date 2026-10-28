@@ -1,4 +1,4 @@
-package com.campusswap.app.data.connectivity
+package com.campusswap.app.model.connectivity
 
 import android.content.Context
 import android.net.ConnectivityManager
