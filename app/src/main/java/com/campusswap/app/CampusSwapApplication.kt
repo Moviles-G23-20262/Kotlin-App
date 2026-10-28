@@ -1,7 +1,7 @@
 package com.campusswap.app
 
 import android.app.Application
-import com.campusswap.app.analytics.Analytics
+import com.campusswap.app.model.analytics.Analytics
 
 class CampusSwapApplication : Application() {
     lateinit var container: AppContainer
