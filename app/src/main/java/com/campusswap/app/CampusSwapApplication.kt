@@ -2,6 +2,7 @@ package com.campusswap.app
 
 import android.app.Application
 import com.campusswap.app.model.analytics.Analytics
+import com.campusswap.app.model.notifications.NotificationWorker
 
 class CampusSwapApplication : Application() {
     lateinit var container: AppContainer
@@ -12,6 +13,7 @@ class CampusSwapApplication : Application() {
         container = AppContainer(this)
         container.sessionManager.launchRestore()
         Analytics.init(this, container.eventSink)
+        NotificationWorker.schedule(this)
     }
 
     override fun onTrimMemory(level: Int) {
