@@ -463,6 +463,20 @@ class AppViewModel : ViewModel() {
         sales.clear()
         ordersLive = true
         ordersSavedAtMillis = null
+        // The next log-in may be demo access: nothing may keep talking to the server with the old account.
+        wishlistRepository = null
+        orderRepository = null
+        notificationRepository = null
+        loadedNotificationIds = emptySet()
+        notificationsLive = true
+        checkoutMessage = null
+        alertError = null
+        wishlistMessage = null
+        chatProducts.clear()
+        meetingProposals.clear()
+        reservedMatches.clear()
+        shownMatches.clear()
+        pendingSearchCategory = null
     }
 
     fun isWishlisted(productId: String) = wishlist.contains(productId)
