@@ -146,7 +146,7 @@ class AppContainer(context: Context) {
         clock = clock,
     )
 
-    val popularityRepository = MeetingPointPopularityRepository(RetrofitPopularityRemoteDataSource(analyticsApi))
+    val popularityRepository = MeetingPointPopularityRepository(RetrofitPopularityRemoteDataSource(analyticsApi), responseCache)
 
     val counterpartLocationSource: CounterpartLocationSource =
         ProposedMeetingLocation(meetingProposalRepository, signedInUserId)
