@@ -10,20 +10,22 @@ import java.util.concurrent.ConcurrentHashMap
 
 class ChatRoomRepository(private val remote: ChatRoomRemoteDataSource) {
     private val rooms = ConcurrentHashMap<String, String>()
+    private val chosen = ConcurrentHashMap<String, String>()
     private val lock = Mutex()
 
     fun select(productId: String, room: String) {
-        rooms[productId] = room
+        chosen[productId] = room
     }
 
-    fun selected(productId: String): String? = rooms[productId]
+    /** The room opened from the inbox or a sale; null when the app looked it up by listing. */
+    fun selected(productId: String): String? = chosen[productId]
 
     /**
      * The room for a listing, from either side. Creating one makes the caller the buyer, and the
      * server refuses that to the seller, so an existing conversation is always looked up first.
      */
     suspend fun roomFor(productId: String): String? = lock.withLock {
-        rooms[productId]?.let { return it }
+        (chosen[productId] ?: rooms[productId])?.let { return it }
         val materialId = SeedIds.backendMaterial(productId) ?: return null
         val id = remote.rooms().firstOrNull { it.materialId == materialId }?.id ?: remote.open(materialId)
         rooms[productId] = id
@@ -33,7 +35,7 @@ class ChatRoomRepository(private val remote: ChatRoomRemoteDataSource) {
     suspend fun summaryFor(productId: String): ChatRoomSummaryDto? = try {
         val materialId = SeedIds.backendMaterial(productId)
         val all = remote.rooms()
-        all.firstOrNull { it.id == rooms[productId] } ?: all.firstOrNull { it.materialId == materialId }
+        all.firstOrNull { it.id == (chosen[productId] ?: rooms[productId]) } ?: all.firstOrNull { it.materialId == materialId }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
