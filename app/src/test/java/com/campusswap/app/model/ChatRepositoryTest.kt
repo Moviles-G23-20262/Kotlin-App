@@ -132,6 +132,19 @@ class ChatRepositoryTest {
     }
 
     @Test
+    fun `offline after a restart, a buyer still sees the conversation saved before`() = runTest {
+        val cache = InMemoryResponseCache()
+        messages.stored += message("m1", OTHER, "Is it still available?")
+        ChatRepository(ChatRoomRepository(rooms), messages, currentUserId = { ME }, cache = cache).messages(seededProduct)
+
+        rooms.failure = IOException("airplane mode")
+        messages.failure = IOException("airplane mode")
+        val afterRestart = ChatRepository(ChatRoomRepository(rooms), messages, currentUserId = { ME }, cache = cache)
+
+        assertEquals(listOf("Is it still available?"), (afterRestart.messages(seededProduct) as ChatLoad.Success).messages.map { it.text })
+    }
+
+    @Test
     fun `another account on the phone never sees my saved conversation`() = runTest {
         val cache = InMemoryResponseCache()
         var user = ME
