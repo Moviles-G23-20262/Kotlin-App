@@ -20,7 +20,6 @@ import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -52,6 +51,7 @@ import com.campusswap.app.view.screens.search.SearchScreen
 import com.campusswap.app.view.screens.sell.SellScreen
 import com.campusswap.app.view.theme.CampusSwapTheme
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.NotificationManagerCompat
 import com.campusswap.app.CampusSwapApplication
 
 @Composable
@@ -70,19 +70,27 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
     }
     val startDestination = remember { if (session is SessionState.SignedIn) Routes.HOME else Routes.LOGIN }
 
+    val context = LocalContext.current
+
+    // Everything the last account left behind goes: its data, the tabs it left open and its
+    // notifications in the shade, so the next log-in (or demo access) starts clean.
+    fun clearUserAndGoToLogin() {
+        appViewModel.logout()
+        NotificationManagerCompat.from(context).cancelAll()
+        bottomNavItems.forEach { navController.clearBackStack(it.route) }
+        navController.navigate(Routes.LOGIN) {
+            popUpTo(0) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+
     LaunchedEffect(session) {
         when (val current = session) {
             is SessionState.SignedIn -> {
                 appViewModel.useSession(current.session)
                 if (!appViewModel.isLoggedIn) appViewModel.restoreSession(current.session.userId)
             }
-            is SessionState.SignedOut -> if (current.expired) {
-                appViewModel.logout()
-                navController.navigate(Routes.LOGIN) {
-                    popUpTo(0) { inclusive = true }
-                    launchSingleTop = true
-                }
-            }
+            is SessionState.SignedOut -> if (current.expired) clearUserAndGoToLogin()
             SessionState.Restoring -> Unit
         }
     }
@@ -130,25 +138,27 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
     }
 
     // As in the prototype, the bottom bar is hidden on Login and on the order confirmation,
-    // plus the focused full-screen tasks (Sell flow, Chat, Meeting point).
+    // plus the focused full-screen tasks (Chat, Meeting point).
     val hideChrome = currentRoute == null ||
         currentRoute == Routes.LOGIN ||
         currentRoute == Routes.REGISTER ||
         currentRoute == Routes.CONFIRMATION ||
-        currentRoute == Routes.SELL ||
         currentRoute == Routes.CHAT ||
         currentRoute == Routes.MEETING_POINT ||
         currentRoute == Routes.COMPLETION
 
+    // Each tab keeps its own stack like iOS: leaving a tab saves it and coming back restores it
+    // where it was. Tapping a tab that is already open (e.g. from a detail on top of it) goes to its root.
     fun navigateToTab(route: String) {
-        if (route == Routes.SELL) {
-            navController.navigate(route)
-        } else {
-            navController.navigate(route) {
-                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                launchSingleTop = true
-                restoreState = true
-            }
+        val inStack = runCatching { navController.getBackStackEntry(route) }.isSuccess
+        if (inStack && route != Routes.HOME) {
+            navController.popBackStack(route, inclusive = false)
+            return
+        }
+        navController.navigate(route) {
+            popUpTo(Routes.HOME) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
         }
     }
 
@@ -292,10 +302,7 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                     onCompleteExchange = { id -> navController.navigate(Routes.completion(id)) },
                     onLogout = {
                         container.authRepository.logout()
-                        appViewModel.logout()
-                        navController.navigate(Routes.LOGIN) {
-                            popUpTo(0) { inclusive = true }
-                        }
+                        clearUserAndGoToLogin()
                     },
                 )
             }

@@ -8,32 +8,33 @@ import com.campusswap.app.model.SellDraft
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.first
 
-/** Keeps the listing being written, so closing the app or losing signal mid-form doesn't lose it. */
+/**
+ * Keeps the listing being written, so closing the app or losing signal mid-form doesn't lose it.
+ * Each account has its own draft ([userId] null = demo access), so a new log-in never sees someone else's.
+ */
 interface DraftStore {
-    suspend fun read(): SellDraft?
-    suspend fun save(draft: SellDraft)
-    suspend fun clear()
+    suspend fun read(userId: String?): SellDraft?
+    suspend fun save(userId: String?, draft: SellDraft)
+    suspend fun clear(userId: String?)
 }
 
 private val Context.draftDataStore by preferencesDataStore(name = "sell_draft")
 
 class DataStoreDraftStore(private val context: Context, private val gson: Gson = Gson()) : DraftStore {
 
-    override suspend fun read(): SellDraft? {
-        val json = context.draftDataStore.data.first()[DRAFT] ?: return null
+    override suspend fun read(userId: String?): SellDraft? {
+        val json = context.draftDataStore.data.first()[key(userId)] ?: return null
         // A draft saved by an older app version may not parse; starting fresh is better than crashing.
         return runCatching { gson.fromJson(json, SellDraft::class.java) }.getOrNull()
     }
 
-    override suspend fun save(draft: SellDraft) {
-        context.draftDataStore.edit { it[DRAFT] = gson.toJson(draft) }
+    override suspend fun save(userId: String?, draft: SellDraft) {
+        context.draftDataStore.edit { it[key(userId)] = gson.toJson(draft) }
     }
 
-    override suspend fun clear() {
-        context.draftDataStore.edit { it.clear() }
+    override suspend fun clear(userId: String?) {
+        context.draftDataStore.edit { it.remove(key(userId)) }
     }
 
-    private companion object {
-        val DRAFT = stringPreferencesKey("draft_json")
-    }
+    private fun key(userId: String?) = stringPreferencesKey("draft_json_${userId ?: "demo"}")
 }

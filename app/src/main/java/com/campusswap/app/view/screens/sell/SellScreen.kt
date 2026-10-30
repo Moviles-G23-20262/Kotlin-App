@@ -112,7 +112,7 @@ fun SellScreen(
     onExit: () -> Unit,
     onPublished: (String) -> Unit,
 ) {
-    var step by remember { mutableStateOf(SellStep.PRODUCT_INFO) }
+    var step by rememberSaveable { mutableStateOf(SellStep.PRODUCT_INFO) }
     var draft by remember { mutableStateOf(SellDraft()) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var isPublishing by remember { mutableStateOf(false) }
@@ -127,7 +127,7 @@ fun SellScreen(
     // Local storage: the draft lives in DataStore, so leaving the screen, closing the app or
     // losing signal mid-form never loses what the seller typed.
     LaunchedEffect(Unit) {
-        val saved = draftStore.read()
+        val saved = draftStore.read(vm.currentUserId)
         if (saved != null && saved.isDirty && !draft.isDirty) {
             draft = saved
             draftRestored = true
@@ -136,7 +136,7 @@ fun SellScreen(
     LaunchedEffect(Unit) {
         snapshotFlow { draft }.drop(1).collectLatest { current ->
             delay(400) // write once the user pauses typing, not on every key
-            if (current.isDirty) draftStore.save(current) else draftStore.clear()
+            if (current.isDirty) draftStore.save(vm.currentUserId, current) else draftStore.clear(vm.currentUserId)
         }
     }
 
@@ -156,9 +156,7 @@ fun SellScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(CampusSwapTheme.colors.bg)
-            .navigationBarsPadding()
-            .imePadding(),
+            .background(CampusSwapTheme.colors.bg),
     ) {
         CampusHeader {
             Row(
@@ -209,7 +207,7 @@ fun SellScreen(
                         scope.launch {
                             publishedProduct = vm.publishListing(draft)
                             draft = SellDraft()
-                            draftStore.clear()
+                            draftStore.clear(vm.currentUserId)
                             isPublishing = false
                             step = SellStep.CONFIRMATION
                         }
@@ -240,7 +238,7 @@ fun SellScreen(
                         photoStore.delete(draft.photoPaths)
                         draft = SellDraft()
                         step = SellStep.PRODUCT_INFO
-                        scope.launch { draftStore.clear() }
+                        scope.launch { draftStore.clear(vm.currentUserId) }
                         onExit()
                     },
                 ) {
