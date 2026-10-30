@@ -8,6 +8,8 @@ import com.campusswap.app.model.FakePopularityRemoteDataSource
 import com.campusswap.app.model.MeetingPointPopularityRepository
 import com.campusswap.app.model.MeetingProposalRepository
 import com.campusswap.app.model.MeetingPointRepository
+import com.campusswap.app.model.local.InMemoryResponseCache
+import com.campusswap.app.model.local.ResponseCache
 import com.campusswap.app.model.location.CounterpartLocationSource
 import com.campusswap.app.model.location.LocationDataSource
 import com.campusswap.app.model.location.LocationResult
@@ -22,9 +24,12 @@ import com.campusswap.app.model.domain.TimeOfDayStrategySelector
 import com.campusswap.app.model.domain.north
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -69,7 +74,7 @@ class MeetingPointViewModelTest {
 
     private fun clockAt(hour: Int) = Clock.fixed(Instant.parse("2026-09-23T%02d:00:00Z".format(hour)), ZoneOffset.UTC)
 
-    private fun viewModel(hour: Int) = MeetingPointViewModel(
+    private fun viewModel(hour: Int, popularityCache: ResponseCache = ResponseCache.None) = MeetingPointViewModel(
         productId = "p1",
         meetingPoints = MeetingPointRepository(remote),
         myLocation = location,
@@ -78,7 +83,7 @@ class MeetingPointViewModelTest {
         },
         strategies = TimeOfDayStrategySelector(),
         clock = clockAt(hour),
-        popularity = MeetingPointPopularityRepository(popularityRemote),
+        popularity = MeetingPointPopularityRepository(popularityRemote, popularityCache),
         proposals = MeetingProposalRepository(ChatRoomRepository(FakeChatRoomRemoteDataSource()), proposalRemote),
     )
 
@@ -160,6 +165,21 @@ class MeetingPointViewModelTest {
 
         assertTrue(state.ranked.none { it.isPopular })
         assertEquals("middle-plaza", state.recommended?.point?.id)
+    }
+
+    @Test fun liveBadgesAreNotMarkedAsSaved() {
+        assertNull(viewModel(hour = 13).state.value.popularSavedAtMillis)
+    }
+
+    @Test fun offlineBadgesComeFromTheSavedCopyAndSayHowOldItIs() = runBlocking {
+        val cache = InMemoryResponseCache(now = 7_000L)
+        MeetingPointPopularityRepository(popularityRemote, cache).popularAt(13)
+        popularityRemote.failure = IOException("airplane mode")
+
+        val state = withTimeout(5_000) { viewModel(hour = 13, cache).state.first { it.popularSavedAtMillis != null } }
+
+        assertEquals(setOf("near-seller", "near-me"), state.ranked.filter { it.isPopular }.map { it.point.id }.toSet())
+        assertEquals(7_000L, state.popularSavedAtMillis)
     }
 
     @Test fun showsTheSharedFreeTimesFromTheServer() {

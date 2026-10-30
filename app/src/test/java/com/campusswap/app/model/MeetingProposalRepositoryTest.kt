@@ -125,6 +125,61 @@ class MeetingProposalRepositoryTest {
         assertNull(repository.latest("p1"))
     }
 
+    private fun offlineReady(cache: InMemoryResponseCache, user: () -> String? = { "me" }) =
+        MeetingProposalRepository(ChatRoomRepository(chatRooms), remote, cache = cache, currentUserId = user)
+
+    @Test fun offlineAfterARestartTheLastProposalComesFromTheSavedCopy() = runBlocking {
+        val cache = InMemoryResponseCache()
+        remote.proposals = mutableListOf(proposalDto("agreed", "ACCEPTED", "2026-10-01T10:00:00Z"))
+        offlineReady(cache).latest("p1")
+
+        chatRooms.failure = IOException("airplane mode")
+        remote.failure = IOException("airplane mode")
+        val saved = offlineReady(cache).latest("p1")
+
+        assertEquals("agreed", saved?.remoteId)
+        assertEquals(ProposalStatus.ACCEPTED, saved?.status)
+        assertEquals(GeoPoint(4.6, -74.06), saved?.point?.location)
+    }
+
+    @Test fun offlineOneBuyersProposalIsNotUsedForAnotherBuyer() = runBlocking {
+        val cache = InMemoryResponseCache()
+        val repository = MeetingProposalRepository(ChatRoomRepository(chatRooms).apply { select("p1", "room-ana") }, remote, cache = cache, currentUserId = { "me" })
+        remote.proposals = mutableListOf(proposalDto("with-ana", "ACCEPTED", "2026-10-01T10:00:00Z"))
+        repository.latest("p1")
+
+        remote.failure = IOException("airplane mode")
+        val otherBuyer = MeetingProposalRepository(ChatRoomRepository(chatRooms).apply { select("p1", "room-luis") }, remote, cache = cache, currentUserId = { "me" })
+
+        assertNull(otherBuyer.latest("p1"))
+    }
+
+    @Test fun offlineAnotherAccountNeverSeesMySavedProposal() = runBlocking {
+        val cache = InMemoryResponseCache()
+        var user = "me"
+        val repository = offlineReady(cache) { user }
+        remote.proposals = mutableListOf(proposalDto("mine", "ACCEPTED", "2026-10-01T10:00:00Z"))
+        repository.latest("p1")
+
+        user = "someone-else"
+        remote.failure = IOException("airplane mode")
+
+        assertNull(repository.latest("p1"))
+    }
+
+    @Test fun aProposalThatIsGoneIsNotBroughtBackOffline() = runBlocking {
+        val cache = InMemoryResponseCache()
+        val repository = offlineReady(cache)
+        remote.proposals = mutableListOf(proposalDto("old", "PENDING", "2026-10-01T10:00:00Z"))
+        repository.latest("p1")
+        remote.proposals = mutableListOf(proposalDto("old", "CANCELLED", "2026-10-01T10:00:00Z"))
+        repository.latest("p1")
+
+        remote.failure = IOException("airplane mode")
+
+        assertNull(repository.latest("p1"))
+    }
+
     @Test fun acceptingSendsTheAnswerForThatProposal() = runBlocking {
         remote.proposals = mutableListOf(proposalDto("proposal-9", "PENDING", "2026-10-02T10:00:00Z"))
         val pending = repository.latest("p1")!!

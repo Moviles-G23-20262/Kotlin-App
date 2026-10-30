@@ -14,6 +14,7 @@ import com.campusswap.app.model.MeetingProposal
 import com.campusswap.app.model.ProposalResult
 import com.campusswap.app.model.ProposalStatus
 import com.campusswap.app.model.MeetingPointPopularityRepository
+import com.campusswap.app.model.Popularity
 import com.campusswap.app.model.MeetingProposalRepository
 import com.campusswap.app.model.MeetingPointRepository
 import com.campusswap.app.model.MeetingPoints
@@ -60,6 +61,8 @@ data class MeetingPointUiState(
     val isLive: Boolean = true,
     val slots: List<TimeSlot> = emptyList(),
     val isProposing: Boolean = false,
+    /** Set while the "Popular now" badges come from the copy saved on the phone. */
+    val popularSavedAtMillis: Long? = null,
 ) {
     val recommended: RankedPoint? get() = ranked.firstOrNull()
 }
@@ -80,7 +83,7 @@ class MeetingPointViewModel(
     val state: StateFlow<MeetingPointUiState> = _state.asStateFlow()
 
     private var refreshJob: Job? = null
-    private var popularIds: Set<String> = emptySet()
+    private var popular = Popularity(emptySet())
     private var slots: List<TimeSlot> = emptyList()
 
     init {
@@ -135,13 +138,18 @@ class MeetingPointViewModel(
         _state.update { it.copy(slots = freeSlots) }
     }
 
-    private fun markPopular(ids: Set<String>) {
-        popularIds = ids
-        _state.update { state -> state.copy(ranked = state.ranked.map { it.copy(isPopular = isPopular(it.point)) }) }
+    private fun markPopular(result: Popularity) {
+        popular = result
+        _state.update { state ->
+            state.copy(
+                ranked = state.ranked.map { it.copy(isPopular = isPopular(it.point)) },
+                popularSavedAtMillis = result.savedAtMillis,
+            )
+        }
     }
 
     private fun isPopular(point: MeetingPoint): Boolean =
-        point.id in popularIds || SeedIds.meetingPoint(point.id) in popularIds
+        point.id in popular.ids || SeedIds.meetingPoint(point.id) in popular.ids
 
     private suspend fun locateMe(points: MeetingPoints): Pair<GeoPoint?, MyLocationStatus> =
         when (val result = myLocation.currentLocation()) {
@@ -183,6 +191,7 @@ class MeetingPointViewModel(
             isLive = points.isLive,
             slots = slots,
             isProposing = _state.value.isProposing,
+            popularSavedAtMillis = popular.savedAtMillis,
         )
     }
 
