@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.CampusSwapApplication
 import com.campusswap.app.view.components.EmptyState
+import com.campusswap.app.view.components.timeAgo
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.MeetingZoneType
 import com.campusswap.app.model.TimeSlot
@@ -715,8 +716,10 @@ private fun guardianReasons(
     }
     val unknownCounterpart = if (state.knowsCounterpart || best == null) null else counterpartHint(otherName)
     val offline = if (state.isLive) null else "Offline: showing the campus zones saved on this phone."
+    val savedPopular = state.popularSavedAtMillis?.takeIf { state.ranked.any { it.isPopular } }
+        ?.let { "Offline: \"Popular now\" uses the busiest points for this hour, saved ${timeAgo(it)}." }
     val freeTime = slot?.let { "You're both free ${it.day}, ${it.label}." }
-    return listOfNotNull(context, choice, unknownCounterpart.takeIf { mine == null }, freeTime, offline)
+    return listOfNotNull(context, choice, unknownCounterpart.takeIf { mine == null }, freeTime, offline, savedPopular)
 }
 
 private fun counterpartHint(otherName: String) =
