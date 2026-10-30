@@ -8,6 +8,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
+import com.campusswap.app.model.local.InMemoryResponseCache
+import com.campusswap.app.model.local.save
+import com.campusswap.app.model.materials.MaterialDto
+import kotlinx.coroutines.flow.toList
 
 class OrderRepositoryTest {
     private val ids = listOf(
@@ -49,5 +53,43 @@ class OrderRepositoryTest {
 
         assertEquals(ids, result.order.products.map { it.id })
         assertTrue(result.notSent.isEmpty())
+    }
+        private class ExchangesServer(private val answer: List<ExchangeDto>?) : OrdersRemoteDataSource {
+        override suspend fun mine(): List<ExchangeDto> = answer ?: throw IOException("no connection")
+        override suspend fun place(materialId: String): ExchangeDto = throw IOException("no connection")
+    }
+
+    private val me = "a0000000-0000-4000-8000-000000000000"
+
+    private fun purchase(title: String) = ExchangeDto(
+        id = "e-$title", buyerId = me, status = "PENDING", orderNumber = 1001, materialId = "m-$title",
+        material = MaterialDto("m-$title", title, "", null, "1000", null, "RESERVED", "SUPPLIES", "s1"),
+    )
+
+    private fun savedCopyOf(vararg exchanges: ExchangeDto) =
+        InMemoryResponseCache().also { runBlocking { it.save(me, "my-exchanges", exchanges.toList()) } }
+
+    @Test fun showsTheSavedCopyFirstAndThenTheServerAnswer() = runBlocking {
+        val repository = OrderRepository(ExchangesServer(listOf(purchase("New"))), savedCopyOf(purchase("Old")))
+
+        val shown = repository.stream(me).toList()
+
+        assertEquals(listOf(false, true), shown.map { it.isLive })
+        assertEquals(listOf("Old", "New"), shown.map { it.purchases.single().products.single().title })
+    }
+
+    @Test fun keepsTheSavedCopyMarkedOfflineWhenTheServerDoesNotAnswer() = runBlocking {
+        val shown = OrderRepository(ExchangesServer(null), savedCopyOf(purchase("Old"))).stream(me).toList()
+
+        assertEquals(1, shown.size)
+        assertEquals(false, shown.single().isLive)
+    }
+
+    @Test fun doesNotGoBackToTheSavedCopyWhenTheScreenAlreadyHasData() = runBlocking {
+        val repository = OrderRepository(ExchangesServer(listOf(purchase("New"))), savedCopyOf(purchase("Old")))
+
+        val shown = repository.stream(me, showSaved = false).toList()
+
+        assertEquals(listOf("New"), shown.map { it.purchases.single().products.single().title })
     }
 }
