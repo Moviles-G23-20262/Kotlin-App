@@ -373,6 +373,7 @@ class AppViewModel : ViewModel() {
     suspend fun placeOrder(meetOnCampus: Boolean = true): Int? {
         checkoutMessage = null
         val repository = orderRepository
+        var notSent: List<Product> = emptyList()
         val order = if (repository == null) {
             // Acceso demo (sin sesión): la orden solo existe en el teléfono, como antes
             Order(number = (1000..9999).random(), lines = cart.toList(), meetOnCampus = meetOnCampus)
@@ -387,11 +388,14 @@ class AppViewModel : ViewModel() {
                     checkoutMessage = "No longer available: ${result.unavailable.joinToString { it.title }}"
                     return null
                 }
-                is PlaceOrderResult.Placed -> result.order
+                is PlaceOrderResult.Placed -> {
+                    notSent = result.notSent
+                    result.order
+                }
             }
         }
         orders.add(0, order)
-        cart.clear()
+        cart.removeAll { line -> notSent.none { it.id == line.product.id } }
         order.products.forEach { product ->
             Analytics.log(
                 Events.PURCHASE_COMPLETED,
@@ -410,6 +414,10 @@ class AppViewModel : ViewModel() {
             )
         }
         if (repository != null) loadOrders(repository)
+        if (notSent.isNotEmpty()) {
+            checkoutMessage = "Connection lost. Order #CSW-${order.number} has ${order.products.joinToString { it.title }}. Still in your cart: ${notSent.joinToString { it.title }}."
+            return null
+        }
         return order.number
     }
 

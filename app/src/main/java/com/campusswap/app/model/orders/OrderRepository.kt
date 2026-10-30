@@ -18,7 +18,7 @@ import com.campusswap.app.model.local.save
 
 sealed interface PlaceOrderResult {
     /** [unavailable]: productos del carrito que no se pudieron pedir */
-    data class Placed(val order: Order, val unavailable: List<Product>) : PlaceOrderResult
+    data class Placed(val order: Order, val unavailable: List<Product>, val notSent: List<Product> = emptyList()) : PlaceOrderResult
     data class Rejected(val unavailable: List<Product>) : PlaceOrderResult
     data object Offline : PlaceOrderResult
 }
@@ -50,7 +50,8 @@ class OrderRepository(
     suspend fun place(lines: List<CartLine>, meetOnCampus: Boolean): PlaceOrderResult {
         val placed = mutableListOf<Pair<Product, ExchangeDto>>()
         val unavailable = mutableListOf<Product>()
-        for (line in lines) {
+        val notSent = mutableListOf<Product>()
+        for ((index, line) in lines.withIndex()) {
             val product = line.product
             // Una publicación pendiente del Outbox todavía no existe en el servidor
             if (!SeedIds.isBackendId(product.id)) {
@@ -64,7 +65,8 @@ class OrderRepository(
             } catch (e: IOException) {
                 // Sin red antes de pedir nada: no se hizo ningún pedido, el carrito queda igual
                 if (placed.isEmpty()) return PlaceOrderResult.Offline
-                unavailable += product
+                notSent += lines.drop(index).map { it.product }
+                break
             } catch (e: HttpException) {
                 // 409: ya lo reservó otra persona · 400: es tu propia publicación · 404: ya no existe
                 unavailable += product
@@ -77,7 +79,7 @@ class OrderRepository(
             lines = placed.map { (product, _) -> CartLine(product, 1) },
             meetOnCampus = meetOnCampus,
         )
-        return PlaceOrderResult.Placed(order, unavailable)
+        return PlaceOrderResult.Placed(order, unavailable, notSent)
     }
 
     /**
