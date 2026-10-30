@@ -5,6 +5,7 @@ import com.campusswap.app.model.remote.AuthUserDto
 import com.campusswap.app.model.remote.LoginResponse
 import com.campusswap.app.model.remote.RegisterRequest
 import com.campusswap.app.model.remote.RegisterResponse
+import com.campusswap.app.model.remote.ResetPasswordRequest
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -37,6 +38,26 @@ class AuthRepositoryTest {
         override suspend fun register(request: RegisterRequest): RegisterResponse {
             lastRegister = request
             return registerOutcome()
+        }
+
+        var codeOutcome: () -> Unit = {}
+        var lastCodeCall: String? = null
+        var lastReset: ResetPasswordRequest? = null
+        override suspend fun forgotPassword(email: String) {
+            lastCodeCall = "forgot:$email"
+            codeOutcome()
+        }
+        override suspend fun resetPassword(request: ResetPasswordRequest): LoginResponse {
+            lastReset = request
+            return outcome()
+        }
+        override suspend fun sendVerificationCode() {
+            lastCodeCall = "send"
+            codeOutcome()
+        }
+        override suspend fun verifyEmail(code: String) {
+            lastCodeCall = "verify:$code"
+            codeOutcome()
         }
     }
 
@@ -121,5 +142,54 @@ class AuthRepositoryTest {
         )
         assertEquals(RegisterResult.Offline, repo(http(500)).register("a@b.edu.co", "secret123", "A B", "Law"))
         assertEquals(RegisterResult.Offline, repo(IOException("down")).register("a@b.edu.co", "secret123", "A B", "Law"))
+    }
+
+    @Test fun forgotPasswordCleansTheEmail() = runTest(UnconfinedTestDispatcher()) {
+        val remote = FakeAuthRemote(outcome = { error("unused") })
+        val repository = AuthRepository(remote, SessionManager(FakeSessionStore(), Clock.fixed(now, ZoneOffset.UTC), this))
+
+        assertEquals(EmailCodeResult.Done, repository.forgotPassword(" Ana@Uniandes.edu.co "))
+        assertEquals("forgot:ana@uniandes.edu.co", remote.lastCodeCall)
+    }
+
+    @Test fun resetPasswordSignsTheUserIn() = runTest(UnconfinedTestDispatcher()) {
+        val store = FakeSessionStore()
+        val remote = FakeAuthRemote { LoginResponse(AuthUserDto("user-1", "ana@uniandes.edu.co", "Ana"), token) }
+        val repository = AuthRepository(remote, SessionManager(store, Clock.fixed(now, ZoneOffset.UTC), this))
+
+        val result = repository.resetPassword("Ana@uniandes.edu.co", " 123456 ", "newpass123")
+
+        assertEquals(ResetPasswordResult.Success(Session(token, "user-1", "ana@uniandes.edu.co", "Ana")), result)
+        assertEquals(ResetPasswordRequest("ana@uniandes.edu.co", "123456", "newpass123"), remote.lastReset)
+        assertEquals(token, store.saved?.token)
+    }
+
+    @Test fun resetPasswordShowsTheServerMessageForABadCode() = runTest(UnconfinedTestDispatcher()) {
+        val store = FakeSessionStore()
+        val remote = FakeAuthRemote { throw http(400, """{"message":"Invalid or expired code","statusCode":400}""") }
+        val repository = AuthRepository(remote, SessionManager(store, Clock.fixed(now, ZoneOffset.UTC), this))
+
+        assertEquals(ResetPasswordResult.Rejected("Invalid or expired code"), repository.resetPassword("a@b.co", "000000", "newpass123"))
+        assertNull(store.saved)
+    }
+
+    @Test fun emailCodeCallsMapServerAnswers() = runTest(UnconfinedTestDispatcher()) {
+        val remote = FakeAuthRemote(outcome = { error("unused") })
+        val repository = AuthRepository(remote, SessionManager(FakeSessionStore(), Clock.fixed(now, ZoneOffset.UTC), this))
+
+        assertEquals(EmailCodeResult.Done, repository.verifyEmail(" 123456 "))
+        assertEquals("verify:123456", remote.lastCodeCall)
+
+        remote.codeOutcome = { throw http(429) }
+        assertEquals(EmailCodeResult.TooSoon, repository.sendVerificationCode())
+
+        remote.codeOutcome = { throw http(503, """{"message":"We could not send the email. Try again in a moment.","statusCode":503}""") }
+        assertEquals(EmailCodeResult.Rejected("We could not send the email. Try again in a moment."), repository.sendVerificationCode())
+
+        remote.codeOutcome = { throw http(503) }
+        assertEquals(EmailCodeResult.Offline, repository.sendVerificationCode())
+
+        remote.codeOutcome = { throw IOException("down") }
+        assertEquals(EmailCodeResult.Offline, repository.verifyEmail("123456"))
     }
 }
