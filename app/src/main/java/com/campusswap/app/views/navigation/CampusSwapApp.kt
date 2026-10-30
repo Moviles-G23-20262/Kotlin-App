@@ -32,8 +32,10 @@ import com.campusswap.app.model.analytics.Events
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.auth.SessionManager
 import com.campusswap.app.model.auth.SessionState
+import com.campusswap.app.views.screens.auth.ForgotPasswordScreen
 import com.campusswap.app.views.screens.auth.LoginScreen
 import com.campusswap.app.views.screens.auth.RegisterScreen
+import com.campusswap.app.views.screens.auth.VerifyEmailScreen
 import com.campusswap.app.views.screens.cart.CartScreen
 import com.campusswap.app.views.screens.cart.CheckoutScreen
 import com.campusswap.app.views.screens.cart.OrderConfirmationScreen
@@ -142,6 +144,8 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
     val hideChrome = currentRoute == null ||
         currentRoute == Routes.LOGIN ||
         currentRoute == Routes.REGISTER ||
+        currentRoute == Routes.FORGOT_PASSWORD ||
+        currentRoute == Routes.VERIFY_EMAIL ||
         currentRoute == Routes.CONFIRMATION ||
         currentRoute == Routes.CHAT ||
         currentRoute == Routes.MEETING_POINT ||
@@ -200,6 +204,7 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                         }
                     },
                     onCreateAccount = { navController.navigate(Routes.REGISTER) { launchSingleTop = true } },
+                    onForgotPassword = { email -> navController.navigate(Routes.forgotPassword(email)) { launchSingleTop = true } },
                     sessionExpired = (session as? SessionState.SignedOut)?.expired == true,
                 )
                 }
@@ -210,11 +215,43 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                     RegisterScreen(
                         onRegistered = { userId ->
                             appViewModel.login(userId)
-                            navController.navigate(Routes.HOME) {
+                            // The server has just emailed the verification code.
+                            navController.navigate(Routes.VERIFY_EMAIL) {
                                 popUpTo(0) { inclusive = true }
                             }
                         },
                         onBackToLogin = { navController.popBackStack() },
+                    )
+                }
+            }
+
+            composable(
+                Routes.FORGOT_PASSWORD,
+                arguments = listOf(navArgument("email") { type = NavType.StringType; defaultValue = "" }),
+            ) { entry ->
+                Box(Modifier.systemBarsPadding()) {
+                    ForgotPasswordScreen(
+                        initialEmail = entry.arguments?.getString("email").orEmpty(),
+                        onPasswordReset = { userId ->
+                            appViewModel.login(userId)
+                            navController.navigate(Routes.HOME) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+            }
+
+            composable(Routes.VERIFY_EMAIL) {
+                Box(Modifier.systemBarsPadding()) {
+                    VerifyEmailScreen(
+                        email = (session as? SessionState.SignedIn)?.session?.email,
+                        onDone = {
+                            navController.navigate(Routes.HOME) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        },
                     )
                 }
             }

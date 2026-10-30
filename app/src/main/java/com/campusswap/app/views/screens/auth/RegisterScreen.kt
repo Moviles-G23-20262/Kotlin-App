@@ -219,8 +219,9 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
     }
 }
 
+/** Shared by the auth screens: one line, error or hint below. */
 @Composable
-private fun FormField(
+internal fun FormField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,

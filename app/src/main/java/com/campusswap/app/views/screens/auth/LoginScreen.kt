@@ -58,6 +58,7 @@ import com.campusswap.app.model.domain.InputValidation
 fun LoginScreen(
     onLoginSuccess: (userId: String?) -> Unit,
     onCreateAccount: () -> Unit,
+    onForgotPassword: (email: String) -> Unit,
     sessionExpired: Boolean = false,
 ) {
     var email by remember { mutableStateOf("") }
@@ -65,7 +66,7 @@ fun LoginScreen(
     var passwordVisible by remember { mutableStateOf(false) }
     var emailError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
-    var infoMessage by remember { mutableStateOf(if (sessionExpired) "Your session expired. Log in again to continue." else null) }
+    val infoMessage = if (sessionExpired) "Your session expired. Log in again to continue." else null
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(container))
     val isLoading = authViewModel.isLoading
@@ -176,7 +177,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 horizontalArrangement = Arrangement.End,
             ) {
-                TextButton(onClick = { infoMessage = "Password recovery isn't wired up in this prototype." }) {
+                TextButton(onClick = { onForgotPassword(email) }, enabled = !isLoading) {
                     Text("Forgot password?", color = AccentBlue)
                 }
             }
@@ -210,7 +211,7 @@ fun LoginScreen(
 
             if (infoMessage != null) {
                 Text(
-                    infoMessage!!,
+                    infoMessage,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

@@ -1,11 +1,14 @@
 package com.campusswap.app.views.navigation
 
+import android.net.Uri
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.campusswap.app.views.components.CampusIcons
 
 object Routes {
     const val LOGIN = "login"
     const val REGISTER = "register"
+    const val FORGOT_PASSWORD = "forgot-password?email={email}"
+    const val VERIFY_EMAIL = "verify-email"
     const val HOME = "home"
     const val SEARCH = "search"
     const val SELL = "sell"
@@ -22,6 +25,7 @@ object Routes {
     const val MEETING_POINT = "meeting/{productId}"
     const val COMPLETION = "complete/{productId}"
 
+    fun forgotPassword(email: String) = "forgot-password?email=${Uri.encode(email)}"
     fun productDetail(id: String) = "product/$id"
     fun chat(id: String, room: String? = null) = if (room == null) "chat/$id" else "chat/$id?room=$room"
     fun meetingPoint(id: String) = "meeting/$id"
