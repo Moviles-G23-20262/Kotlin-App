@@ -77,14 +77,27 @@ class MeetingProposalRepository(
         }
     }
 
+    /** The proposal that matters now. Offline it is the last one the server gave for this conversation. */
     suspend fun latest(productId: String): MeetingProposal? = try {
         val room = rooms.roomFor(productId)
-        room?.let { id -> current(remote.proposals(id))?.let { MeetingProposalMapper.toProposal(it, zone) } }
+        room?.let { id ->
+            val proposal = current(remote.proposals(id))
+            currentUserId()?.let { cache.save(it, latestKey(productId), proposal) }
+            proposal?.let { MeetingProposalMapper.toProposal(it, zone) }
+        }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        null
+        savedLatest(productId)
     }
+
+    private suspend fun savedLatest(productId: String): MeetingProposal? {
+        val owner = currentUserId() ?: return null
+        val saved = cache.load<MeetingProposalDto>(owner, latestKey(productId)) ?: return null
+        return MeetingProposalMapper.toProposal(saved.value, zone)
+    }
+
+    private fun latestKey(productId: String) = "latest-proposal:${rooms.selected(productId) ?: productId}"
 
     suspend fun respond(proposal: MeetingProposal, accept: Boolean): ProposalResult {
         val id = proposal.remoteId ?: return ProposalResult.NotSynced
