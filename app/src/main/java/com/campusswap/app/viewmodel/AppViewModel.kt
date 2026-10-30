@@ -312,6 +312,7 @@ class AppViewModel : ViewModel() {
 
     var ordersSavedAtMillis by mutableStateOf<Long?>(null)
         private set
+    private var ordersJob: Job? = null
 
 
     /** Tus ventas del backend lo que compraron (reservado o vendido) */
@@ -336,18 +337,28 @@ class AppViewModel : ViewModel() {
     var checkoutMessage by mutableStateOf<String?>(null)
         private set
 
-    /** Compras del usuario guardadas en el backend: sobreviven a cerrar la app. */
+    /** Cache then network: la copia guardada sale al instante y se reemplaza cuando responde el servidor. */
     fun loadOrders(repository: OrderRepository) {
         orderRepository = repository
         val userId = currentUserId ?: return
-        viewModelScope.launch {
-            val loaded = repository.load(userId) ?: return@launch
-            orders.clear()
-            orders.addAll(loaded.purchases)
-            sales.clear()
-            sales.addAll(loaded.sales)
-            ordersLive = loaded.isLive
-            ordersSavedAtMillis = loaded.savedAtMillis
+        // Si ya hay compras o ventas en pantalla, no se devuelve a la copia vieja
+        val showSaved = orders.isEmpty() && sales.isEmpty()
+        // Una carga nueva cancela la anterior
+        ordersJob?.cancel()
+        ordersJob = viewModelScope.launch {
+            var live = true
+            var savedAt: Long? = null
+            repository.stream(userId, showSaved).collect { loaded ->
+                orders.clear()
+                orders.addAll(loaded.purchases)
+                sales.clear()
+                sales.addAll(loaded.sales)
+                live = loaded.isLive
+                savedAt = loaded.savedAtMillis
+            }
+            // El aviso offline solo sale si el servidor no respondio
+            ordersLive = live
+            ordersSavedAtMillis = savedAt
         }
     }
 
@@ -455,6 +466,7 @@ class AppViewModel : ViewModel() {
         wishlist.clear()
         wishlistProducts.clear()
         wishlistRepository?.clear()
+        ordersJob?.cancel()
         orders.clear()
         ratings.clear()
         ratingSync.clear()

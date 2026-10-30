@@ -7,6 +7,8 @@ import com.campusswap.app.model.SeedIds
 import com.campusswap.app.model.materials.toProduct
 import com.campusswap.app.model.remote.ExchangeDto
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
 import java.io.IOException
 import java.time.Instant
@@ -78,16 +80,29 @@ class OrderRepository(
         return PlaceOrderResult.Placed(order, unavailable)
     }
 
-    /** Tus compras y ventas. Sin red: la última copia guardada; null solo si nunca se guardó. */
-    suspend fun load(userId: String): MyExchanges? = try {
-        val fromServer = remote.mine()
-        cache.save(userId, KEY, fromServer)
-        toMyExchanges(fromServer, userId, isLive = true, savedAtMillis = null)
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        cache.load<List<ExchangeDto>>(userId, KEY)?.let { saved ->
-            toMyExchanges(saved.value, userId, isLive = false, savedAtMillis = saved.savedAtMillis)
+    /**
+     * Cache then network: primero emite la copia guardada (al instante, sin esperar la red)
+     * y luego la del servidor, que la reemplaza y queda guardada. */
+    fun stream(userId: String, showSaved: Boolean = true): Flow<MyExchanges> = flow {
+        val saved = cache.load<List<ExchangeDto>>(userId, KEY)
+        // 1. Cache
+        if (showSaved && saved != null) {
+            emit(toMyExchanges(saved.value, userId, isLive = false, savedAtMillis = saved.savedAtMillis))
+        }
+        // 2. Network
+        val fromServer = try {
+            remote.mine()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        if (fromServer != null) {
+            cache.save(userId, KEY, fromServer)
+            emit(toMyExchanges(fromServer, userId, isLive = true, savedAtMillis = null))
+        } else if (!showSaved && saved != null) {
+            // Sin red y la copia no se había mostrado: se muestra ahora, marcada como offline
+            emit(toMyExchanges(saved.value, userId, isLive = false, savedAtMillis = saved.savedAtMillis))
         }
     }
 
