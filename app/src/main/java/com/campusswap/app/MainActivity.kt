@@ -12,8 +12,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.viewmodel.AppViewModel
-import com.campusswap.app.view.navigation.CampusSwapApp
-import com.campusswap.app.view.theme.CampusSwapTheme
+import com.campusswap.app.views.navigation.CampusSwapApp
+import com.campusswap.app.views.themes.CampusSwapTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
