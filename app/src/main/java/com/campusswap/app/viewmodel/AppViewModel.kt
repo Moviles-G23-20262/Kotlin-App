@@ -312,6 +312,7 @@ class AppViewModel : ViewModel() {
 
     var ordersSavedAtMillis by mutableStateOf<Long?>(null)
         private set
+    private var ordersJob: Job? = null
 
 
     /** Tus ventas del backend lo que compraron (reservado o vendido) */
@@ -336,18 +337,28 @@ class AppViewModel : ViewModel() {
     var checkoutMessage by mutableStateOf<String?>(null)
         private set
 
-    /** Compras del usuario guardadas en el backend: sobreviven a cerrar la app. */
+    /** Cache then network: la copia guardada sale al instante y se reemplaza cuando responde el servidor. */
     fun loadOrders(repository: OrderRepository) {
         orderRepository = repository
         val userId = currentUserId ?: return
-        viewModelScope.launch {
-            val loaded = repository.load(userId) ?: return@launch
-            orders.clear()
-            orders.addAll(loaded.purchases)
-            sales.clear()
-            sales.addAll(loaded.sales)
-            ordersLive = loaded.isLive
-            ordersSavedAtMillis = loaded.savedAtMillis
+        // Si ya hay compras o ventas en pantalla, no se devuelve a la copia vieja
+        val showSaved = orders.isEmpty() && sales.isEmpty()
+        // Una carga nueva cancela la anterior
+        ordersJob?.cancel()
+        ordersJob = viewModelScope.launch {
+            var live = true
+            var savedAt: Long? = null
+            repository.stream(userId, showSaved).collect { loaded ->
+                orders.clear()
+                orders.addAll(loaded.purchases)
+                sales.clear()
+                sales.addAll(loaded.sales)
+                live = loaded.isLive
+                savedAt = loaded.savedAtMillis
+            }
+            // El aviso offline solo sale si el servidor no respondio
+            ordersLive = live
+            ordersSavedAtMillis = savedAt
         }
     }
 
@@ -362,6 +373,7 @@ class AppViewModel : ViewModel() {
     suspend fun placeOrder(meetOnCampus: Boolean = true): Int? {
         checkoutMessage = null
         val repository = orderRepository
+        var notSent: List<Product> = emptyList()
         val order = if (repository == null) {
             // Acceso demo (sin sesión): la orden solo existe en el teléfono, como antes
             Order(number = (1000..9999).random(), lines = cart.toList(), meetOnCampus = meetOnCampus)
@@ -376,11 +388,14 @@ class AppViewModel : ViewModel() {
                     checkoutMessage = "No longer available: ${result.unavailable.joinToString { it.title }}"
                     return null
                 }
-                is PlaceOrderResult.Placed -> result.order
+                is PlaceOrderResult.Placed -> {
+                    notSent = result.notSent
+                    result.order
+                }
             }
         }
         orders.add(0, order)
-        cart.clear()
+        cart.removeAll { line -> notSent.none { it.id == line.product.id } }
         order.products.forEach { product ->
             Analytics.log(
                 Events.PURCHASE_COMPLETED,
@@ -399,6 +414,10 @@ class AppViewModel : ViewModel() {
             )
         }
         if (repository != null) loadOrders(repository)
+        if (notSent.isNotEmpty()) {
+            checkoutMessage = "Connection lost. Order #CSW-${order.number} has ${order.products.joinToString { it.title }}. Still in your cart: ${notSent.joinToString { it.title }}."
+            return null
+        }
         return order.number
     }
 
@@ -455,6 +474,7 @@ class AppViewModel : ViewModel() {
         wishlist.clear()
         wishlistProducts.clear()
         wishlistRepository?.clear()
+        ordersJob?.cancel()
         orders.clear()
         ratings.clear()
         ratingSync.clear()

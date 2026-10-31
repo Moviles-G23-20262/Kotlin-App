@@ -7,6 +7,8 @@ import com.campusswap.app.model.SeedIds
 import com.campusswap.app.model.materials.toProduct
 import com.campusswap.app.model.remote.ExchangeDto
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import retrofit2.HttpException
 import java.io.IOException
 import java.time.Instant
@@ -16,7 +18,7 @@ import com.campusswap.app.model.local.save
 
 sealed interface PlaceOrderResult {
     /** [unavailable]: productos del carrito que no se pudieron pedir */
-    data class Placed(val order: Order, val unavailable: List<Product>) : PlaceOrderResult
+    data class Placed(val order: Order, val unavailable: List<Product>, val notSent: List<Product> = emptyList()) : PlaceOrderResult
     data class Rejected(val unavailable: List<Product>) : PlaceOrderResult
     data object Offline : PlaceOrderResult
 }
@@ -48,7 +50,8 @@ class OrderRepository(
     suspend fun place(lines: List<CartLine>, meetOnCampus: Boolean): PlaceOrderResult {
         val placed = mutableListOf<Pair<Product, ExchangeDto>>()
         val unavailable = mutableListOf<Product>()
-        for (line in lines) {
+        val notSent = mutableListOf<Product>()
+        for ((index, line) in lines.withIndex()) {
             val product = line.product
             // Una publicación pendiente del Outbox todavía no existe en el servidor
             if (!SeedIds.isBackendId(product.id)) {
@@ -62,7 +65,8 @@ class OrderRepository(
             } catch (e: IOException) {
                 // Sin red antes de pedir nada: no se hizo ningún pedido, el carrito queda igual
                 if (placed.isEmpty()) return PlaceOrderResult.Offline
-                unavailable += product
+                notSent += lines.drop(index).map { it.product }
+                break
             } catch (e: HttpException) {
                 // 409: ya lo reservó otra persona · 400: es tu propia publicación · 404: ya no existe
                 unavailable += product
@@ -75,19 +79,32 @@ class OrderRepository(
             lines = placed.map { (product, _) -> CartLine(product, 1) },
             meetOnCampus = meetOnCampus,
         )
-        return PlaceOrderResult.Placed(order, unavailable)
+        return PlaceOrderResult.Placed(order, unavailable, notSent)
     }
 
-    /** Tus compras y ventas. Sin red: la última copia guardada; null solo si nunca se guardó. */
-    suspend fun load(userId: String): MyExchanges? = try {
-        val fromServer = remote.mine()
-        cache.save(userId, KEY, fromServer)
-        toMyExchanges(fromServer, userId, isLive = true, savedAtMillis = null)
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        cache.load<List<ExchangeDto>>(userId, KEY)?.let { saved ->
-            toMyExchanges(saved.value, userId, isLive = false, savedAtMillis = saved.savedAtMillis)
+    /**
+     * Cache then network: primero emite la copia guardada (al instante, sin esperar la red)
+     * y luego la del servidor, que la reemplaza y queda guardada. */
+    fun stream(userId: String, showSaved: Boolean = true): Flow<MyExchanges> = flow {
+        val saved = cache.load<List<ExchangeDto>>(userId, KEY)
+        // 1. Cache
+        if (showSaved && saved != null) {
+            emit(toMyExchanges(saved.value, userId, isLive = false, savedAtMillis = saved.savedAtMillis))
+        }
+        // 2. Network
+        val fromServer = try {
+            remote.mine()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        if (fromServer != null) {
+            cache.save(userId, KEY, fromServer)
+            emit(toMyExchanges(fromServer, userId, isLive = true, savedAtMillis = null))
+        } else if (!showSaved && saved != null) {
+            // Sin red y la copia no se había mostrado: se muestra ahora, marcada como offline
+            emit(toMyExchanges(saved.value, userId, isLive = false, savedAtMillis = saved.savedAtMillis))
         }
     }
 
