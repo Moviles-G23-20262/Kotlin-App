@@ -28,6 +28,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +58,7 @@ import com.campusswap.app.views.themes.AccentBlue
 import com.campusswap.app.views.themes.ErrorRed
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.viewmodel.AuthViewModel
+import com.campusswap.app.model.domain.UniandesMajors
 
 @Composable
 fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> Unit) {
@@ -77,7 +82,7 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
 
     fun attemptRegister() {
         nameError = InputValidation.nameError(fullName)
-        majorError = InputValidation.majorError(major)
+        majorError = UniandesMajors.error(major)
         emailError = InputValidation.emailError(email, requireInstitutional = true)
         passwordError = InputValidation.passwordError(password)
         confirmError = InputValidation.confirmPasswordError(password, confirmPassword)
@@ -143,12 +148,11 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
                     counter = "${fullName.length}/${InputLimits.NAME_MAX}",
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
                 )
-                FormField(
-                    value = major,
-                    onValueChange = { major = InputValidation.sanitizeName(it, InputLimits.MAJOR_MAX); majorError = null },
-                    label = "Major",
+                MajorDropdown(
+                    selected = major,
+                    onSelect = { major = it; majorError = null },
                     error = majorError,
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words, imeAction = ImeAction.Next),
+                    enabled = !isLoading,
                 )
                 FormField(
                     value = email,
@@ -249,4 +253,40 @@ internal fun FormField(
         },
         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
     )
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MajorDropdown(selected: String, onSelect: (String) -> Unit, error: String?, enabled: Boolean) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { if (enabled) expanded = it },
+        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+    ) {
+        OutlinedTextField(
+            value = selected,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Major") },
+            placeholder = { Text("Choose your major") },
+            singleLine = true,
+            isError = error != null,
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            supportingText = error?.let { message -> { Text(message, color = ErrorRed) } },
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            UniandesMajors.all.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onSelect(option)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
 }
