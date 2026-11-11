@@ -198,7 +198,8 @@ class AppViewModel : ViewModel() {
         cartSaver?.cancel()
         cartSaver = viewModelScope.launch {
             val saved = store.read(userId)
-            if (cart.isEmpty()) cart.addAll(saved)
+            // Carts saved by older versions could hold a quantity above 1; a listing is one item.
+            if (cart.isEmpty()) cart.addAll(saved.distinctBy { it.product.id }.map { it.copy(quantity = 1) })
             snapshotFlow { cart.toList() }
                 .drop(1) // la primera emisión es lo que se acaba de leer
                 .debounce(CART_SAVE_DEBOUNCE_MS)
@@ -553,29 +554,23 @@ class AppViewModel : ViewModel() {
         }
     }
 
+    /**
+     * A listing is a single physical item and the server reserves it once per order, so it is either in
+     * the cart or not: tapping "Add to Cart" again does nothing instead of raising a quantity (and a total)
+     * the order would never honour. The seller's own listings can't be added.
+     */
     fun addToCart(product: Product) {
+        if (isInCart(product.id) || isMine(product)) return
         Analytics.log(Events.CART_ADD, "product_id" to product.id, "category" to product.category.name)
-        val index = cart.indexOfFirst { it.product.id == product.id }
-        if (index >= 0) {
-            val existing = cart[index]
-            cart[index] = existing.copy(quantity = (existing.quantity + 1).coerceAtMost(InputLimits.CART_QUANTITY_MAX))
-        } else {
-            cart.add(CartLine(product, 1))
-        }
+        cart.add(CartLine(product, 1))
     }
+
+    fun isInCart(productId: String): Boolean = cart.any { it.product.id == productId }
+
+    fun isMine(product: Product): Boolean = product.seller.id == currentUser.id
 
     fun removeFromCart(productId: String) {
         cart.removeAll { it.product.id == productId }
-    }
-
-    fun setQuantity(productId: String, quantity: Int) {
-        val index = cart.indexOfFirst { it.product.id == productId }
-        if (index < 0) return
-        if (quantity <= 0) {
-            cart.removeAt(index)
-        } else {
-            cart[index] = cart[index].copy(quantity = quantity.coerceAtMost(InputLimits.CART_QUANTITY_MAX))
-        }
     }
 
     // save searches & smart matches (View 11)

@@ -28,12 +28,7 @@ object InputLimits {
     const val PRICE_STEP = 100L
 
     const val SEARCH_MAX = 60
-    const val ADDRESS_MAX = 120
     const val MESSAGE_MAX = 500
-    const val ADDRESS_MIN = 8
-
-    /** Listings are second-hand items; nobody needs more than a few of the same one. */
-    const val CART_QUANTITY_MAX = 5
 }
 
 object InputValidation {

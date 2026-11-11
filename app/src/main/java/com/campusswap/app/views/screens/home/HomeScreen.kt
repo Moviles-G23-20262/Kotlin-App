@@ -240,6 +240,7 @@ fun HomeScreen(
                 RecommendedRow(
                     product = product,
                     onClick = { onProductClick(product.id) },
+                    inCart = vm.isInCart(product.id),
                     onAddToCart = { vm.addToCart(product) },
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
                 )
@@ -272,6 +273,7 @@ fun HomeScreen(
 private fun RecommendedRow(
     product: Product,
     onClick: () -> Unit,
+    inCart: Boolean,
     onAddToCart: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -296,8 +298,10 @@ private fun RecommendedRow(
         ) {
             PriceText(product.price, modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp))
             PrimaryButton(
-                text = "Add to Cart",
+                // Says when it worked: before, the button looked the same after every tap.
+                text = if (inCart) "In cart ✓" else "Add to Cart",
                 onClick = onAddToCart,
+                enabled = !inCart,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 5.dp),
                 fontSize = CampusType.sizeXs,
             )
