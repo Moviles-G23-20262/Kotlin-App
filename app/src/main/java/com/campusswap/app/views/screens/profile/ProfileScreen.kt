@@ -14,7 +14,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,6 +47,9 @@ import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.themes.CampusType
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.CampusSwapApplication
@@ -78,6 +85,22 @@ fun ProfileScreen(
     val inboxState by inbox.state.collectAsState()
     val buyerMessages = inboxState.conversations.filter { it.sellingThis }.take(3)
 
+    // The log-out icon sits next to "Add Item": one stray tap used to sign the user out.
+    var confirmLogout by remember { mutableStateOf(false) }
+    if (confirmLogout) {
+        AlertDialog(
+            onDismissRequest = { confirmLogout = false },
+            title = { Text("Log out?") },
+            text = { Text("Anything still waiting to be sent stays on this phone and goes out the next time you log in.") },
+            confirmButton = {
+                TextButton(onClick = { confirmLogout = false; onLogout() }) {
+                    Text("Log out", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("Cancel") } },
+        )
+    }
+
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
         CampusHeader {
             Row(
@@ -94,7 +117,7 @@ fun ProfileScreen(
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
                     fontSize = CampusType.sizeXs,
                 )
-                CampusIconButton(CampusIcons.LogOut, contentDescription = "Log out", onClick = onLogout, iconSize = 18.dp)
+                CampusIconButton(CampusIcons.LogOut, contentDescription = "Log out", onClick = { confirmLogout = true }, iconSize = 18.dp)
             }
         OfflineBanner(
             visible = !vm.ordersLive,
