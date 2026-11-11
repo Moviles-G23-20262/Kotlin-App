@@ -21,6 +21,7 @@ object Routes {
     const val WISHLIST = "wishlist"
     const val ALERTS = "alerts"
     const val MESSAGES = "messages"
+    const val MEETUPS = "meetups"
     const val CHAT = "chat/{productId}?room={room}"
     const val MEETING_POINT = "meeting/{productId}"
     const val COMPLETION = "complete/{productId}"

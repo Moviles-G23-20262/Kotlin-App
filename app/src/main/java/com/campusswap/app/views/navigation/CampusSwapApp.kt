@@ -47,6 +47,7 @@ import com.campusswap.app.views.screens.home.HomeScreen
 import com.campusswap.app.views.screens.home.NotificationsScreen
 import com.campusswap.app.views.screens.home.WishlistScreen
 import com.campusswap.app.views.screens.meeting.MeetingPointScreen
+import com.campusswap.app.views.screens.meeting.MeetupsScreen
 import com.campusswap.app.views.screens.product.ProductDetailScreen
 import com.campusswap.app.views.screens.profile.ProfileScreen
 import com.campusswap.app.views.screens.rating.CompletionScreen
@@ -366,7 +367,17 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                 MessagesScreen(
                     onBack = { navController.popBackStack() },
                     onOpenChat = { id, room -> navController.navigate(Routes.chat(id, room)) },
+                    onOpenMeetups = { navController.navigate(Routes.MEETUPS) },
                 )
+            }
+
+            composable(Routes.MEETUPS) {
+                RequireSession(navController, container.sessionManager) {
+                    MeetupsScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenChat = { id, room -> navController.navigate(Routes.chat(id, room)) },
+                    )
+                }
             }
 
             composable(
