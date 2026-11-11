@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.tracing.trace
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -67,24 +68,26 @@ fun SearchScreen(
     var filtersExpanded by remember { mutableStateOf(initialCategory != null && initialCategory != Category.ALL) }
 
     val results = remember(query, selectedCategory, selectedCondition, maxPrice, sortOption, vm.allProducts.size) {
-        vm.allProducts
-            .filter { selectedCategory == Category.ALL || it.category == selectedCategory }
-            .filter { selectedCondition == null || it.condition == selectedCondition }
-            .filter { it.price <= maxPrice.toDouble() }
-            .filter {
-                query.isBlank() ||
-                    it.title.contains(query, ignoreCase = true) ||
-                    it.category.label.contains(query, ignoreCase = true) ||
-                    (it.course?.code?.contains(query, ignoreCase = true) == true)
-            }
-            .let { list ->
-                when (sortOption) {
-                    SortOption.RELEVANCE -> list
-                    SortOption.PRICE_LOW -> list.sortedBy { it.price }
-                    SortOption.PRICE_HIGH -> list.sortedByDescending { it.price }
-                    SortOption.RATING -> list.sortedByDescending { it.rating ?: 0.0 }
+        trace("Search.results") {
+            vm.allProducts
+                .filter { selectedCategory == Category.ALL || it.category == selectedCategory }
+                .filter { selectedCondition == null || it.condition == selectedCondition }
+                .filter { it.price <= maxPrice.toDouble() }
+                .filter {
+                    query.isBlank() ||
+                        it.title.contains(query, ignoreCase = true) ||
+                        it.category.label.contains(query, ignoreCase = true) ||
+                        (it.course?.code?.contains(query, ignoreCase = true) == true)
                 }
-            }
+                .let { list ->
+                    when (sortOption) {
+                        SortOption.RELEVANCE -> list
+                        SortOption.PRICE_LOW -> list.sortedBy { it.price }
+                        SortOption.PRICE_HIGH -> list.sortedByDescending { it.price }
+                        SortOption.RATING -> list.sortedByDescending { it.rating ?: 0.0 }
+                    }
+                }
+        }
     }
 
     LaunchedEffect(query) {

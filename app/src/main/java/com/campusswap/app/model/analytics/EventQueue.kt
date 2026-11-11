@@ -1,5 +1,6 @@
 package com.campusswap.app.model.analytics
 
+import androidx.tracing.trace
 import org.json.JSONObject
 import java.io.File
 
@@ -32,9 +33,9 @@ class EventQueue(
     private val sink: EventSink,
     private val batchSize: Int = 20,
 ) {
-    fun enqueue(event: AnalyticsEvent) = store.append(event)
+    fun enqueue(event: AnalyticsEvent) = trace("EventQueue.enqueue") { store.append(event) }
 
-    fun shouldFlush(): Boolean = store.size() >= batchSize
+    fun shouldFlush(): Boolean = trace("EventQueue.shouldFlush") { store.size() >= batchSize }
 
     /** Sends everything queued, batch by batch. Stops at the first rejected batch. Returns events sent. */
     suspend fun flush(): Int {

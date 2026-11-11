@@ -61,6 +61,7 @@ import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
 import androidx.compose.runtime.snapshotFlow
+import androidx.tracing.trace
 import com.campusswap.app.model.local.CartStore
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
@@ -294,11 +295,13 @@ class AppViewModel : ViewModel() {
         username.trim() == DEMO_USERNAME && password == DEMO_PASSWORD
 
     val featuredSellers: List<FeaturedSeller>
-        get() = allProducts
-            .groupBy { it.seller.id }
-            .filterKeys { it != currentUser.id }
-            .map { (_, items) -> FeaturedSeller(items.first().seller, items.size) }
-            .sortedByDescending { it.seller.rating ?: 0.0 }
+        get() = trace("Home.featuredSellers") {
+            allProducts
+                .groupBy { it.seller.id }
+                .filterKeys { it != currentUser.id }
+                .map { (_, items) -> FeaturedSeller(items.first().seller, items.size) }
+                .sortedByDescending { it.seller.rating ?: 0.0 }
+        }
 
     val serviceFee: Double get() = if (cart.isEmpty()) 0.0 else SERVICE_FEE
 

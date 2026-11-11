@@ -60,6 +60,7 @@ import com.campusswap.app.model.Product
 import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.themes.CampusType
 import androidx.compose.ui.unit.sp
+import androidx.tracing.trace
 
 @Composable
 fun HomeScreen(
@@ -76,13 +77,15 @@ fun HomeScreen(
     var selectedCategory by rememberSaveable { mutableStateOf(Category.ALL) }
 
     // Keyed on the list itself: a queued listing being replaced by the published one keeps the same size.
-    val products = vm.allProducts.toList()
+    val products = trace("Home.copyProducts") { vm.allProducts.toList() }
     val offers: List<Product> = remember(selectedCategory, products) {
-        val list = if (selectedCategory == Category.ALL) vm.allProducts.toList() else vm.allProducts.filter { it.category == selectedCategory }
-        list.take(4)
+        trace("Home.offers") {
+            val list = if (selectedCategory == Category.ALL) vm.allProducts.toList() else vm.allProducts.filter { it.category == selectedCategory }
+            list.take(4)
+        }
     }
     val recommended: List<Product> = remember(products) {
-        vm.allProducts.filter { it.seller.id != vm.currentUser.id }.drop(1).take(3)
+        trace("Home.recommended") { vm.allProducts.filter { it.seller.id != vm.currentUser.id }.drop(1).take(3) }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
