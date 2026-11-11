@@ -87,6 +87,7 @@ import com.campusswap.app.model.MessageAuthor
 import com.campusswap.app.model.MessageStatus
 import com.campusswap.app.views.components.OfflineBanner
 import com.campusswap.app.views.components.timeAgo
+import com.campusswap.app.views.components.WhileVisible
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ErrorOutline
 import com.campusswap.app.model.Product
@@ -128,6 +129,7 @@ fun ChatScreen(
             vm.cacheProposal(id, proposal)
         },
     )
+    WhileVisible(chat) { chat.pollWhileVisible() }
     val state by chat.state.collectAsState()
     val messages = state.messages
     val counterpart = state.counterpartName ?: product.seller.name

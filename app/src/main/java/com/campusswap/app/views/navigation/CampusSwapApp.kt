@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,6 +53,7 @@ import com.campusswap.app.views.screens.rating.CompletionScreen
 import com.campusswap.app.views.screens.search.SearchScreen
 import com.campusswap.app.views.screens.sell.SellScreen
 import com.campusswap.app.views.themes.CampusSwapTheme
+import com.campusswap.app.views.components.WhileVisible
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.NotificationManagerCompat
 import com.campusswap.app.CampusSwapApplication
@@ -122,10 +124,12 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
     }
 
     var unreadMessages by remember { mutableIntStateOf(0) }
-    LaunchedEffect(appViewModel.isLoggedIn, currentRoute) {
+    // Refreshed on every navigation, then every 15 s, but only while the app is in the foreground and online.
+    WhileVisible(appViewModel.isLoggedIn, currentRoute) {
         while (appViewModel.isLoggedIn) {
             unreadMessages = container.conversationsRepository.unreadCount()
             delay(UNREAD_POLL_MS)
+            container.connectivity.isOnline.first { it }
         }
     }
 
@@ -264,6 +268,7 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                         navigateToTab(Routes.SEARCH)
                     },
                     onSearchClick = { navigateToTab(Routes.SEARCH) },
+                    onAlertsClick = { navController.navigate(Routes.ALERTS) },
                     onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
                     onWishlistClick = { navController.navigate(Routes.WISHLIST) },
                     onMessagesClick = { navController.navigate(Routes.MESSAGES) },

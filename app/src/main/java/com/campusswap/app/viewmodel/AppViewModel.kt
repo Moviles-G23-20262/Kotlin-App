@@ -21,6 +21,8 @@ import com.campusswap.app.model.SmartAlert
 import com.campusswap.app.model.TransactionRating
 import com.campusswap.app.model.domain.InputLimits
 import com.campusswap.app.model.domain.InputValidation
+import com.campusswap.app.model.domain.matches
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -61,7 +63,9 @@ import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
 import androidx.compose.runtime.snapshotFlow
+import androidx.tracing.trace
 import com.campusswap.app.model.local.CartStore
+import com.campusswap.app.model.local.ThemeStore
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -74,8 +78,21 @@ import kotlinx.coroutines.flow.drop
  * across screens (cart badge, wishlist hearts, newly published listings, etc.).
  */
 class AppViewModel : ViewModel() {
-    var isDarkTheme by mutableStateOf(true)
+    /** The theme the user picked; null follows the phone's light/dark setting. Saved in [ThemeStore]. */
+    var darkThemeChoice by mutableStateOf<Boolean?>(null)
         private set
+
+    private var themeStore: ThemeStore? = null
+
+    fun restoreTheme(store: ThemeStore) {
+        themeStore = store
+        viewModelScope.launch { darkThemeChoice = store.read() }
+    }
+
+    fun setDarkTheme(dark: Boolean) {
+        darkThemeChoice = dark
+        themeStore?.let { store -> viewModelScope.launch { store.save(dark) } }
+    }
 
     var isLoggedIn by mutableStateOf(false)
         private set
@@ -95,6 +112,10 @@ class AppViewModel : ViewModel() {
 
     /** False when Home is showing the on-device copy of the listings because the server couldn't be reached. */
     var materialsLive by mutableStateOf(true)
+        private set
+
+    /** True while the first page of listings is on its way, so Home shows placeholders, not "No offers". */
+    var materialsLoading by mutableStateOf(false)
         private set
 
     var materialsUpdatedAtMillis by mutableStateOf<Long?>(null)
@@ -196,7 +217,8 @@ class AppViewModel : ViewModel() {
         cartSaver?.cancel()
         cartSaver = viewModelScope.launch {
             val saved = store.read(userId)
-            if (cart.isEmpty()) cart.addAll(saved)
+            // Carts saved by older versions could hold a quantity above 1; a listing is one item.
+            if (cart.isEmpty()) cart.addAll(saved.distinctBy { it.product.id }.map { it.copy(quantity = 1) })
             snapshotFlow { cart.toList() }
                 .drop(1) // la primera emisión es lo que se acaba de leer
                 .debounce(CART_SAVE_DEBOUNCE_MS)
@@ -279,9 +301,6 @@ class AppViewModel : ViewModel() {
 
     val unreadNotificationCount get() = notifications.count { !it.isRead }
 
-    fun toggleTheme() {
-        isDarkTheme = !isDarkTheme
-    }
 
     fun login(userId: String? = null) {
         currentUserId = userId
@@ -293,12 +312,20 @@ class AppViewModel : ViewModel() {
     fun checkCredentials(username: String, password: String): Boolean =
         username.trim() == DEMO_USERNAME && password == DEMO_PASSWORD
 
-    val featuredSellers: List<FeaturedSeller>
-        get() = allProducts
-            .groupBy { it.seller.id }
-            .filterKeys { it != currentUser.id }
-            .map { (_, items) -> FeaturedSeller(items.first().seller, items.size) }
-            .sortedByDescending { it.seller.rating ?: 0.0 }
+    /**
+     * Sellers with listings in the feed, best rated first. derivedStateOf keeps the result and recomputes
+     * it only when the catalogue or the signed-in user changes; as a plain getter it grouped the whole
+     * catalogue every time Home recomposed.
+     */
+    val featuredSellers: List<FeaturedSeller> by derivedStateOf {
+        trace("Home.featuredSellers") {
+            allProducts
+                .groupBy { it.seller.id }
+                .filterKeys { it != currentUser.id }
+                .map { (_, items) -> FeaturedSeller(items.first().seller, items.size) }
+                .sortedByDescending { it.seller.rating ?: 0.0 }
+        }
+    }
 
     val serviceFee: Double get() = if (cart.isEmpty()) 0.0 else SERVICE_FEE
 
@@ -338,9 +365,9 @@ class AppViewModel : ViewModel() {
         private set
 
     /** Cache then network: la copia guardada sale al instante y se reemplaza cuando responde el servidor. */
-    fun loadOrders(repository: OrderRepository) {
+    fun loadOrders(repository: OrderRepository): Job? {
         orderRepository = repository
-        val userId = currentUserId ?: return
+        val userId = currentUserId ?: return null
         // Si ya hay compras o ventas en pantalla, no se devuelve a la copia vieja
         val showSaved = orders.isEmpty() && sales.isEmpty()
         // Una carga nueva cancela la anterior
@@ -360,6 +387,7 @@ class AppViewModel : ViewModel() {
             ordersLive = live
             ordersSavedAtMillis = savedAt
         }
+        return ordersJob
     }
 
     fun findProduct(id: String): Product? =
@@ -543,29 +571,23 @@ class AppViewModel : ViewModel() {
         }
     }
 
+    /**
+     * A listing is a single physical item and the server reserves it once per order, so it is either in
+     * the cart or not: tapping "Add to Cart" again does nothing instead of raising a quantity (and a total)
+     * the order would never honour. The seller's own listings can't be added.
+     */
     fun addToCart(product: Product) {
+        if (isInCart(product.id) || isMine(product)) return
         Analytics.log(Events.CART_ADD, "product_id" to product.id, "category" to product.category.name)
-        val index = cart.indexOfFirst { it.product.id == product.id }
-        if (index >= 0) {
-            val existing = cart[index]
-            cart[index] = existing.copy(quantity = (existing.quantity + 1).coerceAtMost(InputLimits.CART_QUANTITY_MAX))
-        } else {
-            cart.add(CartLine(product, 1))
-        }
+        cart.add(CartLine(product, 1))
     }
+
+    fun isInCart(productId: String): Boolean = cart.any { it.product.id == productId }
+
+    fun isMine(product: Product): Boolean = product.seller.id == currentUser.id
 
     fun removeFromCart(productId: String) {
         cart.removeAll { it.product.id == productId }
-    }
-
-    fun setQuantity(productId: String, quantity: Int) {
-        val index = cart.indexOfFirst { it.product.id == productId }
-        if (index < 0) return
-        if (quantity <= 0) {
-            cart.removeAt(index)
-        } else {
-            cart[index] = cart[index].copy(quantity = quantity.coerceAtMost(InputLimits.CART_QUANTITY_MAX))
-        }
     }
 
     // save searches & smart matches (View 11)
@@ -578,14 +600,7 @@ class AppViewModel : ViewModel() {
         get() = alerts.filter { it.enabled }.flatMap { alert ->
             allProducts
                 .filter { it.seller.id != currentUser.id }
-                .filter { product ->
-                    product.price <= alert.maxPrice &&
-                        product.condition.ordinal <= alert.minCondition.ordinal &&
-                        (alert.course == null || product.course?.code == alert.course.code) &&
-                        (alert.category == Category.ALL || product.category == alert.category) &&
-                        (alert.keyword.isBlank() || product.title.contains(alert.keyword, ignoreCase = true) ||
-                            product.course?.code?.contains(alert.keyword, ignoreCase = true) == true)
-                }
+                .filter { product -> alert.matches(product) }
                 .map { product ->
                     AlertMatch(
                         alert = alert,
@@ -730,9 +745,9 @@ class AppViewModel : ViewModel() {
     val myRating: Double?
         get() = myReviews.takeIf { it.isNotEmpty() }?.map { it.stars }?.average()
 
-    fun loadMyReviews(repository: RatingRepository) {
-        val userId = currentUserId ?: return
-        viewModelScope.launch {
+    fun loadMyReviews(repository: RatingRepository): Job? {
+        val userId = currentUserId ?: return null
+        return viewModelScope.launch {
             val reviews = repository.received(userId) ?: return@launch
             myReviews.clear()
             myReviews.addAll(reviews)
@@ -842,10 +857,10 @@ class AppViewModel : ViewModel() {
         private set
 
     /** [markRead] is for the notifications screen; a background refresh keeps the unread badge. */
-    fun loadNotifications(repository: NotificationRepository, markRead: Boolean = true) {
+    fun loadNotifications(repository: NotificationRepository, markRead: Boolean = true): Job? {
         notificationRepository = repository
-        val userId = currentUserId ?: return
-        viewModelScope.launch {
+        val userId = currentUserId ?: return null
+        return viewModelScope.launch {
             val feed = repository.load(userId)
             notificationsLive = feed.isLive
             notifications.removeAll { it.id in loadedNotificationIds }
@@ -869,15 +884,19 @@ class AppViewModel : ViewModel() {
 
     private var loadedMaterialIds: Set<String> = emptySet()
 
-    fun loadMaterials(repository: MaterialRepository) {
-        viewModelScope.launch {
-            val feed = repository.load()
-            materialsLive = feed.isLive
-            materialsUpdatedAtMillis = feed.updatedAtMillis
-            allProducts.removeAll { it.id in loadedMaterialIds }
-            allProducts.addAll(allProducts.count { it.pendingSync != null }, feed.products)
-            loadedMaterialIds = feed.products.map { it.id }.toSet()
+    /** Returns the load, so pull-to-refresh can wait for it. */
+    fun loadMaterials(repository: MaterialRepository): Job = viewModelScope.launch {
+        materialsLoading = allProducts.none { it.id in loadedMaterialIds }
+        val feed = try {
+            repository.load()
+        } finally {
+            materialsLoading = false
         }
+        materialsLive = feed.isLive
+        materialsUpdatedAtMillis = feed.updatedAtMillis
+        allProducts.removeAll { it.id in loadedMaterialIds }
+        allProducts.addAll(allProducts.count { it.pendingSync != null }, feed.products)
+        loadedMaterialIds = feed.products.map { it.id }.toSet()
     }
 
     fun isRemoteNotification(id: String) = id in loadedNotificationIds
@@ -961,4 +980,3 @@ fun pendingProductId(localId: Long) = "pending-$localId"
 const val DEMO_USERNAME = "uwu"
 const val DEMO_PASSWORD = "uwu123"
 const val SERVICE_FEE = 2000.0
-const val HOME_DELIVERY_FEE = 10000.0

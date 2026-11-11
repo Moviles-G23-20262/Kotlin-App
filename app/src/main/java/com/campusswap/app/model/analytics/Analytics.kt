@@ -43,11 +43,13 @@ object Analytics {
 
     fun screen(name: String) {
         currentScreen = name
+        CrashTelemetry.screen(name)
         log(Events.SCREEN_VIEW)
     }
 
     fun log(name: String, vararg properties: Pair<String, Any?>) {
         val q = queue ?: return
+        CrashTelemetry.breadcrumb(name)
         scope.launch {
             q.enqueue(newEvent(name, properties.toMap()))
             if (q.shouldFlush()) flush()

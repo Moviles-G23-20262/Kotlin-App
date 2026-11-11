@@ -4,6 +4,16 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// BQ1: crashes go to Firebase Crashlytics. The Firebase plugins need app/google-services.json
+// (downloaded from the Firebase console). Without it the app still builds and runs, and
+// CrashTelemetry stays off, so nobody is blocked while the file is missing.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+} else {
+    logger.warn("app/google-services.json not found: building without Firebase Crashlytics (BQ1).")
+}
+
 android {
     namespace = "com.campusswap.app"
     compileSdk = 34
@@ -57,6 +67,7 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
     implementation("androidx.activity:activity-compose:1.9.1")
 
     implementation(platform("androidx.compose:compose-bom:2024.09.00"))
@@ -71,6 +82,8 @@ dependencies {
 
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    implementation("com.google.firebase:firebase-crashlytics")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
@@ -78,6 +91,8 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // Named sections for the CPU profiler's System Trace (micro-optimization measurements).
+    implementation("androidx.tracing:tracing-ktx:1.2.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20231013")

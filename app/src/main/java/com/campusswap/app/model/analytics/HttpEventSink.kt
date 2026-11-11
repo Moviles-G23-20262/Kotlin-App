@@ -1,36 +1,35 @@
 package com.campusswap.app.model.analytics
 
+import com.campusswap.app.model.remote.AnalyticsEventBatchRequest
 import com.campusswap.app.model.remote.AnalyticsEventsApi
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException
-import java.util.Collections
 
+/**
+ * Sends a batch of the queue in a single `POST /analytics-events/batch` instead of one request per
+ * event. The server ignores an event it already has (same client id), so a whole batch can be resent
+ * after a lost response without duplicating anything, and one invalid event is skipped by the server
+ * without failing the rest.
+ */
 class HttpEventSink(
     private val api: AnalyticsEventsApi,
     private val hasSession: () -> Boolean,
 ) : EventSink {
-    private val delivered: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
-
     override suspend fun send(batch: List<AnalyticsEvent>): Boolean {
-        val requests = batch.mapNotNull { event -> BackendEventMapper.toRequest(event)?.let { event to it } }
-        if (requests.isEmpty() || !hasSession()) return true
+        val events = batch.mapNotNull(BackendEventMapper::toRequest)
+        if (events.isEmpty() || !hasSession()) return true
 
-        for ((event, request) in requests) {
-            val key = event.toJson().toString()
-            if (key in delivered) continue
-            try {
-                api.create(request)
-                delivered += key
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: IOException) {
-                return false
-            } catch (e: HttpException) {
-                if (e.code() == 401 || e.code() >= 500) return false
-                delivered += key
-            }
+        return try {
+            api.createBatch(AnalyticsEventBatchRequest(events))
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            false
+        } catch (e: HttpException) {
+            // 401 (session expired) and 5xx keep the batch for later; any other 4xx would fail forever.
+            e.code() != 401 && e.code() < 500
         }
-        return true
     }
 }

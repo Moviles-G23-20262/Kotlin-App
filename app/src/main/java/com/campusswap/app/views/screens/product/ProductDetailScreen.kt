@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -90,8 +91,11 @@ fun ProductDetailScreen(
         return
     }
 
-    val related = remember(product.id, vm.allProducts.size) {
-        vm.allProducts.filter { it.id != product.id && it.category == product.category }.take(3)
+    // Rebuilt only when the catalogue changes (not just its size), stopping at the 3 items shown.
+    val related by remember(product.id, product.category) {
+        derivedStateOf {
+            vm.allProducts.asSequence().filter { it.id != product.id && it.category == product.category }.take(3).toList()
+        }
     }
     var addedTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(addedTick) {
@@ -132,13 +136,16 @@ fun ProductDetailScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 CampusIconButton(CampusIcons.Back, contentDescription = "Back", onClick = onBack)
-                val wishlisted = vm.isWishlisted(product.id)
-                CampusIconButton(
-                    icon = if (wishlisted) CampusIcons.HeartFilled else CampusIcons.Heart,
-                    contentDescription = "Toggle wishlist",
-                    onClick = { vm.toggleWishlist(product.id) },
-                    iconTint = c.accent,
-                )
+                // Saving your own listing to your wishlist makes no sense.
+                if (!vm.isMine(product)) {
+                    val wishlisted = vm.isWishlisted(product.id)
+                    CampusIconButton(
+                        icon = if (wishlisted) CampusIcons.HeartFilled else CampusIcons.Heart,
+                        contentDescription = if (wishlisted) "Remove from wishlist" else "Save to wishlist",
+                        onClick = { vm.toggleWishlist(product.id) },
+                        iconTint = c.accent,
+                    )
+                }
             }
             Row(
                 modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
@@ -209,7 +216,8 @@ fun ProductDetailScreen(
                 }
             }
 
-            SellerCard(product = product, onChat = { onChatWithSeller(product.id) })
+            val isMine = vm.isMine(product)
+            SellerCard(product = product, isMine = isMine, onChat = { onChatWithSeller(product.id) })
 
             HeadingText("About this item", size = CampusType.sizeSm, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
             BodyText(product.description, lineHeight = CampusType.sizeXs * 1.7f)
@@ -239,13 +247,22 @@ fun ProductDetailScreen(
                 }
             }
 
-            if (product.status == "AVAILABLE") Row(
+            // The seller sees their own listing as buyers do, but can't buy it or chat with themselves:
+            // the server refused those orders and the buttons only led to an error.
+            if (isMine) {
+                // A listing still waiting in the outbox already explains itself with PendingSyncLabel.
+                if (product.pendingSync == null) OwnListingNote(modifier = Modifier.padding(top = 20.dp, bottom = 24.dp))
+            } else if (product.status == "AVAILABLE") Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 )
              {
                 SecondaryButton(
-                    text = if (addedTick > 0) "Added!" else "Add to Cart",
+                    text = when {
+                        addedTick > 0 -> "Added!"
+                        vm.isInCart(product.id) -> "In cart ✓"
+                        else -> "Add to Cart"
+                    },
                     onClick = {
                         vm.addToCart(product)
                         addedTick++
@@ -286,7 +303,30 @@ fun ProductDetailScreen(
 }
 
 @Composable
-private fun SellerCard(product: Product, onChat: () -> Unit) {
+private fun OwnListingNote(modifier: Modifier = Modifier) {
+    val c = CampusSwapTheme.colors
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .campusCard(borderColor = c.accentLo)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(CampusIcons.Store, contentDescription = null, tint = c.accentHi, modifier = Modifier.size(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            BodyText("This is your listing", color = c.text, weight = FontWeight.SemiBold)
+            BodyText(
+                "Buyers' questions arrive in Messages, and their orders in your Seller Hub.",
+                size = CampusType.size2xs,
+                color = c.textMuted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SellerCard(product: Product, isMine: Boolean, onChat: () -> Unit) {
     val c = CampusSwapTheme.colors
     val seller = product.seller
     val shape = RoundedCornerShape(14.dp)
@@ -305,6 +345,10 @@ private fun SellerCard(product: Product, onChat: () -> Unit) {
             val rating = seller.rating?.let { formatRating(it) } ?: "New"
             val verified = if (seller.isVerified) " · Verified student" else ""
             RatingLabel("$rating · ${seller.reviewCount} reviews$verified", modifier = Modifier.padding(top = 4.dp))
+        }
+        if (isMine) {
+            BodyText("You", color = c.accentHi, weight = FontWeight.SemiBold)
+            return@Row
         }
         val btnShape = RoundedCornerShape(10.dp)
         Row(

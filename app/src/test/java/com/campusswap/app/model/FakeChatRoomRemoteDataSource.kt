@@ -10,6 +10,7 @@ class FakeChatRoomRemoteDataSource : ChatRoomRemoteDataSource {
     var summaries = mutableListOf<ChatRoomSummaryDto>()
 
     var openCalls = 0
+    var roomsCalls = 0
 
     override suspend fun open(materialId: String): String {
         openCalls++
@@ -24,6 +25,7 @@ class FakeChatRoomRemoteDataSource : ChatRoomRemoteDataSource {
     }
 
     override suspend fun rooms(): List<ChatRoomSummaryDto> {
+        roomsCalls++
         failure?.let { throw it }
         return summaries
     }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -22,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,15 +53,22 @@ import com.campusswap.app.views.components.ProductCard
 import com.campusswap.app.views.components.ProductRowCard
 import com.campusswap.app.views.components.SectionHeader
 import com.campusswap.app.views.components.SectionTitle
+import com.campusswap.app.views.components.SkeletonBox
 import com.campusswap.app.views.components.campusCard
 import com.campusswap.app.views.components.formatRating
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.Category
 import com.campusswap.app.viewmodel.FeaturedSeller
 import com.campusswap.app.model.Product
+import com.campusswap.app.model.domain.Recommendations
 import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.themes.CampusType
 import androidx.compose.ui.unit.sp
+import androidx.tracing.trace
+import androidx.compose.ui.platform.LocalContext
+import com.campusswap.app.CampusSwapApplication
+import com.campusswap.app.views.components.PullToRefresh
+import kotlinx.coroutines.joinAll
 
 @Composable
 fun HomeScreen(
@@ -67,29 +76,71 @@ fun HomeScreen(
     onProductClick: (String) -> Unit,
     onSeeAllCategory: (Category) -> Unit,
     onSearchClick: () -> Unit,
+    onAlertsClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onWishlistClick: () -> Unit,
     onMessagesClick: () -> Unit,
     unreadMessages: Int,
 ) {
     val c = CampusSwapTheme.colors
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+
+    // Pull to refresh reloads the listings and the notification badge. Demo access has no token: asking
+    // the server would answer 401 and wrongly make Home look offline, so it has nothing to reload.
+    suspend fun refreshHome() {
+        if (container.sessionManager.token == null) return
+        listOfNotNull(
+            vm.loadMaterials(container.materialRepository),
+            vm.loadNotifications(container.notificationRepository, markRead = false),
+        ).joinAll()
+    }
     var selectedCategory by rememberSaveable { mutableStateOf(Category.ALL) }
 
-    // Keyed on the list itself: a queued listing being replaced by the published one keeps the same size.
-    val products = vm.allProducts.toList()
-    val offers: List<Product> = remember(selectedCategory, products) {
-        val list = if (selectedCategory == Category.ALL) vm.allProducts.toList() else vm.allProducts.filter { it.category == selectedCategory }
-        list.take(4)
+    // derivedStateOf reads vm.allProducts (a snapshot list) and selectedCategory, so the lists are rebuilt
+    // only when one of them changes, including a queued listing replaced by the published one (same size).
+    // Recomposing Home for anything else (the offline banner, the unread badge, the theme) reuses them,
+    // instead of copying the whole catalogue and comparing it element by element on every recomposition.
+    // Sequences stop as soon as they have the 4 offers or the 3 recommendations they need.
+    val offers: List<Product> by remember {
+        derivedStateOf {
+            trace("Home.offers") {
+                vm.allProducts.asSequence()
+                    .filter { selectedCategory == Category.ALL || it.category == selectedCategory }
+                    .take(4)
+                    .toList()
+            }
+        }
     }
-    val recommended: List<Product> = remember(products) {
-        vm.allProducts.filter { it.seller.id != vm.currentUser.id }.drop(1).take(3)
+    // Ranked by the user's alerts, wishlist courses and categories (see Recommendations); it used to be
+    // listings 2–4 of the feed for everyone. Listings already saved, in the cart or shown in "New
+    // listings" right above are skipped, so the section adds something new.
+    val recommended: List<Product> by remember {
+        derivedStateOf {
+            trace("Home.recommended") {
+                Recommendations.pick(
+                    feed = vm.allProducts,
+                    myUserId = vm.currentUser.id,
+                    wishlist = vm.wishlistProducts,
+                    alerts = vm.alerts,
+                    exclude = vm.wishlist.toSet() + vm.cart.map { it.product.id } + offers.map { it.id },
+                )
+            }
+        }
+    }
+
+    // The banner used to be a fixed "Weekly Deal: save up to 70%" that no data backed. It now says what
+    // is new for this user: listings that match their alerts or, if none, listings from the last week.
+    val alertMatchCount by remember { derivedStateOf { vm.alertMatches.size } }
+    val newThisWeek by remember {
+        derivedStateOf {
+            val weekAgo = System.currentTimeMillis() - WEEK_MS
+            vm.allProducts.count { (it.createdAtMillis ?: 0L) >= weekAgo }
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
         HomeHeader(
             unreadNotifications = vm.unreadNotificationCount,
-            isDarkTheme = vm.isDarkTheme,
-            onThemeToggle = vm::toggleTheme,
             onSearchClick = onSearchClick,
             onNotificationsClick = onNotificationsClick,
             onWishlistClick = onWishlistClick,
@@ -103,150 +154,179 @@ fun HomeScreen(
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
         )
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 24.dp),
-        ) {
-            item {
-                HeroCard(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+        PullToRefresh(onRefresh = { refreshHome() }, modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 24.dp),
+            ) {
+                item {
+                    HeroCard(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+                        Column {
+                            val chipShape = RoundedCornerShape(999.dp)
+                            Row(
+                                modifier = Modifier
+                                    .padding(bottom = 10.dp)
+                                    .clip(chipShape)
+                                    .background(Color.White.copy(alpha = 0.12f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.2f), chipShape)
+                                    .padding(horizontal = 12.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            ) {
+                                Icon(CampusIcons.Sparkle, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                BodyText(
+                                    if (alertMatchCount > 0) "For you" else "This week",
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    weight = FontWeight.Medium,
+                                )
+                            }
+                            HeadingText(
+                                when {
+                                    alertMatchCount > 0 -> plural(alertMatchCount, "listing matches", "listings match") + " your alerts"
+                                    newThisWeek > 0 -> plural(newThisWeek, "new listing", "new listings") + " this week"
+                                    else -> "Course materials from fellow students"
+                                },
+                                size = 17.sp,
+                                color = Color(0xFFF9F9F9),
+                                lineHeight = CampusType.sizeMd * 1.2f,
+                                modifier = Modifier.padding(bottom = 6.dp),
+                            )
+                            BodyText(
+                                "Buy from students on your campus at fair prices and meet at a safe, monitored point.",
+                                color = Color(0xFFF9F9F9).copy(alpha = 0.8f),
+                                lineHeight = CampusType.sizeXs * 1.5f,
+                                modifier = Modifier.padding(bottom = 16.dp),
+                            )
+                            val btnShape = RoundedCornerShape(8.dp)
+                            Row(
+                                modifier = Modifier
+                                    .clip(btnShape)
+                                    .background(Color.White.copy(alpha = 0.15f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.3f), btnShape)
+                                    .clickable(onClick = if (alertMatchCount > 0) onAlertsClick else onSearchClick)
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                BodyText(
+                                    if (alertMatchCount > 0) "See matches" else "Browse",
+                                    color = Color(0xFFF9F9F9),
+                                    weight = FontWeight.SemiBold,
+                                )
+                                Icon(CampusIcons.ArrowRight, contentDescription = null, tint = Color(0xFFF9F9F9), modifier = Modifier.size(15.dp))
+                            }
+                        }
+                    }
+                }
+
+                // categorie
+                item {
                     Column {
-                        val chipShape = RoundedCornerShape(999.dp)
-                        Row(
-                            modifier = Modifier
-                                .padding(bottom = 10.dp)
-                                .clip(chipShape)
-                                .background(Color.White.copy(alpha = 0.12f))
-                                .border(1.dp, Color.White.copy(alpha = 0.2f), chipShape)
-                                .padding(horizontal = 12.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        ) {
-                            Icon(CampusIcons.Sparkle, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                            BodyText("Weekly Deal", color = Color.White.copy(alpha = 0.9f), weight = FontWeight.Medium)
-                        }
-                        HeadingText(
-                            "Save big on course materials",
-                            size = 17.sp,
-                            color = Color(0xFFF9F9F9),
-                            lineHeight = CampusType.sizeMd * 1.2f,
-                            modifier = Modifier.padding(bottom = 6.dp),
-                        )
-                        BodyText(
-                            "Buy from fellow students and save up to 70% on textbooks, calculators and more.",
-                            color = Color(0xFFF9F9F9).copy(alpha = 0.8f),
-                            lineHeight = CampusType.sizeXs * 1.5f,
-                            modifier = Modifier.padding(bottom = 16.dp),
-                        )
-                        val btnShape = RoundedCornerShape(8.dp)
-                        Row(
-                            modifier = Modifier
-                                .clip(btnShape)
-                                .background(Color.White.copy(alpha = 0.15f))
-                                .border(1.dp, Color.White.copy(alpha = 0.3f), btnShape)
-                                .clickable(onClick = onSearchClick)
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            BodyText("Shop Now", color = Color(0xFFF9F9F9), weight = FontWeight.SemiBold)
-                            Icon(CampusIcons.ArrowRight, contentDescription = null, tint = Color(0xFFF9F9F9), modifier = Modifier.size(15.dp))
+                    SectionTitle("Categories", modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp))
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                    ) {
+                        items(Category.entries.toList()) { category ->
+                            Pill(
+                                label = category.label,
+                                selected = selectedCategory == category,
+                                onClick = { selectedCategory = category },
+                            )
                         }
                     }
-                }
-            }
-
-            // categorie
-            item {
-                Column {
-                SectionTitle("Categories", modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp))
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                ) {
-                    items(Category.entries.toList()) { category ->
-                        Pill(
-                            label = category.label,
-                            selected = selectedCategory == category,
-                            onClick = { selectedCategory = category },
-                        )
                     }
                 }
-                }
-            }
 
-            // offers
-            item {
-                Column {
-                SectionHeader(
-                    title = "Current Offers",
-                    icon = CampusIcons.Flame,
-                    onSeeAll = { onSeeAllCategory(selectedCategory) },
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
-                )
-                if (offers.isEmpty()) {
-                    BodyText(
-                        "No offers in this category yet.",
-                        color = c.textMuted,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                // offers
+                item {
+                    Column {
+                    SectionHeader(
+                        title = "New listings",
+                        icon = CampusIcons.Flame,
+                        onSeeAll = { onSeeAllCategory(selectedCategory) },
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
                     )
-                } else {
+                    if (offers.isEmpty() && vm.materialsLoading) {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
+                            userScrollEnabled = false,
+                        ) {
+                            items(3) { SkeletonBox(Modifier.width(155.dp).height(190.dp), radius = 14.dp) }
+                        }
+                    } else if (offers.isEmpty()) {
+                        BodyText(
+                            "No offers in this category yet.",
+                            color = c.textMuted,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    } else {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
+                        ) {
+                            items(offers, key = { it.id }) { product ->
+                                ProductCard(
+                                    product = product,
+                                    modifier = Modifier.width(155.dp),
+                                    isWishlisted = vm.isWishlisted(product.id),
+                                    onClick = { onProductClick(product.id) },
+                                    onToggleWishlist = if (vm.isMine(product)) null else ({ vm.toggleWishlist(product.id) }),
+                                    imageHeight = 110.dp,
+                                    showRating = false,
+                                )
+                            }
+                        }
+                    }
+                    }
+                }
+
+                // Recomended
+                item {
+                    SectionHeader(
+                        title = "Recommended",
+                        icon = CampusIcons.BookOpen,
+                        onSeeAll = { onSeeAllCategory(Category.ALL) },
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
+                    )
+                }
+                if (recommended.isEmpty() && vm.materialsLoading) {
+                    items(3) {
+                        SkeletonBox(Modifier.fillMaxWidth().height(96.dp).padding(start = 16.dp, end = 16.dp, bottom = 12.dp))
+                    }
+                }
+                items(recommended, key = { "rec-${it.id}" }) { product ->
+                    RecommendedRow(
+                        product = product,
+                        onClick = { onProductClick(product.id) },
+                        inCart = vm.isInCart(product.id),
+                        onAddToCart = { vm.addToCart(product) },
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    )
+                }
+
+                // Sellers
+                item {
+                    Column {
+                    SectionTitle(
+                        "Featured Sellers",
+                        icon = CampusIcons.Star,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+                    )
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
                     ) {
-                        items(offers, key = { it.id }) { product ->
-                            ProductCard(
-                                product = product,
-                                modifier = Modifier.width(155.dp),
-                                isWishlisted = vm.isWishlisted(product.id),
-                                onClick = { onProductClick(product.id) },
-                                onToggleWishlist = { vm.toggleWishlist(product.id) },
-                                imageHeight = 110.dp,
-                                showRating = false,
-                            )
+                        items(vm.featuredSellers, key = { it.seller.id }) { featured ->
+                            FeaturedSellerCard(featured)
                         }
                     }
-                }
-                }
-            }
-
-            // Recomended
-            item {
-                SectionHeader(
-                    title = "Recommended",
-                    icon = CampusIcons.BookOpen,
-                    onSeeAll = { onSeeAllCategory(Category.ALL) },
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
-                )
-            }
-            items(recommended, key = { "rec-${it.id}" }) { product ->
-                RecommendedRow(
-                    product = product,
-                    onClick = { onProductClick(product.id) },
-                    onAddToCart = { vm.addToCart(product) },
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                )
-            }
-
-            // Sellers
-            item {
-                Column {
-                SectionTitle(
-                    "Featured Sellers",
-                    icon = CampusIcons.Star,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
-                )
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
-                ) {
-                    items(vm.featuredSellers, key = { it.seller.id }) { featured ->
-                        FeaturedSellerCard(featured)
                     }
-                }
                 }
             }
         }
@@ -257,6 +337,7 @@ fun HomeScreen(
 private fun RecommendedRow(
     product: Product,
     onClick: () -> Unit,
+    inCart: Boolean,
     onAddToCart: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -281,8 +362,10 @@ private fun RecommendedRow(
         ) {
             PriceText(product.price, modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp))
             PrimaryButton(
-                text = "Add to Cart",
+                // Says when it worked: before, the button looked the same after every tap.
+                text = if (inCart) "In cart ✓" else "Add to Cart",
                 onClick = onAddToCart,
+                enabled = !inCart,
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 5.dp),
                 fontSize = CampusType.sizeXs,
             )
@@ -330,8 +413,6 @@ private fun FeaturedSellerCard(featured: FeaturedSeller) {
 @Composable
 private fun HomeHeader(
     unreadNotifications: Int,
-    isDarkTheme: Boolean,
-    onThemeToggle: () -> Unit,
     onSearchClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onWishlistClick: () -> Unit,
@@ -369,12 +450,6 @@ private fun HomeHeader(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CampusIconButton(
-                    icon = if (isDarkTheme) CampusIcons.Sun else CampusIcons.Moon,
-                    contentDescription = "Toggle theme",
-                    onClick = onThemeToggle,
-                    iconSize = 18.dp,
-                )
                 Box {
                     CampusIconButton(CampusIcons.Message, contentDescription = "Messages", onClick = onMessagesClick, modifier = Modifier.size(32.dp))
                     if (unreadMessages > 0) {
@@ -414,3 +489,7 @@ private fun offlineFeedMessage(isOnline: Boolean, updatedAtMillis: Long?): Strin
         "$head. Showing the listings saved on this phone."
     }
 }
+
+private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
+
+private fun plural(count: Int, one: String, many: String) = "$count ${if (count == 1) one else many}"

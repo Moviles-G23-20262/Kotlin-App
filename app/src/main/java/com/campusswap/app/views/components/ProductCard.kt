@@ -56,7 +56,7 @@ fun ProductCard(
                 if (onToggleWishlist != null) {
                     Icon(
                         imageVector = if (isWishlisted) CampusIcons.HeartFilled else CampusIcons.Heart,
-                        contentDescription = "Toggle wishlist",
+                        contentDescription = if (isWishlisted) "Remove from wishlist" else "Save to wishlist",
                         tint = c.accent,
                         modifier = Modifier
                             .size(20.dp)
