@@ -66,4 +66,30 @@ class BackendEventMapperTest {
         assertEquals(6, request.metadata["messages_in_thread"])
         assertNull(request.metadata["chat_room_id"])
     }
+
+    @Test fun theClientIdIsAStableUuidThatSurvivesTheDiskQueue() {
+        val original = event(Events.SMART_MATCH_SHOWN, "product_id" to "p1", "position" to 2)
+        val reread = AnalyticsEvent.fromJson(original.toJson())
+        val id = BackendEventMapper.clientId(original)
+
+        assertEquals(id, BackendEventMapper.clientId(reread))
+        assertEquals(id, BackendEventMapper.toRequest(original)!!.clientId)
+        java.util.UUID.fromString(id)
+    }
+
+    @Test fun theClientIdDoesNotDependOnPropertyOrder() {
+        val a = event(Events.SMART_MATCH_SHOWN, "product_id" to "p1", "position" to 2)
+        val b = event(Events.SMART_MATCH_SHOWN, "position" to 2, "product_id" to "p1")
+
+        assertEquals(BackendEventMapper.clientId(a), BackendEventMapper.clientId(b))
+    }
+
+    @Test fun theBatchBodyUsesTheFieldNamesTheServerValidates() {
+        val item = BackendEventMapper.toRequest(event(Events.SMART_MATCH_SHOWN, "product_id" to "p1"))!!
+        val json = com.google.gson.Gson().toJson(com.campusswap.app.model.remote.AnalyticsEventBatchRequest(listOf(item)))
+
+        listOf("\"events\"", "\"client_id\"", "\"eventType\"", "\"clientCreatedAt\"", "\"occurredAt\"").forEach {
+            assert(json.contains(it)) { "$it missing in $json" }
+        }
+    }
 }
