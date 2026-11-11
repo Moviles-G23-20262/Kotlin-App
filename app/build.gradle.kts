@@ -4,6 +4,16 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
+// BQ1: crashes go to Firebase Crashlytics. The Firebase plugins need app/google-services.json
+// (downloaded from the Firebase console). Without it the app still builds and runs, and
+// CrashTelemetry stays off, so nobody is blocked while the file is missing.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+} else {
+    logger.warn("app/google-services.json not found: building without Firebase Crashlytics (BQ1).")
+}
+
 android {
     namespace = "com.campusswap.app"
     compileSdk = 34
@@ -72,6 +82,8 @@ dependencies {
 
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.8.1")
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    implementation("com.google.firebase:firebase-crashlytics")
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
