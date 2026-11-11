@@ -268,6 +268,7 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                         navigateToTab(Routes.SEARCH)
                     },
                     onSearchClick = { navigateToTab(Routes.SEARCH) },
+                    onAlertsClick = { navController.navigate(Routes.ALERTS) },
                     onNotificationsClick = { navController.navigate(Routes.NOTIFICATIONS) },
                     onWishlistClick = { navController.navigate(Routes.WISHLIST) },
                     onMessagesClick = { navController.navigate(Routes.MESSAGES) },

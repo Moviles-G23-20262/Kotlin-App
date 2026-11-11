@@ -60,6 +60,7 @@ import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.Category
 import com.campusswap.app.viewmodel.FeaturedSeller
 import com.campusswap.app.model.Product
+import com.campusswap.app.model.domain.Recommendations
 import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.themes.CampusType
 import androidx.compose.ui.unit.sp
@@ -75,6 +76,7 @@ fun HomeScreen(
     onProductClick: (String) -> Unit,
     onSeeAllCategory: (Category) -> Unit,
     onSearchClick: () -> Unit,
+    onAlertsClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onWishlistClick: () -> Unit,
     onMessagesClick: () -> Unit,
@@ -109,11 +111,30 @@ fun HomeScreen(
             }
         }
     }
+    // Ranked by the user's alerts, wishlist courses and categories (see Recommendations); it used to be
+    // listings 2–4 of the feed for everyone. Listings already saved, in the cart or shown in "New
+    // listings" right above are skipped, so the section adds something new.
     val recommended: List<Product> by remember {
         derivedStateOf {
             trace("Home.recommended") {
-                vm.allProducts.asSequence().filter { it.seller.id != vm.currentUser.id }.drop(1).take(3).toList()
+                Recommendations.pick(
+                    feed = vm.allProducts,
+                    myUserId = vm.currentUser.id,
+                    wishlist = vm.wishlistProducts,
+                    alerts = vm.alerts,
+                    exclude = vm.wishlist.toSet() + vm.cart.map { it.product.id } + offers.map { it.id },
+                )
             }
+        }
+    }
+
+    // The banner used to be a fixed "Weekly Deal: save up to 70%" that no data backed. It now says what
+    // is new for this user: listings that match their alerts or, if none, listings from the last week.
+    val alertMatchCount by remember { derivedStateOf { vm.alertMatches.size } }
+    val newThisWeek by remember {
+        derivedStateOf {
+            val weekAgo = System.currentTimeMillis() - WEEK_MS
+            vm.allProducts.count { (it.createdAtMillis ?: 0L) >= weekAgo }
         }
     }
 
@@ -153,17 +174,25 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                             ) {
                                 Icon(CampusIcons.Sparkle, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                                BodyText("Weekly Deal", color = Color.White.copy(alpha = 0.9f), weight = FontWeight.Medium)
+                                BodyText(
+                                    if (alertMatchCount > 0) "For you" else "This week",
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    weight = FontWeight.Medium,
+                                )
                             }
                             HeadingText(
-                                "Save big on course materials",
+                                when {
+                                    alertMatchCount > 0 -> plural(alertMatchCount, "listing matches", "listings match") + " your alerts"
+                                    newThisWeek > 0 -> plural(newThisWeek, "new listing", "new listings") + " this week"
+                                    else -> "Course materials from fellow students"
+                                },
                                 size = 17.sp,
                                 color = Color(0xFFF9F9F9),
                                 lineHeight = CampusType.sizeMd * 1.2f,
                                 modifier = Modifier.padding(bottom = 6.dp),
                             )
                             BodyText(
-                                "Buy from fellow students and save up to 70% on textbooks, calculators and more.",
+                                "Buy from students on your campus at fair prices and meet at a safe, monitored point.",
                                 color = Color(0xFFF9F9F9).copy(alpha = 0.8f),
                                 lineHeight = CampusType.sizeXs * 1.5f,
                                 modifier = Modifier.padding(bottom = 16.dp),
@@ -174,12 +203,16 @@ fun HomeScreen(
                                     .clip(btnShape)
                                     .background(Color.White.copy(alpha = 0.15f))
                                     .border(1.dp, Color.White.copy(alpha = 0.3f), btnShape)
-                                    .clickable(onClick = onSearchClick)
+                                    .clickable(onClick = if (alertMatchCount > 0) onAlertsClick else onSearchClick)
                                     .padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
-                                BodyText("Shop Now", color = Color(0xFFF9F9F9), weight = FontWeight.SemiBold)
+                                BodyText(
+                                    if (alertMatchCount > 0) "See matches" else "Browse",
+                                    color = Color(0xFFF9F9F9),
+                                    weight = FontWeight.SemiBold,
+                                )
                                 Icon(CampusIcons.ArrowRight, contentDescription = null, tint = Color(0xFFF9F9F9), modifier = Modifier.size(15.dp))
                             }
                         }
@@ -210,7 +243,7 @@ fun HomeScreen(
                 item {
                     Column {
                     SectionHeader(
-                        title = "Current Offers",
+                        title = "New listings",
                         icon = CampusIcons.Flame,
                         onSeeAll = { onSeeAllCategory(selectedCategory) },
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
@@ -456,3 +489,7 @@ private fun offlineFeedMessage(isOnline: Boolean, updatedAtMillis: Long?): Strin
         "$head. Showing the listings saved on this phone."
     }
 }
+
+private const val WEEK_MS = 7L * 24 * 60 * 60 * 1000
+
+private fun plural(count: Int, one: String, many: String) = "$count ${if (count == 1) one else many}"

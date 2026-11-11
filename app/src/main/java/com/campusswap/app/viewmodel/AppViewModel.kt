@@ -21,6 +21,7 @@ import com.campusswap.app.model.SmartAlert
 import com.campusswap.app.model.TransactionRating
 import com.campusswap.app.model.domain.InputLimits
 import com.campusswap.app.model.domain.InputValidation
+import com.campusswap.app.model.domain.matches
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -599,14 +600,7 @@ class AppViewModel : ViewModel() {
         get() = alerts.filter { it.enabled }.flatMap { alert ->
             allProducts
                 .filter { it.seller.id != currentUser.id }
-                .filter { product ->
-                    product.price <= alert.maxPrice &&
-                        product.condition.ordinal <= alert.minCondition.ordinal &&
-                        (alert.course == null || product.course?.code == alert.course.code) &&
-                        (alert.category == Category.ALL || product.category == alert.category) &&
-                        (alert.keyword.isBlank() || product.title.contains(alert.keyword, ignoreCase = true) ||
-                            product.course?.code?.contains(alert.keyword, ignoreCase = true) == true)
-                }
+                .filter { product -> alert.matches(product) }
                 .map { product ->
                     AlertMatch(
                         alert = alert,
