@@ -21,6 +21,7 @@ import com.campusswap.app.model.SmartAlert
 import com.campusswap.app.model.TransactionRating
 import com.campusswap.app.model.domain.InputLimits
 import com.campusswap.app.model.domain.InputValidation
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -294,14 +295,20 @@ class AppViewModel : ViewModel() {
     fun checkCredentials(username: String, password: String): Boolean =
         username.trim() == DEMO_USERNAME && password == DEMO_PASSWORD
 
-    val featuredSellers: List<FeaturedSeller>
-        get() = trace("Home.featuredSellers") {
+    /**
+     * Sellers with listings in the feed, best rated first. derivedStateOf keeps the result and recomputes
+     * it only when the catalogue or the signed-in user changes; as a plain getter it grouped the whole
+     * catalogue every time Home recomposed.
+     */
+    val featuredSellers: List<FeaturedSeller> by derivedStateOf {
+        trace("Home.featuredSellers") {
             allProducts
                 .groupBy { it.seller.id }
                 .filterKeys { it != currentUser.id }
                 .map { (_, items) -> FeaturedSeller(items.first().seller, items.size) }
                 .sortedByDescending { it.seller.rating ?: 0.0 }
         }
+    }
 
     val serviceFee: Double get() = if (cart.isEmpty()) 0.0 else SERVICE_FEE
 
