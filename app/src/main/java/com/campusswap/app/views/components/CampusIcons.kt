@@ -20,8 +20,10 @@ object CampusIcons {
 
     private fun line(x1: Float, y1: Float, x2: Float, y2: Float) = "M$x1,$y1 L$x2,$y2"
 
+    private val separators = Regex("[\\s,]+")
+
     private fun poly(points: String, close: Boolean = false): String {
-        val nums = points.trim().split(Regex("[\\s,]+")).map { it.toFloat() }
+        val nums = points.trim().split(separators).map { it.toFloat() }
         val sb = StringBuilder()
         for (i in nums.indices step 2) {
             sb.append(if (i == 0) "M" else " L").append(nums[i]).append(',').append(nums[i + 1])

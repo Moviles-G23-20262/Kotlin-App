@@ -41,10 +41,15 @@ object InputValidation {
     private val emailPattern = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}$")
     private val institutionalDomain = Regex("\\.edu(\\.[a-z]{2})?$")
 
+    // Compiled once. The sanitizers run on every keystroke of the name, search, title, description, chat,
+    // alert and address fields; building the Regex inside them compiled a new java.util.regex.Pattern per key.
+    private val repeatedSpaces = Regex(" {2,}")
+    private val blankLineRuns = Regex("\n{3,}")
+
     /** Letters (any alphabet, accents included), single spaces, apostrophes and hyphens. */
     fun sanitizeName(input: String, max: Int = InputLimits.NAME_MAX): String =
         input.filter { it.isLetter() || it == ' ' || it == '\'' || it == '-' }
-            .replace(Regex(" {2,}"), " ")
+            .replace(repeatedSpaces, " ")
             .trimStart()
             .take(max)
 
@@ -61,7 +66,7 @@ object InputValidation {
 
     /** Free text: no leading whitespace, no runs of blank lines, capped at [max]. */
     fun sanitizeText(input: String, max: Int): String =
-        input.trimStart().replace(Regex("\n{3,}"), "\n\n").take(max)
+        input.trimStart().replace(blankLineRuns, "\n\n").take(max)
 
     fun nameError(name: String): String? {
         val trimmed = name.trim()
