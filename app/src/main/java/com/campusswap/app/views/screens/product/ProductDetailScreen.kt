@@ -28,6 +28,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -90,8 +91,11 @@ fun ProductDetailScreen(
         return
     }
 
-    val related = remember(product.id, vm.allProducts.size) {
-        vm.allProducts.filter { it.id != product.id && it.category == product.category }.take(3)
+    // Rebuilt only when the catalogue changes (not just its size), stopping at the 3 items shown.
+    val related by remember(product.id, product.category) {
+        derivedStateOf {
+            vm.allProducts.asSequence().filter { it.id != product.id && it.category == product.category }.take(3).toList()
+        }
     }
     var addedTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(addedTick) {

@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,16 +77,27 @@ fun HomeScreen(
     val c = CampusSwapTheme.colors
     var selectedCategory by rememberSaveable { mutableStateOf(Category.ALL) }
 
-    // Keyed on the list itself: a queued listing being replaced by the published one keeps the same size.
-    val products = trace("Home.copyProducts") { vm.allProducts.toList() }
-    val offers: List<Product> = remember(selectedCategory, products) {
-        trace("Home.offers") {
-            val list = if (selectedCategory == Category.ALL) vm.allProducts.toList() else vm.allProducts.filter { it.category == selectedCategory }
-            list.take(4)
+    // derivedStateOf reads vm.allProducts (a snapshot list) and selectedCategory, so the lists are rebuilt
+    // only when one of them changes, including a queued listing replaced by the published one (same size).
+    // Recomposing Home for anything else (the offline banner, the unread badge, the theme) reuses them,
+    // instead of copying the whole catalogue and comparing it element by element on every recomposition.
+    // Sequences stop as soon as they have the 4 offers or the 3 recommendations they need.
+    val offers: List<Product> by remember {
+        derivedStateOf {
+            trace("Home.offers") {
+                vm.allProducts.asSequence()
+                    .filter { selectedCategory == Category.ALL || it.category == selectedCategory }
+                    .take(4)
+                    .toList()
+            }
         }
     }
-    val recommended: List<Product> = remember(products) {
-        trace("Home.recommended") { vm.allProducts.filter { it.seller.id != vm.currentUser.id }.drop(1).take(3) }
+    val recommended: List<Product> by remember {
+        derivedStateOf {
+            trace("Home.recommended") {
+                vm.allProducts.asSequence().filter { it.seller.id != vm.currentUser.id }.drop(1).take(3).toList()
+            }
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {

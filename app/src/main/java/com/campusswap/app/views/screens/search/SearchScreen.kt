@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +47,7 @@ import com.campusswap.app.views.components.formatPrice
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.Category
 import com.campusswap.app.model.Condition
+import com.campusswap.app.model.Product
 import com.campusswap.app.model.SortOption
 import com.campusswap.app.views.themes.CampusSwapTheme
 
@@ -67,26 +69,34 @@ fun SearchScreen(
     var sortOption by remember { mutableStateOf(SortOption.RELEVANCE) }
     var filtersExpanded by remember { mutableStateOf(initialCategory != null && initialCategory != Category.ALL) }
 
-    val results = remember(query, selectedCategory, selectedCondition, maxPrice, sortOption, vm.allProducts.size) {
-        trace("Search.results") {
-            vm.allProducts
-                .filter { selectedCategory == Category.ALL || it.category == selectedCategory }
-                .filter { selectedCondition == null || it.condition == selectedCondition }
-                .filter { it.price <= maxPrice.toDouble() }
-                .filter {
-                    query.isBlank() ||
-                        it.title.contains(query, ignoreCase = true) ||
-                        it.category.label.contains(query, ignoreCase = true) ||
-                        (it.course?.code?.contains(query, ignoreCase = true) == true)
+    // One pass over the catalogue instead of four chained filters (four intermediate lists per
+    // keystroke), inside derivedStateOf so it reruns only when a filter or the catalogue changes. It was
+    // keyed on the catalogue's size, which missed a queued listing replaced by the published one.
+    val results: List<Product> by remember {
+        derivedStateOf {
+            trace("Search.results") {
+                val category = selectedCategory
+                val condition = selectedCondition
+                val max = maxPrice.toDouble()
+                val text = query
+                val matches = vm.allProducts.filter {
+                    (category == Category.ALL || it.category == category) &&
+                        (condition == null || it.condition == condition) &&
+                        it.price <= max &&
+                        (
+                            text.isBlank() ||
+                                it.title.contains(text, ignoreCase = true) ||
+                                it.category.label.contains(text, ignoreCase = true) ||
+                                (it.course?.code?.contains(text, ignoreCase = true) == true)
+                            )
                 }
-                .let { list ->
-                    when (sortOption) {
-                        SortOption.RELEVANCE -> list
-                        SortOption.PRICE_LOW -> list.sortedBy { it.price }
-                        SortOption.PRICE_HIGH -> list.sortedByDescending { it.price }
-                        SortOption.RATING -> list.sortedByDescending { it.rating ?: 0.0 }
-                    }
+                when (sortOption) {
+                    SortOption.RELEVANCE -> matches
+                    SortOption.PRICE_LOW -> matches.sortedBy { it.price }
+                    SortOption.PRICE_HIGH -> matches.sortedByDescending { it.price }
+                    SortOption.RATING -> matches.sortedByDescending { it.rating ?: 0.0 }
                 }
+            }
         }
     }
 
