@@ -37,6 +37,7 @@ import com.campusswap.app.views.components.OfflineBanner
 import com.campusswap.app.views.components.campusCard
 import com.campusswap.app.views.components.plainClickable
 import com.campusswap.app.views.components.timeAgo
+import com.campusswap.app.views.components.WhileVisible
 import com.campusswap.app.model.Conversation
 import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.themes.CampusType
@@ -46,6 +47,7 @@ fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String, String) -> Unit) {
     val c = CampusSwapTheme.colors
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
     val vm: ConversationsViewModel = viewModel(factory = ConversationsViewModel.factory(container))
+    WhileVisible(vm) { vm.pollWhileVisible() }
     val state by vm.state.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {

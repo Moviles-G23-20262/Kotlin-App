@@ -23,11 +23,12 @@ import com.campusswap.app.model.sync.OutboxRepository
 import com.campusswap.app.model.sync.PendingActionKind
 import com.campusswap.app.model.sync.ProposalPayload
 import com.campusswap.app.model.sync.payloadAs
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -55,12 +56,13 @@ class ChatViewModel(
     private val outbox: OutboxRepository,
     private val currentUserId: () -> String?,
     private val isOnline: () -> Boolean,
+    /** Emits true while the phone has a network; polling waits on it instead of failing every 5 s. */
+    private val connection: Flow<Boolean>,
     private val onProposalChanged: (String, MeetingProposal) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
 
-    private var pollJob: Job? = null
     private var delivered: List<ChatMessage> = emptyList()
     private var queued: List<PendingMessageEntity> = emptyList()
     private var queuedProposals: List<PendingActionEntity> = emptyList()
@@ -70,7 +72,6 @@ class ChatViewModel(
 
     init {
         room?.let { chat.select(productId, it) }
-        startPolling()
         viewModelScope.launch {
             outbox.pendingMessages.collect { rows ->
                 queued = rows.filter {
@@ -91,13 +92,16 @@ class ChatViewModel(
         }
     }
 
-    private fun startPolling() {
-        pollJob?.cancel()
-        pollJob = viewModelScope.launch {
-            while (true) {
-                refresh()
-                delay(POLL_INTERVAL_MS)
-            }
+    /**
+     * Keeps the open thread fresh. The screen runs it only while it is visible (see `WhileVisible`),
+     * so a chat left in the back stack or an app in the background stops asking the server. Offline it
+     * loads the saved copy once and then waits for the network instead of failing every 5 s.
+     */
+    suspend fun pollWhileVisible() {
+        while (true) {
+            refresh()
+            delay(POLL_INTERVAL_MS)
+            connection.first { it }
         }
     }
 
@@ -263,6 +267,7 @@ class ChatViewModel(
                     outbox = container.outboxRepository,
                     currentUserId = { container.sessionManager.validSession()?.userId },
                     isOnline = isOnline,
+                    connection = container.connectivity.isOnline,
                     onProposalChanged = onProposalChanged,
                 )
             }

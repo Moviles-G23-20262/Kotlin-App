@@ -54,6 +54,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import com.campusswap.app.views.components.OfflineBanner
 import com.campusswap.app.views.components.timeAgo
+import com.campusswap.app.views.components.WhileVisible
 
 @Composable
 fun ProfileScreen(
@@ -73,6 +74,7 @@ fun ProfileScreen(
     // Conversaciones reales (las mismas de la bandeja de Carla) donde tú eres el vendedor
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
     val inbox: ConversationsViewModel = viewModel(factory = ConversationsViewModel.factory(container))
+    WhileVisible(inbox) { inbox.pollWhileVisible() }
     val inboxState by inbox.state.collectAsState()
     val buyerMessages = inboxState.conversations.filter { it.sellingThis }.take(3)
 
