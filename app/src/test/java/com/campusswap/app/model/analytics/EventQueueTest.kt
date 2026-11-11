@@ -57,4 +57,27 @@ class EventQueueTest {
         queue.enqueue(event(3))
         assertTrue(queue.shouldFlush())
     }
+
+    @Test fun sizeCountsWhatIsAlreadyOnDiskAndFollowsAppendsAndDrops() {
+        val file = tmp.newFile()
+        FileEventStore(file).apply { append(event(1)); append(event(2)) }
+
+        val store = FileEventStore(file)
+        assertEquals(2, store.size())
+        store.append(event(3))
+        assertEquals(3, store.size())
+        store.drop(2)
+        assertEquals(1, store.size())
+        assertEquals(listOf(3L), store.peek(10).map { it.timestamp })
+        store.drop(1)
+        assertEquals(0, store.size())
+        assertTrue(store.peek(10).isEmpty())
+    }
+
+    @Test fun peekReadsOnlyWhatItNeeds() {
+        val store = FileEventStore(tmp.newFile())
+        (1..50).forEach { store.append(event(it)) }
+
+        assertEquals(listOf(1L, 2L, 3L), store.peek(3).map { it.timestamp })
+    }
 }
