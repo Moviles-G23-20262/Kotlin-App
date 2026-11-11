@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -116,6 +117,14 @@ fun ProfileScreen(
                     leadingIcon = CampusIcons.Plus,
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 7.dp),
                     fontSize = CampusType.sizeXs,
+                )
+                // Moved here from Home's header, which had five icons competing for space.
+                val dark = vm.darkThemeChoice ?: isSystemInDarkTheme()
+                CampusIconButton(
+                    icon = if (dark) CampusIcons.Sun else CampusIcons.Moon,
+                    contentDescription = if (dark) "Switch to light theme" else "Switch to dark theme",
+                    onClick = { vm.setDarkTheme(!dark) },
+                    iconSize = 18.dp,
                 )
                 CampusIconButton(CampusIcons.LogOut, contentDescription = "Log out", onClick = { confirmLogout = true }, iconSize = 18.dp)
             }

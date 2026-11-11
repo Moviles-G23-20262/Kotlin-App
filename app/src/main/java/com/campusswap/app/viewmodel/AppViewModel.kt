@@ -64,6 +64,7 @@ import java.time.ZoneId
 import androidx.compose.runtime.snapshotFlow
 import androidx.tracing.trace
 import com.campusswap.app.model.local.CartStore
+import com.campusswap.app.model.local.ThemeStore
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -76,8 +77,21 @@ import kotlinx.coroutines.flow.drop
  * across screens (cart badge, wishlist hearts, newly published listings, etc.).
  */
 class AppViewModel : ViewModel() {
-    var isDarkTheme by mutableStateOf(true)
+    /** The theme the user picked; null follows the phone's light/dark setting. Saved in [ThemeStore]. */
+    var darkThemeChoice by mutableStateOf<Boolean?>(null)
         private set
+
+    private var themeStore: ThemeStore? = null
+
+    fun restoreTheme(store: ThemeStore) {
+        themeStore = store
+        viewModelScope.launch { darkThemeChoice = store.read() }
+    }
+
+    fun setDarkTheme(dark: Boolean) {
+        darkThemeChoice = dark
+        themeStore?.let { store -> viewModelScope.launch { store.save(dark) } }
+    }
 
     var isLoggedIn by mutableStateOf(false)
         private set
@@ -286,9 +300,6 @@ class AppViewModel : ViewModel() {
 
     val unreadNotificationCount get() = notifications.count { !it.isRead }
 
-    fun toggleTheme() {
-        isDarkTheme = !isDarkTheme
-    }
 
     fun login(userId: String? = null) {
         currentUserId = userId

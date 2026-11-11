@@ -105,8 +105,6 @@ fun HomeScreen(
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
         HomeHeader(
             unreadNotifications = vm.unreadNotificationCount,
-            isDarkTheme = vm.isDarkTheme,
-            onThemeToggle = vm::toggleTheme,
             onSearchClick = onSearchClick,
             onNotificationsClick = onNotificationsClick,
             onWishlistClick = onWishlistClick,
@@ -365,8 +363,6 @@ private fun FeaturedSellerCard(featured: FeaturedSeller) {
 @Composable
 private fun HomeHeader(
     unreadNotifications: Int,
-    isDarkTheme: Boolean,
-    onThemeToggle: () -> Unit,
     onSearchClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onWishlistClick: () -> Unit,
@@ -404,12 +400,6 @@ private fun HomeHeader(
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CampusIconButton(
-                    icon = if (isDarkTheme) CampusIcons.Sun else CampusIcons.Moon,
-                    contentDescription = "Toggle theme",
-                    onClick = onThemeToggle,
-                    iconSize = 18.dp,
-                )
                 Box {
                     CampusIconButton(CampusIcons.Message, contentDescription = "Messages", onClick = onMessagesClick, modifier = Modifier.size(32.dp))
                     if (unreadMessages > 0) {

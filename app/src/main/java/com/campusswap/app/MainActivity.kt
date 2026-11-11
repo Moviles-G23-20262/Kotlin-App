@@ -9,6 +9,7 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.viewmodel.AppViewModel
@@ -25,7 +26,9 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             val appViewModel: AppViewModel = viewModel()
-            val dark = appViewModel.isDarkTheme
+            LaunchedEffect(Unit) { appViewModel.restoreTheme((application as CampusSwapApplication).container.themeStore) }
+            // Follows the phone's light/dark setting until the user picks one in the Seller Hub.
+            val dark = appViewModel.darkThemeChoice ?: isSystemInDarkTheme()
             LaunchedEffect(dark) {
                 val style = if (dark) {
                     SystemBarStyle.dark(Color.TRANSPARENT)
