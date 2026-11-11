@@ -101,6 +101,40 @@ data class PendingActionEntity(
     val failedReason: String? = null,
 )
 
+@Entity(tableName = "meetups", primaryKeys = ["ownerId", "proposalId"])
+data class MeetupEntity(
+    val ownerId: String,
+    val proposalId: String,
+    val roomId: String,
+    val productId: String,
+    val productTitle: String,
+    val counterpartName: String,
+    val pointName: String,
+    val startsAtMillis: Long,
+    val endsAtMillis: Long,
+    val confirmed: Boolean,
+    val proposedByMe: Boolean,
+    val savedAtMillis: Long,
+)
+
+@Dao
+interface MeetupDao {
+    @Query("SELECT * FROM meetups WHERE ownerId = :ownerId ORDER BY startsAtMillis")
+    suspend fun forOwner(ownerId: String): List<MeetupEntity>
+
+    @Query("DELETE FROM meetups WHERE ownerId = :ownerId")
+    suspend fun clear(ownerId: String)
+
+    @Insert
+    suspend fun insertAll(items: List<MeetupEntity>)
+
+    @Transaction
+    suspend fun replace(ownerId: String, items: List<MeetupEntity>) {
+        clear(ownerId)
+        insertAll(items)
+    }
+}
+
 @Dao
 interface ResponseCacheDao {
     @Query("SELECT * FROM cached_responses WHERE ownerId = :ownerId AND cacheKey = :cacheKey")
@@ -181,15 +215,16 @@ interface OutboxDao {
 @Database(
     entities = [
         CachedMaterialEntity::class, PendingListingEntity::class, PendingMessageEntity::class,
-        CachedResponseEntity::class, PendingActionEntity::class,
+        CachedResponseEntity::class, PendingActionEntity::class, MeetupEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class CampusSwapDatabase : RoomDatabase() {
     abstract fun cachedMaterials(): CachedMaterialDao
     abstract fun outbox(): OutboxDao
     abstract fun responses(): ResponseCacheDao
+    abstract fun meetups(): MeetupDao
 
     companion object {
         // v2: columnas nuevas de GET /materials (fotos, edición, modelo, fecha y carrera del vendedor)
@@ -225,9 +260,20 @@ abstract class CampusSwapDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE pending_messages ADD COLUMN roomId TEXT")
             }
         }
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS meetups (ownerId TEXT NOT NULL, proposalId TEXT NOT NULL, " +
+                        "roomId TEXT NOT NULL, productId TEXT NOT NULL, productTitle TEXT NOT NULL, " +
+                        "counterpartName TEXT NOT NULL, pointName TEXT NOT NULL, startsAtMillis INTEGER NOT NULL, " +
+                        "endsAtMillis INTEGER NOT NULL, confirmed INTEGER NOT NULL, proposedByMe INTEGER NOT NULL, " +
+                        "savedAtMillis INTEGER NOT NULL, PRIMARY KEY(ownerId, proposalId))",
+                )
+            }
+        }
         fun create(context: Context): CampusSwapDatabase =
             Room.databaseBuilder(context, CampusSwapDatabase::class.java, "campusswap.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .fallbackToDestructiveMigration()
                 .build()
     }

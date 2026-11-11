@@ -8,6 +8,7 @@ import com.campusswap.app.model.ExchangeRepository
 import com.campusswap.app.model.MeetingPointPopularityRepository
 import com.campusswap.app.model.MeetingPointRepository
 import com.campusswap.app.model.MeetingProposalRepository
+import com.campusswap.app.model.MeetupsRepository
 import com.campusswap.app.model.auth.AuthRepository
 import com.campusswap.app.model.auth.DataStoreSessionStore
 import com.campusswap.app.model.auth.SessionManager
@@ -140,13 +141,18 @@ class AppContainer(context: Context) {
 
     val chatRepository = ChatRepository(chatRoomRepository, messageRemote, signedInUserId, cache = responseCache)
 
+    private val proposalRemote =
+        RetrofitMeetingProposalRemoteDataSource(ApiClient.create<MeetingProposalApi>(BuildConfig.BASE_URL, backendClient))
+
     val meetingProposalRepository = MeetingProposalRepository(
         rooms = chatRoomRepository,
-        remote = RetrofitMeetingProposalRemoteDataSource(ApiClient.create<MeetingProposalApi>(BuildConfig.BASE_URL, backendClient)),
+        remote = proposalRemote,
         cache = responseCache,
         currentUserId = signedInUserId,
         clock = clock,
     )
+
+    val meetupsRepository = MeetupsRepository(chatRoomRemote, proposalRemote, database.meetups(), signedInUserId, clock)
 
     val popularityRepository = MeetingPointPopularityRepository(RetrofitPopularityRemoteDataSource(analyticsApi), responseCache)
 
