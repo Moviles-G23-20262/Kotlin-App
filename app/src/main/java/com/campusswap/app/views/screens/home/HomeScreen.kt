@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -52,6 +53,7 @@ import com.campusswap.app.views.components.ProductCard
 import com.campusswap.app.views.components.ProductRowCard
 import com.campusswap.app.views.components.SectionHeader
 import com.campusswap.app.views.components.SectionTitle
+import com.campusswap.app.views.components.SkeletonBox
 import com.campusswap.app.views.components.campusCard
 import com.campusswap.app.views.components.formatRating
 import com.campusswap.app.viewmodel.AppViewModel
@@ -199,7 +201,16 @@ fun HomeScreen(
                     onSeeAll = { onSeeAllCategory(selectedCategory) },
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
                 )
-                if (offers.isEmpty()) {
+                if (offers.isEmpty() && vm.materialsLoading) {
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
+                        userScrollEnabled = false,
+                    ) {
+                        items(3) { SkeletonBox(Modifier.width(155.dp).height(190.dp), radius = 14.dp) }
+                    }
+                } else if (offers.isEmpty()) {
                     BodyText(
                         "No offers in this category yet.",
                         color = c.textMuted,
@@ -235,6 +246,11 @@ fun HomeScreen(
                     onSeeAll = { onSeeAllCategory(Category.ALL) },
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
                 )
+            }
+            if (recommended.isEmpty() && vm.materialsLoading) {
+                items(3) {
+                    SkeletonBox(Modifier.fillMaxWidth().height(96.dp).padding(start = 16.dp, end = 16.dp, bottom = 12.dp))
+                }
             }
             items(recommended, key = { "rec-${it.id}" }) { product ->
                 RecommendedRow(

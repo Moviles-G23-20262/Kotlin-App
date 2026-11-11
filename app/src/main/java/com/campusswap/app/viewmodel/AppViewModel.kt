@@ -99,6 +99,10 @@ class AppViewModel : ViewModel() {
     var materialsLive by mutableStateOf(true)
         private set
 
+    /** True while the first page of listings is on its way, so Home shows placeholders, not "No offers". */
+    var materialsLoading by mutableStateOf(false)
+        private set
+
     var materialsUpdatedAtMillis by mutableStateOf<Long?>(null)
         private set
 
@@ -876,7 +880,12 @@ class AppViewModel : ViewModel() {
 
     fun loadMaterials(repository: MaterialRepository) {
         viewModelScope.launch {
-            val feed = repository.load()
+            materialsLoading = allProducts.none { it.id in loadedMaterialIds }
+            val feed = try {
+                repository.load()
+            } finally {
+                materialsLoading = false
+            }
             materialsLive = feed.isLive
             materialsUpdatedAtMillis = feed.updatedAtMillis
             allProducts.removeAll { it.id in loadedMaterialIds }
