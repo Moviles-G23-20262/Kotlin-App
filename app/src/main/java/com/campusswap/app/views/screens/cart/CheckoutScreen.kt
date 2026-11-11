@@ -1,7 +1,5 @@
 package com.campusswap.app.views.screens.cart
 
-import com.campusswap.app.model.domain.InputLimits
-import com.campusswap.app.model.domain.InputValidation
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.background
@@ -29,7 +27,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,26 +41,21 @@ import com.campusswap.app.views.components.BackHeader
 import com.campusswap.app.views.components.BodyText
 import com.campusswap.app.views.components.BottomActionBar
 import com.campusswap.app.views.components.CampusIcons
-import com.campusswap.app.views.components.CampusTextField
 import com.campusswap.app.views.components.HeadingText
 import com.campusswap.app.views.components.MonoText
 import com.campusswap.app.views.components.OfflineBanner
 import com.campusswap.app.views.components.PrimaryButton
-import com.campusswap.app.views.components.RadioOption
 import com.campusswap.app.views.components.SecondaryButton
 import com.campusswap.app.views.components.StickyNote
 import com.campusswap.app.views.components.campusCard
 import com.campusswap.app.views.components.formatPrice
 import com.campusswap.app.viewmodel.AppViewModel
-import com.campusswap.app.viewmodel.HOME_DELIVERY_FEE
 import com.campusswap.app.model.Order
 import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.themes.CampusType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private enum class DeliveryMethod { CAMPUS, ADDRESS }
-private enum class PaymentMethod(val label: String) { GCASH("GCash"), CASH("Cash on Meetup"), MAYA("Maya") }
 
 @Composable
 fun CheckoutScreen(
@@ -72,14 +64,8 @@ fun CheckoutScreen(
     onOrderPlaced: (Int) -> Unit,
 ) {
     val c = CampusSwapTheme.colors
-    var delivery by rememberSaveable { mutableStateOf(DeliveryMethod.CAMPUS) }
-    var address by rememberSaveable { mutableStateOf("") }
-    var payment by rememberSaveable { mutableStateOf(PaymentMethod.GCASH) }
     var placing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-
-    val deliveryFee = if (delivery == DeliveryMethod.ADDRESS) HOME_DELIVERY_FEE else 0.0
-    val total = vm.orderTotal + deliveryFee
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
         BackHeader(title = "Checkout", onBack = onBack)
@@ -97,56 +83,21 @@ fun CheckoutScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            CheckoutCard(title = "Delivery Method", icon = CampusIcons.MapPin) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    RadioOption(
-                        label = "Campus Meetup",
-                        sub = "Meet at a safe point on campus",
-                        selected = delivery == DeliveryMethod.CAMPUS,
-                        onClick = { delivery = DeliveryMethod.CAMPUS },
-                    )
-                    RadioOption(
-                        label = "Home Delivery",
-                        sub = "Ship to your address (+${formatPrice(HOME_DELIVERY_FEE)})",
-                        selected = delivery == DeliveryMethod.ADDRESS,
-                        onClick = { delivery = DeliveryMethod.ADDRESS },
-                    )
-                }
-                if (delivery == DeliveryMethod.ADDRESS) {
-                    CampusTextField(
-                        value = address,
-                        onValueChange = { address = InputValidation.sanitizeText(it, InputLimits.ADDRESS_MAX) },
-                        placeholder = "Enter delivery address",
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    )
-                } else {
-                    val noteShape = RoundedCornerShape(8.dp)
-                    Row(
-                        modifier = Modifier
-                            .padding(top = 8.dp)
-                            .fillMaxWidth()
-                            .background(c.elevated, noteShape)
-                            .border(1.dp, c.borderSubtle, noteShape)
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(CampusIcons.Location, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(16.dp))
-                        BodyText("Suggested: Main Library, Ground Floor")
-                    }
-                }
+            // Every exchange happens in person at a monitored campus point: the app never ships items or
+            // takes payments, so the screen says so instead of offering options the order never used.
+            CheckoutCard(title = "Meetup", icon = CampusIcons.MapPin) {
+                CheckoutNote(
+                    CampusIcons.Location,
+                    "You'll agree on a safe, monitored campus point with the seller in the chat. " +
+                        "The Campus Guardian suggests the best one for both of you.",
+                )
             }
 
-            CheckoutCard(title = "Payment Method", icon = CampusIcons.Wallet) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    PaymentMethod.entries.forEach { method ->
-                        RadioOption(
-                            label = method.label,
-                            selected = payment == method,
-                            onClick = { payment = method },
-                        )
-                    }
-                }
+            CheckoutCard(title = "Payment", icon = CampusIcons.Wallet) {
+                CheckoutNote(
+                    CampusIcons.Wallet,
+                    "Pay the seller in person when you meet, in cash, Nequi or Daviplata, after checking the item.",
+                )
             }
 
             CheckoutCard(title = "Items", icon = CampusIcons.Package, titleBottomPadding = 10) {
@@ -158,19 +109,19 @@ fun CheckoutScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             BodyText(
-                                "${line.product.title} x${line.quantity}",
+                                line.product.title,
                                 modifier = Modifier.weight(1f).padding(end = 8.dp),
                             )
                             MonoText(
-                                formatPrice(line.product.price * line.quantity),
+                                formatPrice(line.product.price),
                                 size = CampusType.sizeXs,
                                 color = c.accentHi,
                                 weight = FontWeight.Medium,
                             )
                         }
                     }
-                    if (deliveryFee > 0) SummaryRow("Home delivery", formatPrice(deliveryFee))
-                    TotalRow(total)
+                    if (vm.serviceFee > 0) SummaryRow("Service fee", formatPrice(vm.serviceFee))
+                    TotalRow(vm.orderTotal)
                 }
             }
         }
@@ -189,18 +140,35 @@ fun CheckoutScreen(
                 onClick = {
                     placing = true
                     scope.launch {
-                        val number = vm.placeOrder(meetOnCampus = delivery == DeliveryMethod.CAMPUS)
+                        val number = vm.placeOrder()
                         placing = false
                         if (number != null) onOrderPlaced(number)
                     }
                 },
-                enabled = !placing && vm.cart.isNotEmpty() && !vm.needsConnectionToOrder &&
-                    (delivery == DeliveryMethod.CAMPUS || address.trim().length >= InputLimits.ADDRESS_MIN),
+                enabled = !placing && vm.cart.isNotEmpty() && !vm.needsConnectionToOrder,
                 leadingIcon = CampusIcons.Send,
                 contentPadding = PaddingValues(13.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+@Composable
+private fun CheckoutNote(icon: ImageVector, text: String) {
+    val c = CampusSwapTheme.colors
+    val noteShape = RoundedCornerShape(8.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(c.elevated, noteShape)
+            .border(1.dp, c.borderSubtle, noteShape)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, contentDescription = null, tint = c.textMuted, modifier = Modifier.size(16.dp))
+        BodyText(text, color = c.text2)
     }
 }
 

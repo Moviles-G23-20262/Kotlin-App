@@ -971,4 +971,3 @@ fun pendingProductId(localId: Long) = "pending-$localId"
 const val DEMO_USERNAME = "uwu"
 const val DEMO_PASSWORD = "uwu123"
 const val SERVICE_FEE = 2000.0
-const val HOME_DELIVERY_FEE = 10000.0
