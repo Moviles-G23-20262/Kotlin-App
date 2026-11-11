@@ -275,7 +275,7 @@ fun HomeScreen(
                                     modifier = Modifier.width(155.dp),
                                     isWishlisted = vm.isWishlisted(product.id),
                                     onClick = { onProductClick(product.id) },
-                                    onToggleWishlist = { vm.toggleWishlist(product.id) },
+                                    onToggleWishlist = if (vm.isMine(product)) null else ({ vm.toggleWishlist(product.id) }),
                                     imageHeight = 110.dp,
                                     showRating = false,
                                 )
