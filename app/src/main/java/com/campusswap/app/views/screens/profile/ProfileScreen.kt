@@ -63,6 +63,8 @@ import java.util.Locale
 import com.campusswap.app.views.components.OfflineBanner
 import com.campusswap.app.views.components.timeAgo
 import com.campusswap.app.views.components.WhileVisible
+import com.campusswap.app.views.components.PullToRefresh
+import kotlinx.coroutines.joinAll
 
 @Composable
 fun ProfileScreen(
@@ -84,6 +86,16 @@ fun ProfileScreen(
     val inbox: ConversationsViewModel = viewModel(factory = ConversationsViewModel.factory(container))
     WhileVisible(inbox) { inbox.pollWhileVisible() }
     val inboxState by inbox.state.collectAsState()
+
+    // Pull to refresh reloads purchases and sales, received reviews and the buyers' messages.
+    suspend fun refreshHub() {
+        if (container.sessionManager.token == null) return
+        listOfNotNull(
+            vm.loadOrders(container.orderRepository),
+            vm.loadMyReviews(container.ratingRepository),
+        ).joinAll()
+        inbox.refresh()
+    }
     val buyerMessages = inboxState.conversations.filter { it.sellingThis }.take(3)
 
     // The log-out icon sits next to "Add Item": one stray tap used to sign the user out.
@@ -136,226 +148,228 @@ fun ProfileScreen(
         )
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        InitialsAvatar(user.name, size = 44.dp)
-                        Column {
-                            BodyText(user.name, color = c.text, weight = FontWeight.SemiBold, size = CampusType.sizeSm)
-                            MonoText(user.maskedEmail + if (user.isVerified) " · Verified student" else "")
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        StatCard(CampusIcons.Package, listings.size.toString(), "Active Listings", Modifier.weight(1f))
-                        StatCard(CampusIcons.Wallet, formatCompact(vm.earnedThisMonth), "Earned This Month", Modifier.weight(1f))
-                        StatCard(
-                            CampusIcons.TrendingUp,
-                            vm.myRating?.let { "${formatRating(it)} (${vm.myReviews.size})" } ?: "New",
-                            "Your Rating",
-                            Modifier.weight(1f),
-                        )                    }
-                }
-            }
-
-            if (vm.myReviews.isNotEmpty()) {
-                item { SectionTitle("Reviews about you", icon = CampusIcons.Star, iconTint = c.text) }
-                items(vm.myReviews.take(5), key = { "review-${it.id}" }) { review ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .campusCard()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            InitialsAvatar(review.rater?.fullName ?: "Student", size = 32.dp)
-                            BodyText(
-                                review.rater?.fullName ?: "A student",
-                                color = c.text,
-                                weight = FontWeight.SemiBold,
-                                modifier = Modifier.weight(1f),
-                            )
-                            MonoText("${review.stars}.0 ★")
-                        }
-                        review.review?.takeIf { it.isNotBlank() }?.let {
-                            BodyText(it, modifier = Modifier.padding(top = 8.dp))
-                        }
-                        if (review.tags.orEmpty().isNotEmpty()) {
-                            Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                review.tags.orEmpty().take(3).forEach { Badge(it) }
+        PullToRefresh(onRefresh = { refreshHub() }, modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            InitialsAvatar(user.name, size = 44.dp)
+                            Column {
+                                BodyText(user.name, color = c.text, weight = FontWeight.SemiBold, size = CampusType.sizeSm)
+                                MonoText(user.maskedEmail + if (user.isVerified) " · Verified student" else "")
                             }
                         }
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            StatCard(CampusIcons.Package, listings.size.toString(), "Active Listings", Modifier.weight(1f))
+                            StatCard(CampusIcons.Wallet, formatCompact(vm.earnedThisMonth), "Earned This Month", Modifier.weight(1f))
+                            StatCard(
+                                CampusIcons.TrendingUp,
+                                vm.myRating?.let { "${formatRating(it)} (${vm.myReviews.size})" } ?: "New",
+                                "Your Rating",
+                                Modifier.weight(1f),
+                            )                    }
                     }
                 }
-            }
 
-            // every order stays here until the change is closed (View 12).
-            item { SectionTitle("My Purchases", icon = CampusIcons.ShoppingBag, iconTint = c.text) }
-            if (purchases.isEmpty()) {
-                item {
-                    BodyText(
-                        "Nothing bought yet. Items you buy stay here until you meet the seller and rate the exchange.",
-                        color = c.textMuted,
-                    )
-                }
-            } else {
-                items(purchases, key = { "buy-${it.product.id}" }) { purchase ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .campusCard()
-                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                if (vm.myReviews.isNotEmpty()) {
+                    item { SectionTitle("Reviews about you", icon = CampusIcons.Star, iconTint = c.text) }
+                    items(vm.myReviews.take(5), key = { "review-${it.id}" }) { review ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .campusCard()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                InitialsAvatar(review.rater?.fullName ?: "Student", size = 32.dp)
                                 BodyText(
-                                    purchase.product.title,
+                                    review.rater?.fullName ?: "A student",
                                     color = c.text,
                                     weight = FontWeight.SemiBold,
-                                    maxLines = 2,
-                                    modifier = Modifier.clickable { onProductClick(purchase.product.id) },
+                                    modifier = Modifier.weight(1f),
                                 )
-                                MonoText("Order #CSW-${purchase.order.number} · ${purchase.product.seller.name}")
+                                MonoText("${review.stars}.0 ★")
                             }
-                            PriceText(purchase.product.price)
-                        }
-                        val rating = purchase.rating
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Icon(
-                                if (rating != null) CampusIcons.CheckCircle else if (purchase.isScheduled) CampusIcons.MapPin else CampusIcons.Clock,
-                                contentDescription = null,
-                                tint = if (rating != null) c.success else c.accentHi,
-                                modifier = Modifier.size(14.dp),
-                            )
-                            BodyText(
-                                when {
-                                    rating != null -> "Closed · you rated ${rating.stars}.0"
-                                    purchase.isScheduled -> "Meeting confirmed · ${purchase.proposal?.point?.name}"
-                                    else -> "Waiting for a meeting point"
-                                },
-                                size = CampusType.size2xs,
-                                color = c.textMuted,
-                                modifier = Modifier.weight(1f),
-                            )
-                            if (rating == null) {
-                                PrimaryButton(
-                                    text = "Complete exchange",
-                                    onClick = { onCompleteExchange(purchase.product.id) },
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                                    fontSize = CampusType.sizeXs,
-                                )
+                            review.review?.takeIf { it.isNotBlank() }?.let {
+                                BodyText(it, modifier = Modifier.padding(top = 8.dp))
                             }
-                        }
-                    }
-                }
-            }
-
-            // Active list
-            item { SectionTitle("Active Listings", icon = CampusIcons.Package, iconTint = c.text) }
-            if (listings.isEmpty()) {
-                item {
-                    BodyText("You have no active listings yet. Tap “Add Item” to publish one.", color = c.textMuted)
-                }
-            } else {
-                items(listings, key = { "mine-${it.id}" }) { product ->
-                    ProductRowCard(product = product, onClick = { onProductClick(product.id) }, thumbSize = 58.dp) {
-                        BodyText(product.title, color = c.text, weight = FontWeight.SemiBold, maxLines = 2, modifier = Modifier.padding(bottom = 3.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        ) {
-                            Badge(product.condition.label)
-                        }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            PriceText(product.price)
-                            val tagShape = RoundedCornerShape(6.dp)
-                            BodyText(
-                                "Active",
-                                size = CampusType.size2xs,
-                                color = c.success,
-                                weight = FontWeight.Medium,
-                                modifier = Modifier
-                                    .background(c.elevated, tagShape)
-                                    .border(1.dp, c.borderSubtle, tagShape)
-                                    .padding(horizontal = 8.dp, vertical = 2.dp),
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Recent sales
-            item { SectionTitle("Recent Sales", icon = CampusIcons.TrendingUp, iconTint = c.text) }
-            if (recentSales.isEmpty()) {
-                item { BodyText("No sales yet. When someone buys one of your listings, it shows up here.", color = c.textMuted) }
-            } else {
-                items(recentSales, key = { "sale-${it.product.id}" }) { sale ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .campusCard()
-                            .clickable {
-                                val room = inboxState.conversations.firstOrNull {
-                                    it.productId == sale.product.id && it.counterpartId == sale.buyerId
+                            if (review.tags.orEmpty().isNotEmpty()) {
+                                Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    review.tags.orEmpty().take(3).forEach { Badge(it) }
                                 }
-                                onOpenChat(sale.product.id, room?.roomId)
                             }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
-                            BodyText(sale.product.title, color = c.text, weight = FontWeight.SemiBold, maxLines = 1)
-                            BodyText(saleLabel(sale), size = CampusType.size2xs, color = c.textMuted)
                         }
-                        MonoText(formatPrice(sale.product.price), size = CampusType.sizeXs, color = c.accentHi, weight = FontWeight.Medium)
                     }
                 }
-            }
 
-            // Buyer messages
-            item { SectionTitle("Buyer Messages", icon = CampusIcons.Message, iconTint = c.text) }
-            if (buyerMessages.isEmpty()) {
-                item { BodyText("No one has asked about your listings yet.", color = c.textMuted) }
-            } else {
-                items(buyerMessages, key = { "msg-${it.roomId}" }) { msg ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .campusCard()
-                            .clickable { onOpenChat(msg.productId, msg.roomId) }
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                    ) {
+                // every order stays here until the change is closed (View 12).
+                item { SectionTitle("My Purchases", icon = CampusIcons.ShoppingBag, iconTint = c.text) }
+                if (purchases.isEmpty()) {
+                    item {
+                        BodyText(
+                            "Nothing bought yet. Items you buy stay here until you meet the seller and rate the exchange.",
+                            color = c.textMuted,
+                        )
+                    }
+                } else {
+                    items(purchases, key = { "buy-${it.product.id}" }) { purchase ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .campusCard()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    BodyText(
+                                        purchase.product.title,
+                                        color = c.text,
+                                        weight = FontWeight.SemiBold,
+                                        maxLines = 2,
+                                        modifier = Modifier.clickable { onProductClick(purchase.product.id) },
+                                    )
+                                    MonoText("Order #CSW-${purchase.order.number} · ${purchase.product.seller.name}")
+                                }
+                                PriceText(purchase.product.price)
+                            }
+                            val rating = purchase.rating
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                Icon(
+                                    if (rating != null) CampusIcons.CheckCircle else if (purchase.isScheduled) CampusIcons.MapPin else CampusIcons.Clock,
+                                    contentDescription = null,
+                                    tint = if (rating != null) c.success else c.accentHi,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                BodyText(
+                                    when {
+                                        rating != null -> "Closed · you rated ${rating.stars}.0"
+                                        purchase.isScheduled -> "Meeting confirmed · ${purchase.proposal?.point?.name}"
+                                        else -> "Waiting for a meeting point"
+                                    },
+                                    size = CampusType.size2xs,
+                                    color = c.textMuted,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (rating == null) {
+                                    PrimaryButton(
+                                        text = "Complete exchange",
+                                        onClick = { onCompleteExchange(purchase.product.id) },
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                        fontSize = CampusType.sizeXs,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Active list
+                item { SectionTitle("Active Listings", icon = CampusIcons.Package, iconTint = c.text) }
+                if (listings.isEmpty()) {
+                    item {
+                        BodyText("You have no active listings yet. Tap “Add Item” to publish one.", color = c.textMuted)
+                    }
+                } else {
+                    items(listings, key = { "mine-${it.id}" }) { product ->
+                        ProductRowCard(product = product, onClick = { onProductClick(product.id) }, thumbSize = 58.dp) {
+                            BodyText(product.title, color = c.text, weight = FontWeight.SemiBold, maxLines = 2, modifier = Modifier.padding(bottom = 3.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            ) {
+                                Badge(product.condition.label)
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                PriceText(product.price)
+                                val tagShape = RoundedCornerShape(6.dp)
+                                BodyText(
+                                    "Active",
+                                    size = CampusType.size2xs,
+                                    color = c.success,
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier
+                                        .background(c.elevated, tagShape)
+                                        .border(1.dp, c.borderSubtle, tagShape)
+                                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Recent sales
+                item { SectionTitle("Recent Sales", icon = CampusIcons.TrendingUp, iconTint = c.text) }
+                if (recentSales.isEmpty()) {
+                    item { BodyText("No sales yet. When someone buys one of your listings, it shows up here.", color = c.textMuted) }
+                } else {
+                    items(recentSales, key = { "sale-${it.product.id}" }) { sale ->
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .campusCard()
+                                .clickable {
+                                    val room = inboxState.conversations.firstOrNull {
+                                        it.productId == sale.product.id && it.counterpartId == sale.buyerId
+                                    }
+                                    onOpenChat(sale.product.id, room?.roomId)
+                                }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                InitialsAvatar(msg.counterpartName, size = 28.dp, fontSize = CampusType.size2xs)
-                                BodyText(msg.counterpartName, color = c.text, weight = FontWeight.SemiBold)
+                            Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                                BodyText(sale.product.title, color = c.text, weight = FontWeight.SemiBold, maxLines = 1)
+                                BodyText(saleLabel(sale), size = CampusType.size2xs, color = c.textMuted)
                             }
-                            MonoText(msg.time)
+                            MonoText(formatPrice(sale.product.price), size = CampusType.sizeXs, color = c.accentHi, weight = FontWeight.Medium)
                         }
-                        BodyText("Re: ${msg.productTitle}", size = CampusType.size2xs, color = c.textMuted, maxLines = 1, modifier = Modifier.padding(bottom = 2.dp))
-                        BodyText(msg.lastMessage ?: "No messages yet")
+                    }
+                }
+
+                // Buyer messages
+                item { SectionTitle("Buyer Messages", icon = CampusIcons.Message, iconTint = c.text) }
+                if (buyerMessages.isEmpty()) {
+                    item { BodyText("No one has asked about your listings yet.", color = c.textMuted) }
+                } else {
+                    items(buyerMessages, key = { "msg-${it.roomId}" }) { msg ->
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .campusCard()
+                                .clickable { onOpenChat(msg.productId, msg.roomId) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    InitialsAvatar(msg.counterpartName, size = 28.dp, fontSize = CampusType.size2xs)
+                                    BodyText(msg.counterpartName, color = c.text, weight = FontWeight.SemiBold)
+                                }
+                                MonoText(msg.time)
+                            }
+                            BodyText("Re: ${msg.productTitle}", size = CampusType.size2xs, color = c.textMuted, maxLines = 1, modifier = Modifier.padding(bottom = 2.dp))
+                            BodyText(msg.lastMessage ?: "No messages yet")
+                        }
                     }
                 }
             }

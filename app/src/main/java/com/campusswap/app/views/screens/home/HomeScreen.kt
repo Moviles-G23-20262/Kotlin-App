@@ -64,6 +64,10 @@ import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.themes.CampusType
 import androidx.compose.ui.unit.sp
 import androidx.tracing.trace
+import androidx.compose.ui.platform.LocalContext
+import com.campusswap.app.CampusSwapApplication
+import com.campusswap.app.views.components.PullToRefresh
+import kotlinx.coroutines.joinAll
 
 @Composable
 fun HomeScreen(
@@ -77,6 +81,17 @@ fun HomeScreen(
     unreadMessages: Int,
 ) {
     val c = CampusSwapTheme.colors
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+
+    // Pull to refresh reloads the listings and the notification badge. Demo access has no token: asking
+    // the server would answer 401 and wrongly make Home look offline, so it has nothing to reload.
+    suspend fun refreshHome() {
+        if (container.sessionManager.token == null) return
+        listOfNotNull(
+            vm.loadMaterials(container.materialRepository),
+            vm.loadNotifications(container.notificationRepository, markRead = false),
+        ).joinAll()
+    }
     var selectedCategory by rememberSaveable { mutableStateOf(Category.ALL) }
 
     // derivedStateOf reads vm.allProducts (a snapshot list) and selectedCategory, so the lists are rebuilt
@@ -118,165 +133,167 @@ fun HomeScreen(
             modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp),
         )
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 24.dp),
-        ) {
-            item {
-                HeroCard(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+        PullToRefresh(onRefresh = { refreshHome() }, modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 24.dp),
+            ) {
+                item {
+                    HeroCard(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
+                        Column {
+                            val chipShape = RoundedCornerShape(999.dp)
+                            Row(
+                                modifier = Modifier
+                                    .padding(bottom = 10.dp)
+                                    .clip(chipShape)
+                                    .background(Color.White.copy(alpha = 0.12f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.2f), chipShape)
+                                    .padding(horizontal = 12.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                            ) {
+                                Icon(CampusIcons.Sparkle, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                BodyText("Weekly Deal", color = Color.White.copy(alpha = 0.9f), weight = FontWeight.Medium)
+                            }
+                            HeadingText(
+                                "Save big on course materials",
+                                size = 17.sp,
+                                color = Color(0xFFF9F9F9),
+                                lineHeight = CampusType.sizeMd * 1.2f,
+                                modifier = Modifier.padding(bottom = 6.dp),
+                            )
+                            BodyText(
+                                "Buy from fellow students and save up to 70% on textbooks, calculators and more.",
+                                color = Color(0xFFF9F9F9).copy(alpha = 0.8f),
+                                lineHeight = CampusType.sizeXs * 1.5f,
+                                modifier = Modifier.padding(bottom = 16.dp),
+                            )
+                            val btnShape = RoundedCornerShape(8.dp)
+                            Row(
+                                modifier = Modifier
+                                    .clip(btnShape)
+                                    .background(Color.White.copy(alpha = 0.15f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.3f), btnShape)
+                                    .clickable(onClick = onSearchClick)
+                                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                BodyText("Shop Now", color = Color(0xFFF9F9F9), weight = FontWeight.SemiBold)
+                                Icon(CampusIcons.ArrowRight, contentDescription = null, tint = Color(0xFFF9F9F9), modifier = Modifier.size(15.dp))
+                            }
+                        }
+                    }
+                }
+
+                // categorie
+                item {
                     Column {
-                        val chipShape = RoundedCornerShape(999.dp)
-                        Row(
-                            modifier = Modifier
-                                .padding(bottom = 10.dp)
-                                .clip(chipShape)
-                                .background(Color.White.copy(alpha = 0.12f))
-                                .border(1.dp, Color.White.copy(alpha = 0.2f), chipShape)
-                                .padding(horizontal = 12.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        ) {
-                            Icon(CampusIcons.Sparkle, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
-                            BodyText("Weekly Deal", color = Color.White.copy(alpha = 0.9f), weight = FontWeight.Medium)
-                        }
-                        HeadingText(
-                            "Save big on course materials",
-                            size = 17.sp,
-                            color = Color(0xFFF9F9F9),
-                            lineHeight = CampusType.sizeMd * 1.2f,
-                            modifier = Modifier.padding(bottom = 6.dp),
-                        )
-                        BodyText(
-                            "Buy from fellow students and save up to 70% on textbooks, calculators and more.",
-                            color = Color(0xFFF9F9F9).copy(alpha = 0.8f),
-                            lineHeight = CampusType.sizeXs * 1.5f,
-                            modifier = Modifier.padding(bottom = 16.dp),
-                        )
-                        val btnShape = RoundedCornerShape(8.dp)
-                        Row(
-                            modifier = Modifier
-                                .clip(btnShape)
-                                .background(Color.White.copy(alpha = 0.15f))
-                                .border(1.dp, Color.White.copy(alpha = 0.3f), btnShape)
-                                .clickable(onClick = onSearchClick)
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        ) {
-                            BodyText("Shop Now", color = Color(0xFFF9F9F9), weight = FontWeight.SemiBold)
-                            Icon(CampusIcons.ArrowRight, contentDescription = null, tint = Color(0xFFF9F9F9), modifier = Modifier.size(15.dp))
-                        }
-                    }
-                }
-            }
-
-            // categorie
-            item {
-                Column {
-                SectionTitle("Categories", modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp))
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp),
-                ) {
-                    items(Category.entries.toList()) { category ->
-                        Pill(
-                            label = category.label,
-                            selected = selectedCategory == category,
-                            onClick = { selectedCategory = category },
-                        )
-                    }
-                }
-                }
-            }
-
-            // offers
-            item {
-                Column {
-                SectionHeader(
-                    title = "Current Offers",
-                    icon = CampusIcons.Flame,
-                    onSeeAll = { onSeeAllCategory(selectedCategory) },
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
-                )
-                if (offers.isEmpty() && vm.materialsLoading) {
+                    SectionTitle("Categories", modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp))
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
-                        userScrollEnabled = false,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 8.dp),
                     ) {
-                        items(3) { SkeletonBox(Modifier.width(155.dp).height(190.dp), radius = 14.dp) }
-                    }
-                } else if (offers.isEmpty()) {
-                    BodyText(
-                        "No offers in this category yet.",
-                        color = c.textMuted,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                } else {
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
-                    ) {
-                        items(offers, key = { it.id }) { product ->
-                            ProductCard(
-                                product = product,
-                                modifier = Modifier.width(155.dp),
-                                isWishlisted = vm.isWishlisted(product.id),
-                                onClick = { onProductClick(product.id) },
-                                onToggleWishlist = { vm.toggleWishlist(product.id) },
-                                imageHeight = 110.dp,
-                                showRating = false,
+                        items(Category.entries.toList()) { category ->
+                            Pill(
+                                label = category.label,
+                                selected = selectedCategory == category,
+                                onClick = { selectedCategory = category },
                             )
                         }
                     }
-                }
-                }
-            }
-
-            // Recomended
-            item {
-                SectionHeader(
-                    title = "Recommended",
-                    icon = CampusIcons.BookOpen,
-                    onSeeAll = { onSeeAllCategory(Category.ALL) },
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
-                )
-            }
-            if (recommended.isEmpty() && vm.materialsLoading) {
-                items(3) {
-                    SkeletonBox(Modifier.fillMaxWidth().height(96.dp).padding(start = 16.dp, end = 16.dp, bottom = 12.dp))
-                }
-            }
-            items(recommended, key = { "rec-${it.id}" }) { product ->
-                RecommendedRow(
-                    product = product,
-                    onClick = { onProductClick(product.id) },
-                    inCart = vm.isInCart(product.id),
-                    onAddToCart = { vm.addToCart(product) },
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
-                )
-            }
-
-            // Sellers
-            item {
-                Column {
-                SectionTitle(
-                    "Featured Sellers",
-                    icon = CampusIcons.Star,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
-                )
-                LazyRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
-                ) {
-                    items(vm.featuredSellers, key = { it.seller.id }) { featured ->
-                        FeaturedSellerCard(featured)
                     }
                 }
+
+                // offers
+                item {
+                    Column {
+                    SectionHeader(
+                        title = "Current Offers",
+                        icon = CampusIcons.Flame,
+                        onSeeAll = { onSeeAllCategory(selectedCategory) },
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
+                    )
+                    if (offers.isEmpty() && vm.materialsLoading) {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
+                            userScrollEnabled = false,
+                        ) {
+                            items(3) { SkeletonBox(Modifier.width(155.dp).height(190.dp), radius = 14.dp) }
+                        }
+                    } else if (offers.isEmpty()) {
+                        BodyText(
+                            "No offers in this category yet.",
+                            color = c.textMuted,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        )
+                    } else {
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
+                        ) {
+                            items(offers, key = { it.id }) { product ->
+                                ProductCard(
+                                    product = product,
+                                    modifier = Modifier.width(155.dp),
+                                    isWishlisted = vm.isWishlisted(product.id),
+                                    onClick = { onProductClick(product.id) },
+                                    onToggleWishlist = { vm.toggleWishlist(product.id) },
+                                    imageHeight = 110.dp,
+                                    showRating = false,
+                                )
+                            }
+                        }
+                    }
+                    }
+                }
+
+                // Recomended
+                item {
+                    SectionHeader(
+                        title = "Recommended",
+                        icon = CampusIcons.BookOpen,
+                        onSeeAll = { onSeeAllCategory(Category.ALL) },
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
+                    )
+                }
+                if (recommended.isEmpty() && vm.materialsLoading) {
+                    items(3) {
+                        SkeletonBox(Modifier.fillMaxWidth().height(96.dp).padding(start = 16.dp, end = 16.dp, bottom = 12.dp))
+                    }
+                }
+                items(recommended, key = { "rec-${it.id}" }) { product ->
+                    RecommendedRow(
+                        product = product,
+                        onClick = { onProductClick(product.id) },
+                        inCart = vm.isInCart(product.id),
+                        onAddToCart = { vm.addToCart(product) },
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    )
+                }
+
+                // Sellers
+                item {
+                    Column {
+                    SectionTitle(
+                        "Featured Sellers",
+                        icon = CampusIcons.Star,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
+                    )
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
+                    ) {
+                        items(vm.featuredSellers, key = { it.seller.id }) { featured ->
+                            FeaturedSellerCard(featured)
+                        }
+                    }
+                    }
                 }
             }
         }

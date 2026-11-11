@@ -36,6 +36,7 @@ import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.themes.CampusType
 import androidx.compose.ui.platform.LocalContext
 import com.campusswap.app.CampusSwapApplication
+import com.campusswap.app.views.components.PullToRefresh
 
 
 @Composable
@@ -58,70 +59,72 @@ fun NotificationsScreen(
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
         BackHeader(title = "Notifications", onBack = onBack)
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-                        if (!vm.notificationsLive) {
-                item {
-                    BodyText("You're offline. Showing the last notifications we loaded.", color = c.textMuted)
+        PullToRefresh(onRefresh = { vm.loadNotifications(container.notificationRepository)?.join() }, modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                            if (!vm.notificationsLive) {
+                    item {
+                        BodyText("You're offline. Showing the last notifications we loaded.", color = c.textMuted)
+                    }
                 }
-            }
-            // View 11 — the alert engine gets a permanent slot at the top of the inbox.
-            item {
-                SummaryCard(
-                    icon = CampusIcons.Sparkle,
-                    title = if (matchCount > 0) "$matchCount new ${if (matchCount == 1) "match" else "matches"}" else "No new matches",
-                    message = if (activeAlerts > 0) {
-                        "$activeAlerts active ${if (activeAlerts == 1) "alert" else "alerts"} watching the marketplace for you."
-                    } else {
-                        "Create an alert and we'll watch new listings for you."
-                    },
-                    actionLabel = if (activeAlerts > 0) "View alerts" else "Create an alert",
-                    onAction = onOpenAlerts,
-                )
-            }
-
-            // View 12 — anything bought but not yet rated is one tap from closing.
-            if (pending.isNotEmpty()) {
+                // View 11 — the alert engine gets a permanent slot at the top of the inbox.
                 item {
-                    val first = pending.first()
                     SummaryCard(
-                        icon = CampusIcons.Package,
-                        title = "${pending.size} exchange${if (pending.size == 1) "" else "s"} to close",
-                        message = if (first.isScheduled) {
-                            "Meeting confirmed for \"${first.product.title}\". Check the item, then rate ${first.product.seller.name.substringBefore(' ')}."
+                        icon = CampusIcons.Sparkle,
+                        title = if (matchCount > 0) "$matchCount new ${if (matchCount == 1) "match" else "matches"}" else "No new matches",
+                        message = if (activeAlerts > 0) {
+                            "$activeAlerts active ${if (activeAlerts == 1) "alert" else "alerts"} watching the marketplace for you."
                         } else {
-                            "Agree on a meeting point for \"${first.product.title}\", then close the exchange."
+                            "Create an alert and we'll watch new listings for you."
                         },
-                        actionLabel = "Complete exchange",
-                        onAction = { onCompleteExchange(first.product.id) },
+                        actionLabel = if (activeAlerts > 0) "View alerts" else "Create an alert",
+                        onAction = onOpenAlerts,
                     )
                 }
-            }
 
-            if (vm.notifications.isEmpty()) {
-                item {
-                    Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
-                        EmptyState(
-                            icon = CampusIcons.Bell,
-                            title = "No notifications",
-                            message = "You're all caught up.",
+                // View 12 — anything bought but not yet rated is one tap from closing.
+                if (pending.isNotEmpty()) {
+                    item {
+                        val first = pending.first()
+                        SummaryCard(
+                            icon = CampusIcons.Package,
+                            title = "${pending.size} exchange${if (pending.size == 1) "" else "s"} to close",
+                            message = if (first.isScheduled) {
+                                "Meeting confirmed for \"${first.product.title}\". Check the item, then rate ${first.product.seller.name.substringBefore(' ')}."
+                            } else {
+                                "Agree on a meeting point for \"${first.product.title}\", then close the exchange."
+                            },
+                            actionLabel = "Complete exchange",
+                            onAction = { onCompleteExchange(first.product.id) },
                         )
                     }
                 }
-            } else {
-                items(vm.notifications, key = { it.id }) { notification ->
-                    NotificationRow(notification) {
-                        val id = notification.productId
-                        when (notification.kind) {
-                            NotificationKind.ALERT_MATCH ->
-                                if (id != null && vm.isRemoteNotification(notification.id)) onProductClick(id) else onOpenAlerts()
-                            NotificationKind.CHAT -> id?.let(onOpenChat)
-                            NotificationKind.EXCHANGE -> id?.let(onCompleteExchange)
-                            NotificationKind.PRODUCT -> id?.let(onProductClick)
-                            NotificationKind.GENERIC -> id?.let(onProductClick)
+
+                if (vm.notifications.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                            EmptyState(
+                                icon = CampusIcons.Bell,
+                                title = "No notifications",
+                                message = "You're all caught up.",
+                            )
+                        }
+                    }
+                } else {
+                    items(vm.notifications, key = { it.id }) { notification ->
+                        NotificationRow(notification) {
+                            val id = notification.productId
+                            when (notification.kind) {
+                                NotificationKind.ALERT_MATCH ->
+                                    if (id != null && vm.isRemoteNotification(notification.id)) onProductClick(id) else onOpenAlerts()
+                                NotificationKind.CHAT -> id?.let(onOpenChat)
+                                NotificationKind.EXCHANGE -> id?.let(onCompleteExchange)
+                                NotificationKind.PRODUCT -> id?.let(onProductClick)
+                                NotificationKind.GENERIC -> id?.let(onProductClick)
+                            }
                         }
                     }
                 }

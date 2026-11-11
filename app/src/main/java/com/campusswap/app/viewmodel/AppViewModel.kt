@@ -364,9 +364,9 @@ class AppViewModel : ViewModel() {
         private set
 
     /** Cache then network: la copia guardada sale al instante y se reemplaza cuando responde el servidor. */
-    fun loadOrders(repository: OrderRepository) {
+    fun loadOrders(repository: OrderRepository): Job? {
         orderRepository = repository
-        val userId = currentUserId ?: return
+        val userId = currentUserId ?: return null
         // Si ya hay compras o ventas en pantalla, no se devuelve a la copia vieja
         val showSaved = orders.isEmpty() && sales.isEmpty()
         // Una carga nueva cancela la anterior
@@ -386,6 +386,7 @@ class AppViewModel : ViewModel() {
             ordersLive = live
             ordersSavedAtMillis = savedAt
         }
+        return ordersJob
     }
 
     fun findProduct(id: String): Product? =
@@ -750,9 +751,9 @@ class AppViewModel : ViewModel() {
     val myRating: Double?
         get() = myReviews.takeIf { it.isNotEmpty() }?.map { it.stars }?.average()
 
-    fun loadMyReviews(repository: RatingRepository) {
-        val userId = currentUserId ?: return
-        viewModelScope.launch {
+    fun loadMyReviews(repository: RatingRepository): Job? {
+        val userId = currentUserId ?: return null
+        return viewModelScope.launch {
             val reviews = repository.received(userId) ?: return@launch
             myReviews.clear()
             myReviews.addAll(reviews)
@@ -862,10 +863,10 @@ class AppViewModel : ViewModel() {
         private set
 
     /** [markRead] is for the notifications screen; a background refresh keeps the unread badge. */
-    fun loadNotifications(repository: NotificationRepository, markRead: Boolean = true) {
+    fun loadNotifications(repository: NotificationRepository, markRead: Boolean = true): Job? {
         notificationRepository = repository
-        val userId = currentUserId ?: return
-        viewModelScope.launch {
+        val userId = currentUserId ?: return null
+        return viewModelScope.launch {
             val feed = repository.load(userId)
             notificationsLive = feed.isLive
             notifications.removeAll { it.id in loadedNotificationIds }
@@ -889,20 +890,19 @@ class AppViewModel : ViewModel() {
 
     private var loadedMaterialIds: Set<String> = emptySet()
 
-    fun loadMaterials(repository: MaterialRepository) {
-        viewModelScope.launch {
-            materialsLoading = allProducts.none { it.id in loadedMaterialIds }
-            val feed = try {
-                repository.load()
-            } finally {
-                materialsLoading = false
-            }
-            materialsLive = feed.isLive
-            materialsUpdatedAtMillis = feed.updatedAtMillis
-            allProducts.removeAll { it.id in loadedMaterialIds }
-            allProducts.addAll(allProducts.count { it.pendingSync != null }, feed.products)
-            loadedMaterialIds = feed.products.map { it.id }.toSet()
+    /** Returns the load, so pull-to-refresh can wait for it. */
+    fun loadMaterials(repository: MaterialRepository): Job = viewModelScope.launch {
+        materialsLoading = allProducts.none { it.id in loadedMaterialIds }
+        val feed = try {
+            repository.load()
+        } finally {
+            materialsLoading = false
         }
+        materialsLive = feed.isLive
+        materialsUpdatedAtMillis = feed.updatedAtMillis
+        allProducts.removeAll { it.id in loadedMaterialIds }
+        allProducts.addAll(allProducts.count { it.pendingSync != null }, feed.products)
+        loadedMaterialIds = feed.products.map { it.id }.toSet()
     }
 
     fun isRemoteNotification(id: String) = id in loadedNotificationIds

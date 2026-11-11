@@ -41,6 +41,7 @@ import com.campusswap.app.views.components.WhileVisible
 import com.campusswap.app.model.Conversation
 import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.themes.CampusType
+import com.campusswap.app.views.components.PullToRefresh
 
 @Composable
 fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String, String) -> Unit) {
@@ -71,21 +72,23 @@ fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String, String) -> Unit) {
                 actionLabel = "Go back",
                 onAction = onBack,
             )
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                state.savedAtMillis?.let { savedAt ->
-                    item(key = "offline") {
-                        OfflineBanner(
-                            visible = true,
-                            message = "You're offline. Showing your conversations as they were ${timeAgo(savedAt)}.",
-                        )
+            else -> PullToRefresh(onRefresh = { vm.refresh() }, modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    state.savedAtMillis?.let { savedAt ->
+                        item(key = "offline") {
+                            OfflineBanner(
+                                visible = true,
+                                message = "You're offline. Showing your conversations as they were ${timeAgo(savedAt)}.",
+                            )
+                        }
                     }
-                }
-                items(state.conversations, key = { it.roomId }) { conversation ->
-                    ConversationRow(conversation) { onOpenChat(conversation.productId, conversation.roomId) }
+                    items(state.conversations, key = { it.roomId }) { conversation ->
+                        ConversationRow(conversation) { onOpenChat(conversation.productId, conversation.roomId) }
+                    }
                 }
             }
         }
