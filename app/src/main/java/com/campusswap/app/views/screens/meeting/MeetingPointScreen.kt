@@ -72,6 +72,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.tracing.trace
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
@@ -335,49 +336,51 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
         val otherPosition = state.otherMapPosition?.toOffset()
 
         Canvas(modifier = Modifier.fillMaxSize()) {
-            fun shape(points: List<MapPosition>) = Path().apply {
-                points.forEachIndexed { index, position ->
-                    val x = size.width * position.x
-                    val y = size.height * position.y
-                    if (index == 0) moveTo(x, y) else lineTo(x, y)
+            trace("CampusMap.draw") {
+                fun shape(points: List<MapPosition>) = Path().apply {
+                    points.forEachIndexed { index, position ->
+                        val x = size.width * position.x
+                        val y = size.height * position.y
+                        if (index == 0) moveTo(x, y) else lineTo(x, y)
+                    }
+                    close()
                 }
-                close()
-            }
 
-            greens.forEach { drawPath(shape(it), CampusGreen) }
-            water.forEach { drawPath(shape(it), CampusWater) }
+                greens.forEach { drawPath(shape(it), CampusGreen) }
+                water.forEach { drawPath(shape(it), CampusWater) }
 
-            roads.sortedBy { it.first.ordinal }.forEach { (weight, line) ->
-                val stroke = when (weight) {
-                    RoadWeight.FOOTPATH -> 2.5f
-                    RoadWeight.STREET -> 6f
-                    RoadWeight.AVENUE -> 10f
+                roads.sortedBy { it.first.ordinal }.forEach { (weight, line) ->
+                    val stroke = when (weight) {
+                        RoadWeight.FOOTPATH -> 2.5f
+                        RoadWeight.STREET -> 6f
+                        RoadWeight.AVENUE -> 10f
+                    }
+                    val colour = if (weight == RoadWeight.FOOTPATH) CampusPath else CampusRoadLine
+                    for (i in 0 until line.size - 1) {
+                        drawLine(
+                            color = colour,
+                            start = Offset(size.width * line[i].x, size.height * line[i].y),
+                            end = Offset(size.width * line[i + 1].x, size.height * line[i + 1].y),
+                            strokeWidth = stroke,
+                            cap = StrokeCap.Round,
+                        )
+                    }
                 }
-                val colour = if (weight == RoadWeight.FOOTPATH) CampusPath else CampusRoadLine
-                for (i in 0 until line.size - 1) {
-                    drawLine(
-                        color = colour,
-                        start = Offset(size.width * line[i].x, size.height * line[i].y),
-                        end = Offset(size.width * line[i + 1].x, size.height * line[i + 1].y),
-                        strokeWidth = stroke,
-                        cap = StrokeCap.Round,
-                    )
-                }
-            }
 
-            outlines.forEach { (_, projected) ->
-                val path = shape(projected)
-                drawPath(path, CampusBuildingFill)
-                drawPath(path, CampusBuildingEdge, style = Stroke(width = 1.5f))
-            }
-
-            if (selected != null) {
-                val dash = PathEffect.dashPathEffect(floatArrayOf(14f, 12f))
-                val target = Offset(size.width * selected.map.x, size.height * selected.map.y)
-                listOfNotNull(mePosition, otherPosition).forEach { from ->
-                    drawLine(AccentBlue, Offset(size.width * from.x, size.height * from.y), target, strokeWidth = 5f, pathEffect = dash, cap = StrokeCap.Round)
+                outlines.forEach { (_, projected) ->
+                    val path = shape(projected)
+                    drawPath(path, CampusBuildingFill)
+                    drawPath(path, CampusBuildingEdge, style = Stroke(width = 1.5f))
                 }
-                drawCircle(AccentBlue.copy(alpha = 0.18f), radius = size.width * 0.08f, center = target)
+
+                if (selected != null) {
+                    val dash = PathEffect.dashPathEffect(floatArrayOf(14f, 12f))
+                    val target = Offset(size.width * selected.map.x, size.height * selected.map.y)
+                    listOfNotNull(mePosition, otherPosition).forEach { from ->
+                        drawLine(AccentBlue, Offset(size.width * from.x, size.height * from.y), target, strokeWidth = 5f, pathEffect = dash, cap = StrokeCap.Round)
+                    }
+                    drawCircle(AccentBlue.copy(alpha = 0.18f), radius = size.width * 0.08f, center = target)
+                }
             }
         }
 
