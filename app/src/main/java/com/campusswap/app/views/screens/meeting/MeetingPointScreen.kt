@@ -69,9 +69,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.tracing.trace
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -322,6 +327,15 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
     val water = remember(campus) { campus.water.map { shape -> shape.map(projection::project) } }
     val roads = remember(campus) { campus.roads.map { it.weight to it.line.map(projection::project) } }
     val outlines = remember(campus) { campus.buildings.map { it to it.outline.map(projection::project) } }
+    val campusLayer = remember(campus) {
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer()
+            .drawWithCache {
+                val paths = trace("CampusMap.buildPaths") { campusPaths(size, greens, water, roads, outlines) }
+                onDrawBehind { trace("CampusMap.draw") { drawCampus(paths) } }
+            }
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -335,44 +349,10 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
         val mePosition = state.myMapPosition?.toOffset()
         val otherPosition = state.otherMapPosition?.toOffset()
 
+        Spacer(modifier = campusLayer)
+
         Canvas(modifier = Modifier.fillMaxSize()) {
-            trace("CampusMap.draw") {
-                fun shape(points: List<MapPosition>) = Path().apply {
-                    points.forEachIndexed { index, position ->
-                        val x = size.width * position.x
-                        val y = size.height * position.y
-                        if (index == 0) moveTo(x, y) else lineTo(x, y)
-                    }
-                    close()
-                }
-
-                greens.forEach { drawPath(shape(it), CampusGreen) }
-                water.forEach { drawPath(shape(it), CampusWater) }
-
-                roads.sortedBy { it.first.ordinal }.forEach { (weight, line) ->
-                    val stroke = when (weight) {
-                        RoadWeight.FOOTPATH -> 2.5f
-                        RoadWeight.STREET -> 6f
-                        RoadWeight.AVENUE -> 10f
-                    }
-                    val colour = if (weight == RoadWeight.FOOTPATH) CampusPath else CampusRoadLine
-                    for (i in 0 until line.size - 1) {
-                        drawLine(
-                            color = colour,
-                            start = Offset(size.width * line[i].x, size.height * line[i].y),
-                            end = Offset(size.width * line[i + 1].x, size.height * line[i + 1].y),
-                            strokeWidth = stroke,
-                            cap = StrokeCap.Round,
-                        )
-                    }
-                }
-
-                outlines.forEach { (_, projected) ->
-                    val path = shape(projected)
-                    drawPath(path, CampusBuildingFill)
-                    drawPath(path, CampusBuildingEdge, style = Stroke(width = 1.5f))
-                }
-
+            trace("CampusMap.drawSelection") {
                 if (selected != null) {
                     val dash = PathEffect.dashPathEffect(floatArrayOf(14f, 12f))
                     val target = Offset(size.width * selected.map.x, size.height * selected.map.y)
@@ -692,6 +672,61 @@ private fun PopularNowBadge() {
 }
 
 private fun MapPosition.toOffset() = Offset(x, y)
+
+private class CampusPaths(
+    val greens: List<Path>,
+    val water: List<Path>,
+    val roads: List<Pair<RoadWeight, Path>>,
+    val buildings: List<Path>,
+)
+
+private val buildingEdge = Stroke(width = 1.5f)
+
+private val roadStrokes = mapOf(
+    RoadWeight.FOOTPATH to Stroke(width = 2.5f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+    RoadWeight.STREET to Stroke(width = 6f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+    RoadWeight.AVENUE to Stroke(width = 10f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+)
+
+private fun polygon(points: List<MapPosition>, size: Size) = Path().apply {
+    points.forEachIndexed { index, position ->
+        if (index == 0) moveTo(size.width * position.x, size.height * position.y) else lineTo(size.width * position.x, size.height * position.y)
+    }
+    close()
+}
+
+private fun polylines(lines: List<List<MapPosition>>, size: Size) = Path().apply {
+    lines.forEach { line ->
+        line.forEachIndexed { index, position ->
+            if (index == 0) moveTo(size.width * position.x, size.height * position.y) else lineTo(size.width * position.x, size.height * position.y)
+        }
+    }
+}
+
+private fun campusPaths(
+    size: Size,
+    greens: List<List<MapPosition>>,
+    water: List<List<MapPosition>>,
+    roads: List<Pair<RoadWeight, List<MapPosition>>>,
+    outlines: List<Pair<CampusBuilding, List<MapPosition>>>,
+) = CampusPaths(
+    greens = greens.map { polygon(it, size) },
+    water = water.map { polygon(it, size) },
+    roads = RoadWeight.entries.map { weight -> weight to polylines(roads.filter { it.first == weight }.map { it.second }, size) },
+    buildings = outlines.map { polygon(it.second, size) },
+)
+
+private fun DrawScope.drawCampus(paths: CampusPaths) {
+    paths.greens.forEach { drawPath(it, CampusGreen) }
+    paths.water.forEach { drawPath(it, CampusWater) }
+    paths.roads.forEach { (weight, path) ->
+        drawPath(path, if (weight == RoadWeight.FOOTPATH) CampusPath else CampusRoadLine, style = roadStrokes.getValue(weight))
+    }
+    paths.buildings.forEach {
+        drawPath(it, CampusBuildingFill)
+        drawPath(it, CampusBuildingEdge, style = buildingEdge)
+    }
+}
 
 private fun guardianReasons(
     state: MeetingPointUiState,
