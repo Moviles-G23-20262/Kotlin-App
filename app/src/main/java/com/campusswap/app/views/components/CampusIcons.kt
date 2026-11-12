@@ -140,6 +140,9 @@ object CampusIcons {
     val Tag by lazy { icon("Tag", "M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z", line(7f, 7f, 7.01f, 7f)) }
     val Sparkle by lazy { icon("Sparkle", "M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z") }
     val Clock by lazy { icon("Clock", circle(12f, 12f, 10f), poly("12 6 12 12 16 14")) }
+    val Calendar by lazy {
+        icon("Calendar", "M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z", line(16f, 2f, 16f, 6f), line(8f, 2f, 8f, 6f), line(3f, 10f, 21f, 10f))
+    }
     val Inbox by lazy {
         icon("Inbox", poly("22 12 16 12 14 15 10 15 8 12 2 12"), "M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z")
     }

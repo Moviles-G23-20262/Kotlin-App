@@ -63,7 +63,7 @@ object CrashTelemetry {
         "sell" -> "publish_listing"
         "cart", "checkout", "confirmation" -> "checkout"
         "messages", "chat" -> "chat"
-        "meeting" -> "meeting_point"
+        "meeting", "meetups" -> "meeting_point"
         "complete" -> "exchange_and_rating"
         "notifications", "alerts" -> "smart_matching"
         "profile" -> "seller_hub"

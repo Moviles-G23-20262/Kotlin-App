@@ -30,6 +30,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.CampusSwapApplication
 import com.campusswap.app.views.components.BackHeader
 import com.campusswap.app.views.components.BodyText
+import com.campusswap.app.views.components.CampusIconButton
 import com.campusswap.app.views.components.CampusIcons
 import com.campusswap.app.views.components.EmptyState
 import com.campusswap.app.views.components.HeadingText
@@ -44,7 +45,7 @@ import com.campusswap.app.views.themes.CampusType
 import com.campusswap.app.views.components.PullToRefresh
 
 @Composable
-fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String, String) -> Unit) {
+fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String, String) -> Unit, onOpenMeetups: () -> Unit) {
     val c = CampusSwapTheme.colors
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
     val vm: ConversationsViewModel = viewModel(factory = ConversationsViewModel.factory(container))
@@ -52,7 +53,9 @@ fun MessagesScreen(onBack: () -> Unit, onOpenChat: (String, String) -> Unit) {
     val state by vm.state.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize().background(c.bg)) {
-        BackHeader(title = "Messages", onBack = onBack)
+        BackHeader(title = "Messages", onBack = onBack) {
+            CampusIconButton(CampusIcons.Calendar, contentDescription = "My meetups", onClick = onOpenMeetups)
+        }
 
         when {
             state.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
