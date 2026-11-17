@@ -7,6 +7,7 @@ import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
 import androidx.core.content.FileProvider
+import androidx.tracing.trace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -24,15 +25,14 @@ class ListingPhotoStore(private val context: Context) {
     }
 
     suspend fun finishCameraPhoto(path: String): String? = withContext(Dispatchers.IO) {
-        File(path).takeIf { it.length() > 0 }?.let { shrink(it) }
-    }
+        File(path).takeIf { it.length() > 0 }?.let { trace("ListingPhotoStore.shrink") { shrink(it) } }    }
 
     /** Copia una foto de la galeria a la app y la reduce. Devuelve la ruta, o null si no se pudo leer. */
     suspend fun importFromGallery(uri: Uri): String? = withContext(Dispatchers.IO) {
         runCatching {
             val file = newFile()
             context.contentResolver.openInputStream(uri)!!.use { input -> file.outputStream().use { input.copyTo(it) } }
-            shrink(file)
+            trace("ListingPhotoStore.shrink") { shrink(file) }
         }.getOrNull()
     }
 
