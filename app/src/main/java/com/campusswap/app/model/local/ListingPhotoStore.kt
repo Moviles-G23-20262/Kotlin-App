@@ -7,6 +7,7 @@ import android.graphics.Matrix
 import android.media.ExifInterface
 import android.net.Uri
 import androidx.core.content.FileProvider
+import androidx.tracing.trace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -24,15 +25,14 @@ class ListingPhotoStore(private val context: Context) {
     }
 
     suspend fun finishCameraPhoto(path: String): String? = withContext(Dispatchers.IO) {
-        File(path).takeIf { it.length() > 0 }?.let { shrink(it) }
-    }
+        File(path).takeIf { it.length() > 0 }?.let { trace("ListingPhotoStore.shrink") { shrink(it) } }    }
 
     /** Copia una foto de la galeria a la app y la reduce. Devuelve la ruta, o null si no se pudo leer. */
     suspend fun importFromGallery(uri: Uri): String? = withContext(Dispatchers.IO) {
         runCatching {
             val file = newFile()
             context.contentResolver.openInputStream(uri)!!.use { input -> file.outputStream().use { input.copyTo(it) } }
-            shrink(file)
+            trace("ListingPhotoStore.shrink") { shrink(file) }
         }.getOrNull()
     }
 
@@ -47,17 +47,33 @@ class ListingPhotoStore(private val context: Context) {
     private fun shrink(file: File): String? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.path, bounds)
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_SIDE) sample *= 2
-        val decoded = BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+        val longSide = maxOf(bounds.outWidth, bounds.outHeight)
+        if (longSide <= 0) return null
 
-        val scale = minOf(1f, MAX_SIDE.toFloat() / maxOf(decoded.width, decoded.height))
-        val matrix = Matrix().apply {
-            postScale(scale, scale)
-            postRotate(rotationOf(file).toFloat())
+        val options = BitmapFactory.Options().apply {
+            var sample = 1
+            while (longSide / (sample * 2) >= MAX_SIDE) sample *= 2
+            inSampleSize = sample
+            val sampledSide = longSide / sample
+            if (sampledSide > MAX_SIDE) {
+                // El decodificador escala de una vez al tamaño final: no queda un bitmap intermedio grande
+                inScaled = true
+                inDensity = sampledSide
+                inTargetDensity = MAX_SIDE
+            }
         }
-        val result = Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+        val decoded = BitmapFactory.decodeFile(file.path, options) ?: return null
+
+        val rotation = rotationOf(file)
+        val result = if (rotation == 0) {
+            decoded
+        } else {
+            val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
+            Bitmap.createBitmap(decoded, 0, 0, decoded.width, decoded.height, matrix, true)
+        }
+        if (result !== decoded) decoded.recycle()
         file.outputStream().use { result.compress(Bitmap.CompressFormat.JPEG, QUALITY, it) }
+        result.recycle()
         return file.absolutePath
     }
 
