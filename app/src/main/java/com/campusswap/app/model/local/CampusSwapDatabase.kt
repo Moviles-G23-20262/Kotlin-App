@@ -216,8 +216,9 @@ interface OutboxDao {
     entities = [
         CachedMaterialEntity::class, PendingListingEntity::class, PendingMessageEntity::class,
         CachedResponseEntity::class, PendingActionEntity::class, MeetupEntity::class,
+        SellerProfileEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class CampusSwapDatabase : RoomDatabase() {
@@ -225,6 +226,7 @@ abstract class CampusSwapDatabase : RoomDatabase() {
     abstract fun outbox(): OutboxDao
     abstract fun responses(): ResponseCacheDao
     abstract fun meetups(): MeetupDao
+    abstract fun sellerProfiles(): SellerProfileDao
 
     companion object {
         // v2: columnas nuevas de GET /materials (fotos, edición, modelo, fecha y carrera del vendedor)
@@ -271,9 +273,20 @@ abstract class CampusSwapDatabase : RoomDatabase() {
                 )
             }
         }
+
+        // v7: perfiles de vendedor guardados para verlos sin conexion
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS seller_profiles (sellerId TEXT NOT NULL, ratingsJson TEXT NOT NULL, " +
+                        "listingsJson TEXT NOT NULL, savedAtMillis INTEGER NOT NULL, PRIMARY KEY(sellerId))",
+                )
+            }
+        }
+
         fun create(context: Context): CampusSwapDatabase =
             Room.databaseBuilder(context, CampusSwapDatabase::class.java, "campusswap.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .fallbackToDestructiveMigration()
                 .build()
     }
