@@ -81,6 +81,8 @@ import com.campusswap.app.model.wishlist.WishlistRepository
 import com.campusswap.app.model.orders.OrderRepository
 import com.campusswap.app.model.orders.OrdersApi
 import com.campusswap.app.model.orders.RetrofitOrdersRemoteDataSource
+import com.campusswap.app.model.sellers.SellerProfileApi
+import com.campusswap.app.model.sellers.SellerProfileRepository
 
 class AppContainer(context: Context) {
     val clock: Clock = Clock.systemDefaultZone()
@@ -201,5 +203,12 @@ class AppContainer(context: Context) {
         RetrofitSmartAlertRemoteDataSource(ApiClient.create<SmartAlertsApi>(BuildConfig.BASE_URL, backendClient)),
         signedInUserId,
         responseCache,
+    )
+
+    
+    val sellerProfileRepository = SellerProfileRepository(
+        ApiClient.create<SellerProfileApi>(BuildConfig.BASE_URL, backendClient),
+        database.sellerProfiles(),
+        clock,
     )
 }
