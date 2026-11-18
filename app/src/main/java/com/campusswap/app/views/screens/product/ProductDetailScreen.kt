@@ -74,6 +74,7 @@ fun ProductDetailScreen(
     onChatWithSeller: (String) -> Unit,
     onBuyNow: () -> Unit,
     onCompleteExchange: (String) -> Unit,
+    onOpenSeller: (String) -> Unit,
 ) {
     val c = CampusSwapTheme.colors
     // Not remembered by list size: a queued listing changes state (queued → refused) without the list growing.
@@ -217,8 +218,13 @@ fun ProductDetailScreen(
             }
 
             val isMine = vm.isMine(product)
-            SellerCard(product = product, isMine = isMine, onChat = { onChatWithSeller(product.id) })
 
+            SellerCard(
+                product = product,
+                isMine = isMine,
+                onChat = { onChatWithSeller(product.id) },
+                onOpenProfile = { onOpenSeller(product.seller.id) },
+            )
             HeadingText("About this item", size = CampusType.sizeSm, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
             BodyText(product.description, lineHeight = CampusType.sizeXs * 1.7f)
 
@@ -326,7 +332,7 @@ private fun OwnListingNote(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun SellerCard(product: Product, isMine: Boolean, onChat: () -> Unit) {
+private fun SellerCard(product: Product, isMine: Boolean, onChat: () -> Unit, onOpenProfile: () -> Unit) {
     val c = CampusSwapTheme.colors
     val seller = product.seller
     val shape = RoundedCornerShape(14.dp)
@@ -339,12 +345,20 @@ private fun SellerCard(product: Product, isMine: Boolean, onChat: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        InitialsAvatar(seller.name, size = 42.dp, background = c.surface)
-        Column(modifier = Modifier.weight(1f)) {
-            BodyText(seller.name, color = c.text, weight = FontWeight.SemiBold)
-            val rating = seller.rating?.let { formatRating(it) } ?: "New"
-            val verified = if (seller.isVerified) " · Verified student" else ""
-            RatingLabel("$rating · ${seller.reviewCount} reviews$verified", modifier = Modifier.padding(top = 4.dp))
+        // Avatar y nombre abren el perfil del vendedor
+        Row(
+            modifier = Modifier.weight(1f).plainClickable(onOpenProfile),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            InitialsAvatar(seller.name, size = 42.dp, background = c.surface)
+            Column(modifier = Modifier.weight(1f)) {
+                BodyText(seller.name, color = c.text, weight = FontWeight.SemiBold)
+                val rating = seller.rating?.let { formatRating(it) } ?: "New"
+                val verified = if (seller.isVerified) " · Verified student" else ""
+                RatingLabel("$rating · ${seller.reviewCount} reviews$verified", modifier = Modifier.padding(top = 4.dp))
+                BodyText("View profile", size = CampusType.size2xs, color = c.accentHi, weight = FontWeight.SemiBold, modifier = Modifier.padding(top = 4.dp))
+            }
         }
         if (isMine) {
             BodyText("You", color = c.accentHi, weight = FontWeight.SemiBold)

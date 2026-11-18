@@ -59,7 +59,7 @@ object CrashTelemetry {
     /** Groups screens into the features of the app, which is how BQ1 is asked. */
     internal fun featureOf(route: String): String = when (screenName(route)) {
         "login", "register", "forgot-password", "verify-email" -> "auth"
-        "home", "search", "product", "wishlist" -> "browse"
+        "home", "search", "product", "wishlist", "seller" -> "browse"
         "sell" -> "publish_listing"
         "cart", "checkout", "confirmation" -> "checkout"
         "messages", "chat" -> "chat"

@@ -52,6 +52,7 @@ import com.campusswap.app.views.screens.product.ProductDetailScreen
 import com.campusswap.app.views.screens.profile.ProfileScreen
 import com.campusswap.app.views.screens.rating.CompletionScreen
 import com.campusswap.app.views.screens.search.SearchScreen
+import com.campusswap.app.views.screens.seller.SellerProfileScreen
 import com.campusswap.app.views.screens.sell.SellScreen
 import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.components.WhileVisible
@@ -360,6 +361,17 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                     onChatWithSeller = { id -> navController.navigate(Routes.chat(id)) },
                     onBuyNow = { navigateToTab(Routes.CART) },
                     onCompleteExchange = { id -> navController.navigate(Routes.completion(id)) },
+                    onOpenSeller = { id -> navController.navigate(Routes.sellerProfile(id)) },
+                )
+            }
+
+            composable(Routes.SELLER_PROFILE) { entry ->
+                val sellerId = entry.arguments?.getString("sellerId").orEmpty()
+                SellerProfileScreen(
+                    sellerId = sellerId,
+                    fallback = appViewModel.allProducts.firstOrNull { it.seller.id == sellerId }?.seller,
+                    onBack = { navController.popBackStack() },
+                    onProductClick = { id -> navController.navigate(Routes.productDetail(id)) },
                 )
             }
 

@@ -25,6 +25,7 @@ object Routes {
     const val CHAT = "chat/{productId}?room={room}"
     const val MEETING_POINT = "meeting/{productId}"
     const val COMPLETION = "complete/{productId}"
+    const val SELLER_PROFILE = "seller/{sellerId}"
 
     fun forgotPassword(email: String) = "forgot-password?email=${Uri.encode(email)}"
     fun productDetail(id: String) = "product/$id"
@@ -32,6 +33,7 @@ object Routes {
     fun meetingPoint(id: String) = "meeting/$id"
     fun completion(id: String) = "complete/$id"
     fun confirmation(orderNumber: Int) = "confirmation/$orderNumber"
+    fun sellerProfile(id: String) = "seller/$id"
 }
 
 data class BottomNavItem(
