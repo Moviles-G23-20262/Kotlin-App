@@ -13,6 +13,7 @@ import com.campusswap.app.model.Order
 import com.campusswap.app.model.PendingExchange
 import com.campusswap.app.model.PendingSync
 import com.campusswap.app.model.Product
+import com.campusswap.app.model.SeedIds
 import com.campusswap.app.model.ProposalStatus
 import com.campusswap.app.model.SampleData
 import com.campusswap.app.model.SellDraft
@@ -438,11 +439,13 @@ class AppViewModel : ViewModel() {
                 }
                 is PlaceOrderResult.Rejected -> {
                     cart.removeAll { line -> result.unavailable.any { it.id == line.product.id } }
+                    markListing(result.unavailable.filter { SeedIds.isBackendId(it.id) }.map { it.id }, "RESERVED")
                     checkoutMessage = orderProblems(null, result.unavailable, result.notSent)
                     return null
                 }
                 is PlaceOrderResult.Placed -> {
                     unavailable = result.unavailable
+                    markListing(result.unavailable.filter { SeedIds.isBackendId(it.id) }.map { it.id }, "RESERVED")
                     notSent = result.notSent
                     result.order
                 }
@@ -450,6 +453,7 @@ class AppViewModel : ViewModel() {
         }
         orders.removeAll { it.number == order.number }
         orders.add(0, order)
+        markListing(order.products.map { it.id }, "RESERVED")
         // Sale del carrito lo pedido y lo que ya no está disponible; se queda lo que no se pudo enviar
         cart.removeAll { line -> notSent.none { it.id == line.product.id } }
         order.products.forEach { product ->
@@ -477,6 +481,29 @@ class AppViewModel : ViewModel() {
         }
         if (unavailable.isNotEmpty()) confirmationNote = orderProblems(null, unavailable, emptyList())
         return order.number
+    }
+
+    /**
+     * The listing left the market (RESERVED once ordered, SOLD once the exchange is closed). It leaves
+     * Home and Search right away, as the server feed (AVAILABLE only) will on its next load, and the
+     * wishlist and chats show its new status. It stays reachable by id for the order and the chat.
+     */
+    fun markListing(productIds: Collection<String>, status: String) {
+        if (productIds.isEmpty()) return
+        fun MutableList<Product>.mark() {
+            for (i in indices) if (this[i].id in productIds && this[i].status != status) this[i] = this[i].copy(status = status)
+        }
+        val leaving = allProducts.filter { it.id in productIds && it.pendingSync == null }
+        allProducts.removeAll(leaving)
+        leaving.forEach { rememberChatProduct(it.copy(status = status)) }
+        wishlistProducts.mark()
+        chatProducts.mark()
+    }
+
+    /** The buyer confirmed the exchange at the meetup and the server closed it: the listing is sold. */
+    fun onExchangeConfirmed(productId: String) {
+        markListing(listOf(productId), "SOLD")
+        orderRepository?.let(::loadOrders)
     }
 
     /** One message for everything that didn't go as planned at checkout. */
@@ -508,6 +535,10 @@ class AppViewModel : ViewModel() {
 
     fun hasPendingExchange(productId: String): Boolean =
         orderFor(productId) != null && ratings[productId] == null
+
+    /** The signed-in seller's listing is reserved and the handover still has to be confirmed. */
+    fun hasPendingSale(productId: String): Boolean =
+        sales.any { it.product.id == productId && it.status == "PENDING" }
 
     fun restoreSession(userId: String) {
         currentUserId = userId

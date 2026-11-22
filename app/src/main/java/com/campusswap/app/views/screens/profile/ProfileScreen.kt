@@ -338,7 +338,17 @@ fun ProfileScreen(
                                 BodyText(sale.product.title, color = c.text, weight = FontWeight.SemiBold, maxLines = 1)
                                 BodyText(saleLabel(sale), size = CampusType.size2xs, color = c.textMuted)
                             }
-                            MonoText(formatPrice(sale.product.price), size = CampusType.sizeXs, color = c.accentHi, weight = FontWeight.Medium)
+                            if (sale.status == "PENDING") {
+                                // The sale closes only when the seller confirms the handover too.
+                                PrimaryButton(
+                                    text = "Confirm handover",
+                                    onClick = { onCompleteExchange(sale.product.id) },
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    fontSize = CampusType.sizeXs,
+                                )
+                            } else {
+                                MonoText(formatPrice(sale.product.price), size = CampusType.sizeXs, color = c.accentHi, weight = FontWeight.Medium)
+                            }
                         }
                     }
                 }

@@ -55,7 +55,8 @@ private val LOCATION_PERMISSIONS = arrayOf(
 private val RADIUS_METERS = Proximity.CONFIRMATION_RADIUS_METERS.toInt()
 
 @Composable
-fun ExchangeCheckIn(viewModel: ExchangeCheckInViewModel, pointName: String?) {
+/** [otherName]: who still has to confirm for the sale to close, e.g. "Ana (the seller)". */
+fun ExchangeCheckIn(viewModel: ExchangeCheckInViewModel, pointName: String?, otherName: String = "the other person") {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     var showRationale by remember { mutableStateOf(false) }
@@ -102,6 +103,17 @@ fun ExchangeCheckIn(viewModel: ExchangeCheckInViewModel, pointName: String?) {
             onOpenSettings = { context.openSettingsFor(s.reason) },
         )
         is CheckInState.Confirmed -> Confirmed(s.verifiedByGps)
+        is CheckInState.WaitingForOther -> {
+            val c = CampusSwapTheme.colors
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(CampusIcons.Check, contentDescription = null, tint = c.accentHi, modifier = Modifier.size(18.dp))
+                BodyText("You confirmed the meetup", color = c.text, weight = FontWeight.SemiBold)
+            }
+            Hint(
+                "Waiting for $otherName to confirm too. The sale closes, and the listing is marked sold, " +
+                    "only when you both have. This updates by itself.",
+            )
+        }
         is CheckInState.Queued -> Hint(
             if (s.verifiedByGps) "You're at the spot, but offline. The confirmation is saved on your phone and sent as soon as you reconnect."
             else "You're offline. The confirmation is saved on your phone and sent as soon as you reconnect.",
@@ -176,9 +188,9 @@ private fun Confirmed(verifiedByGps: Boolean?) {
         Icon(CampusIcons.Check, contentDescription = null, tint = c.success, modifier = Modifier.size(18.dp))
         BodyText(
             when (verifiedByGps) {
-                true -> "Exchange confirmed · verified by GPS"
-                false -> "Exchange confirmed manually"
-                null -> "Exchange confirmed"
+                true -> "You both confirmed · verified by GPS · sold"
+                false -> "You both confirmed · sold"
+                null -> "You both confirmed · sold"
             },
             color = c.success,
             weight = FontWeight.SemiBold,
@@ -212,6 +224,7 @@ private fun failureMessage(reason: FailReason): String = when (reason) {
     FailReason.OFFLINE -> "No connection. Your confirmation wasn't sent yet."
     FailReason.REJECTED -> "The server couldn't record this exchange. Try again in a moment."
     FailReason.NOT_SYNCED -> "This listing isn't on the server yet, so the exchange can't be recorded."
+    FailReason.NO_ORDER -> "The buyer hasn't ordered this listing yet. Ask them to place the order or confirm the meetup first, then try again."
 }
 
 private fun hasPreciseLocation(context: Context): Boolean =
