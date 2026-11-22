@@ -50,8 +50,6 @@ import com.campusswap.app.views.components.typedOnly
 import com.campusswap.app.views.themes.AccentBlue
 import com.campusswap.app.views.themes.ErrorRed
 
-internal const val OFFLINE_MESSAGE = "Can't reach the server. Check your connection and try again."
-
 /**
  * Two steps on one screen: the email to send a code to, then that code plus the new password.
  * A successful reset signs the user in.
@@ -83,7 +81,7 @@ fun ForgotPasswordScreen(initialEmail: String, onPasswordReset: (userId: String)
             when (result) {
                 EmailCodeResult.Done, EmailCodeResult.TooSoon -> codeSentAt = System.currentTimeMillis()
                 is EmailCodeResult.Rejected -> formError = result.message
-                EmailCodeResult.Offline -> formError = OFFLINE_MESSAGE
+                EmailCodeResult.Offline -> formError = authViewModel.connectionProblem
             }
         }
     }
@@ -99,7 +97,7 @@ fun ForgotPasswordScreen(initialEmail: String, onPasswordReset: (userId: String)
                 is ResetPasswordResult.Success -> onPasswordReset(result.session.userId)
                 // The password follows the same rules on both sides, so a refusal is about the code.
                 is ResetPasswordResult.Rejected -> codeError = result.message
-                ResetPasswordResult.Offline -> formError = OFFLINE_MESSAGE
+                ResetPasswordResult.Offline -> formError = authViewModel.connectionProblem
             }
         }
     }

@@ -52,6 +52,8 @@ import com.campusswap.app.model.auth.LoginResult
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.viewmodel.AuthViewModel
 import com.campusswap.app.views.components.NoClipboard
+import com.campusswap.app.views.components.OfflineBanner
+import androidx.compose.runtime.collectAsState
 import com.campusswap.app.views.components.typedOnly
 import com.campusswap.app.model.domain.InputLimits
 import com.campusswap.app.model.domain.InputValidation
@@ -72,6 +74,7 @@ fun LoginScreen(
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(container))
     val isLoading = authViewModel.isLoading
+    val isOnline by container.connectivity.isOnline.collectAsState()
 
     fun attemptLogin() {
         emailError = InputValidation.emailError(email)
@@ -81,7 +84,7 @@ fun LoginScreen(
                 when (result) {
                     is LoginResult.Success -> onLoginSuccess(result.session.userId)
                     LoginResult.InvalidCredentials -> passwordError = "Incorrect email or password"
-                    LoginResult.Offline -> emailError = "Can't reach the server. Check your connection and try again."
+                    LoginResult.Offline -> emailError = authViewModel.connectionProblem
                 }
             }
         }
@@ -123,7 +126,12 @@ fun LoginScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 4.dp, bottom = 32.dp),
+                modifier = Modifier.padding(top = 4.dp, bottom = if (isOnline) 32.dp else 16.dp),
+            )
+            OfflineBanner(
+                visible = !isOnline,
+                message = "You're offline. Connect to the internet to log in.",
+                modifier = Modifier.padding(bottom = 16.dp),
             )
 
             OutlinedTextField(

@@ -94,7 +94,7 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
                 is RegisterResult.Success -> onRegistered(result.session.userId)
                 RegisterResult.EmailTaken -> emailError = "An account with this email already exists"
                 is RegisterResult.Rejected -> formError = result.message
-                RegisterResult.Offline -> formError = "Can't reach the server. Check your connection and try again."
+                RegisterResult.Offline -> formError = authViewModel.connectionProblem
             }
         }
     }
