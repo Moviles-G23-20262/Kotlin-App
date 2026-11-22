@@ -142,7 +142,7 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
 
                 FormField(
                     value = fullName,
-                    onValueChange = { fullName = InputValidation.sanitizeName(it); nameError = null },
+                    onValueChange = { fullName = InputValidation.withoutPaste(fullName, InputValidation.sanitizeName(it)); nameError = null },
                     label = "Full name",
                     error = nameError,
                     counter = "${fullName.length}/${InputLimits.NAME_MAX}",
@@ -156,7 +156,7 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
                 )
                 FormField(
                     value = email,
-                    onValueChange = { email = InputValidation.sanitizeEmail(it); emailError = null },
+                    onValueChange = { email = InputValidation.withoutPaste(email, InputValidation.sanitizeEmail(it)); emailError = null },
                     label = "Institutional email",
                     error = emailError,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
@@ -168,7 +168,7 @@ fun RegisterScreen(onRegistered: (userId: String) -> Unit, onBackToLogin: () -> 
                     onValueChange = { password = typedOnly(password, InputValidation.sanitizePassword(it)); passwordError = null },
                     label = "Password",
                     error = passwordError,
-                    hint = "At least ${InputLimits.PASSWORD_MIN} characters, with letters and numbers",
+                    hint = "At least ${InputLimits.PASSWORD_MIN} characters, with upper and lowercase letters, a number and a symbol",
                     visualTransformation = transformation,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
                     trailingIcon = {

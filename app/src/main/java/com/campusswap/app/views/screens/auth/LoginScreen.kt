@@ -136,7 +136,7 @@ fun LoginScreen(
 
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = InputValidation.sanitizeEmail(it); emailError = null },
+                onValueChange = { email = InputValidation.withoutPaste(email, InputValidation.sanitizeEmail(it)); emailError = null },
                 label = { Text("Institutional email") },
                 singleLine = true,
                 isError = emailError != null,

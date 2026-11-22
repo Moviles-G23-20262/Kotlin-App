@@ -117,7 +117,7 @@ fun SearchScreen(
                 CampusIconButton(CampusIcons.Back, contentDescription = "Back", onClick = onBack)
                 CampusTextField(
                     value = query,
-                    onValueChange = { query = InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX) },
+                    onValueChange = { query = InputValidation.withoutPaste(query, InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX)) },
                     placeholder = "Search course materials...",
                     leadingIcon = CampusIcons.Search,
                     modifier = Modifier.weight(1f),

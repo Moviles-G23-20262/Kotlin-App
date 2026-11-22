@@ -146,7 +146,7 @@ fun ForgotPasswordScreen(initialEmail: String, onPasswordReset: (userId: String)
                 )
                 FormField(
                     value = email,
-                    onValueChange = { email = InputValidation.sanitizeEmail(it); emailError = null },
+                    onValueChange = { email = InputValidation.withoutPaste(email, InputValidation.sanitizeEmail(it)); emailError = null },
                     label = "Institutional email",
                     error = emailError,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
@@ -179,7 +179,7 @@ fun ForgotPasswordScreen(initialEmail: String, onPasswordReset: (userId: String)
                             onValueChange = { newPassword = typedOnly(newPassword, InputValidation.sanitizePassword(it)); passwordError = null },
                             label = "New password",
                             error = passwordError,
-                            hint = "At least ${InputLimits.PASSWORD_MIN} characters, with letters and numbers",
+                            hint = "At least ${InputLimits.PASSWORD_MIN} characters, with upper and lowercase letters, a number and a symbol",
                             visualTransformation = transformation,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
                             trailingIcon = {
