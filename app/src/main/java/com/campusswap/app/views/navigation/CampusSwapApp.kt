@@ -330,6 +330,7 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
                 OrderConfirmationScreen(
                     orderNumber = orderNumber,
                     order = appViewModel.orders.firstOrNull { it.number.toString() == orderNumber },
+                    note = appViewModel.confirmationNote,
                     onBackToHome = { navigateToTab(Routes.HOME) },
                     onKeepShopping = { navigateToTab(Routes.SEARCH) },
                     onOpenChat = { id -> navController.navigate(Routes.chat(id)) },
