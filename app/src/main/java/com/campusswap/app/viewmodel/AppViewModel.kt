@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.campusswap.app.model.analytics.Analytics
@@ -367,6 +368,16 @@ class AppViewModel : ViewModel() {
     var checkoutMessage by mutableStateOf<String?>(null)
         private set
 
+    private fun <T> SnapshotStateList<T>.replaceIfChanged(new: List<T>) {
+        if (size == new.size && indices.all { this[it] == new[it] }) return
+        trace("SellerHub.replaceLists") {
+            Snapshot.withMutableSnapshot {
+                clear()
+                addAll(new)
+            }
+        }
+    }
+
     /** Cache then network: la copia guardada sale al instante y se reemplaza cuando responde el servidor. */
     fun loadOrders(repository: OrderRepository): Job? {
         orderRepository = repository
@@ -379,10 +390,8 @@ class AppViewModel : ViewModel() {
             var live = true
             var savedAt: Long? = null
             repository.stream(userId, showSaved).collect { loaded ->
-                orders.clear()
-                orders.addAll(loaded.purchases)
-                sales.clear()
-                sales.addAll(loaded.sales)
+                orders.replaceIfChanged(loaded.purchases)
+                sales.replaceIfChanged(loaded.sales)
                 live = loaded.isLive
                 savedAt = loaded.savedAtMillis
             }
@@ -770,8 +779,7 @@ class AppViewModel : ViewModel() {
         val userId = currentUserId ?: return null
         return viewModelScope.launch {
             val reviews = repository.received(userId) ?: return@launch
-            myReviews.clear()
-            myReviews.addAll(reviews)
+            myReviews.replaceIfChanged(reviews)
         }
     }
 
