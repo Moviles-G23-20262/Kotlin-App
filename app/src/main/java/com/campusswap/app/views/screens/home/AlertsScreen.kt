@@ -163,7 +163,7 @@ fun AlertsScreen(
             items(vm.alerts, key = { "alert-${it.id}" }) { alert ->
                 AlertCard(
                     alert = alert,
-                    matchCount = matches.count { it.alert.id == alert.id },
+                    matchCount = vm.matchCountByAlert[alert.id] ?: 0,
                     onToggle = { vm.toggleAlert(alert.id) },
                     onRemove = { vm.removeAlert(alert.id) },
                 )
