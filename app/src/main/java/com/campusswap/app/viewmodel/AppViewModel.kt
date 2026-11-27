@@ -14,6 +14,7 @@ import com.campusswap.app.model.Order
 import com.campusswap.app.model.PendingExchange
 import com.campusswap.app.model.PendingSync
 import com.campusswap.app.model.Product
+import com.campusswap.app.model.SeedIds
 import com.campusswap.app.model.ProposalStatus
 import com.campusswap.app.model.SampleData
 import com.campusswap.app.model.SearchFilters
@@ -74,7 +75,9 @@ import com.campusswap.app.model.local.CartStore
 import com.campusswap.app.model.local.ThemeStore
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
@@ -302,7 +305,6 @@ class AppViewModel : ViewModel() {
     /** Set by Home's "See all" before navigating to Search, then consumed once. */
     var pendingSearchCategory: Category? = null
 
-    
     var searchFilters by mutableStateOf(SearchFilters())
         private set
 
@@ -420,46 +422,73 @@ class AppViewModel : ViewModel() {
             ?: sales.firstNotNullOfOrNull { sale -> sale.product.takeIf { it.id == id } }
             ?: chatProducts.find { it.id == id }
 
-
     suspend fun openSellerChats(rooms: ChatRoomRepository, order: Order) {
-        if (orderRepository == null) return // demo access: there is no server to open chats on
+        if (orderRepository == null) return
         order.products.distinctBy { it.seller.id }.forEach { product ->
             try {
                 rooms.roomFor(product.id)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                // Without a connection this seller's chat opens later, when the buyer taps their button.
             }
         }
     }
 
-    /** Pide al backend los productos del carrito; devuelve # de orden */
+    /** Note for the confirmation screen when part of the cart could not be ordered (null = everything went through). */
+    var confirmationNote by mutableStateOf<String?>(null)
+        private set
+
+    private var placingOrder: Deferred<Int?>? = null
+
+    /**
+     * Pide al backend los productos del carrito; devuelve # de orden, o null si hay que quedarse en el
+     * checkout (ver [checkoutMessage]). Corre en el viewModelScope: si el comprador sale de la pantalla a
+     * mitad del pedido, los pedidos que faltan no se cortan y el carrito queda al día. Un segundo toque
+     * mientras corre espera el mismo pedido en vez de lanzar otro.
+     */
     suspend fun placeOrder(meetOnCampus: Boolean = true): Int? {
+        val running = placingOrder?.takeIf { it.isActive }
+            ?: viewModelScope.async { placeOrderNow(meetOnCampus) }.also { placingOrder = it }
+        return running.await()
+    }
+
+    private suspend fun placeOrderNow(meetOnCampus: Boolean): Int? {
         checkoutMessage = null
+        confirmationNote = null
         val repository = orderRepository
+        var unavailable: List<Product> = emptyList()
         var notSent: List<Product> = emptyList()
         val order = if (repository == null) {
             // Acceso demo (sin sesión): la orden solo existe en el teléfono, como antes
             Order(number = (1000..9999).random(), lines = cart.toList(), meetOnCampus = meetOnCampus)
         } else {
-            when (val result = repository.place(cart.toList(), meetOnCampus)) {
+            when (val result = repository.place(cart.toList(), meetOnCampus, buyerId = currentUserId)) {
                 PlaceOrderResult.Offline -> {
-                    checkoutMessage = "You're offline. Your cart is saved: place the order when you're back online."
+                    checkoutMessage = if (isOnline) {
+                        "Can't reach CampusSwap right now. Your cart is saved: try again in a moment."
+                    } else {
+                        "You're offline. Your cart is saved: place the order when you're back online."
+                    }
                     return null
                 }
                 is PlaceOrderResult.Rejected -> {
                     cart.removeAll { line -> result.unavailable.any { it.id == line.product.id } }
-                    checkoutMessage = "No longer available: ${result.unavailable.joinToString { it.title }}"
+                    markListing(result.unavailable.filter { SeedIds.isBackendId(it.id) }.map { it.id }, "RESERVED")
+                    checkoutMessage = orderProblems(null, result.unavailable, result.notSent)
                     return null
                 }
                 is PlaceOrderResult.Placed -> {
+                    unavailable = result.unavailable
+                    markListing(result.unavailable.filter { SeedIds.isBackendId(it.id) }.map { it.id }, "RESERVED")
                     notSent = result.notSent
                     result.order
                 }
             }
         }
+        orders.removeAll { it.number == order.number }
         orders.add(0, order)
+        markListing(order.products.map { it.id }, "RESERVED")
+        // Sale del carrito lo pedido y lo que ya no está disponible; se queda lo que no se pudo enviar
         cart.removeAll { line -> notSent.none { it.id == line.product.id } }
         order.products.forEach { product ->
             Analytics.log(
@@ -480,11 +509,48 @@ class AppViewModel : ViewModel() {
         }
         if (repository != null) loadOrders(repository)
         if (notSent.isNotEmpty()) {
-            checkoutMessage = "Connection lost. Order #CSW-${order.number} has ${order.products.joinToString { it.title }}. Still in your cart: ${notSent.joinToString { it.title }}."
+            // Queda algo en el carrito: el comprador sigue en el checkout para reintentarlo
+            checkoutMessage = orderProblems(order, unavailable, notSent)
             return null
         }
+        if (unavailable.isNotEmpty()) confirmationNote = orderProblems(null, unavailable, emptyList())
         return order.number
     }
+
+    /**
+     * The listing left the market (RESERVED once ordered, SOLD once the exchange is closed). It leaves
+     * Home and Search right away, as the server feed (AVAILABLE only) will on its next load, and the
+     * wishlist and chats show its new status. It stays reachable by id for the order and the chat.
+     */
+    fun markListing(productIds: Collection<String>, status: String) {
+        if (productIds.isEmpty()) return
+        fun MutableList<Product>.mark() {
+            for (i in indices) if (this[i].id in productIds && this[i].status != status) this[i] = this[i].copy(status = status)
+        }
+        val leaving = allProducts.filter { it.id in productIds && it.pendingSync == null }
+        allProducts.removeAll(leaving)
+        leaving.forEach { rememberChatProduct(it.copy(status = status)) }
+        wishlistProducts.mark()
+        chatProducts.mark()
+    }
+
+    /** The buyer confirmed the exchange at the meetup and the server closed it: the listing is sold. */
+    fun onExchangeConfirmed(productId: String) {
+        markListing(listOf(productId), "SOLD")
+        orderRepository?.let(::loadOrders)
+    }
+
+    /** One message for everything that didn't go as planned at checkout. */
+    private fun orderProblems(order: Order?, unavailable: List<Product>, notSent: List<Product>): String = buildList {
+        if (order != null) add("Order #CSW-${order.number} placed for ${order.products.joinToString { it.title }}.")
+        if (unavailable.isNotEmpty()) {
+            add("No longer available, removed from your cart: ${unavailable.joinToString { it.title }}.")
+        }
+        if (notSent.isNotEmpty()) {
+            val why = if (isOnline) "CampusSwap didn't answer in time" else "you went offline"
+            add("Not ordered yet because $why: ${notSent.joinToString { it.title }}. It's still in your cart, tap Place Order to try again.")
+        }
+    }.joinToString(" ")
 
     val pendingExchanges: List<PendingExchange>
         get() = orders.flatMap { order ->
@@ -503,6 +569,10 @@ class AppViewModel : ViewModel() {
 
     fun hasPendingExchange(productId: String): Boolean =
         orderFor(productId) != null && ratings[productId] == null
+
+    /** The signed-in seller's listing is reserved and the handover still has to be confirmed. */
+    fun hasPendingSale(productId: String): Boolean =
+        sales.any { it.product.id == productId && it.status == "PENDING" }
 
     fun restoreSession(userId: String) {
         currentUserId = userId
@@ -555,6 +625,7 @@ class AppViewModel : ViewModel() {
         loadedNotificationIds = emptySet()
         notificationsLive = true
         checkoutMessage = null
+        confirmationNote = null
         alertError = null
         wishlistMessage = null
         chatProducts.clear()

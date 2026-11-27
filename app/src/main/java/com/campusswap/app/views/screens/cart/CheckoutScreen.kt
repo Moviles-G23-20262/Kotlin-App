@@ -203,11 +203,12 @@ fun OrderConfirmationScreen(
     orderNumber: String,
     /** The order just placed, so the confirmation can hand off to the exchange flow. */
     order: Order?,
+    /** Part of the cart that could not be ordered, e.g. a listing someone else reserved first. */
+    note: String? = null,
     onBackToHome: () -> Unit,
     onKeepShopping: () -> Unit,
     onOpenChat: (String) -> Unit,
     onCompleteExchange: (String) -> Unit,
-    note: String? = null,
 ) {
     val c = CampusSwapTheme.colors
     val bySeller = order?.products.orEmpty().groupBy { it.seller.id }.values.toList()
@@ -255,6 +256,7 @@ fun OrderConfirmationScreen(
         if (note != null) {
             BodyText(note, color = c.text, modifier = Modifier.widthIn(max = 340.dp).padding(bottom = 24.dp))
         }
+
         StickyNote(modifier = Modifier.widthIn(max = 340.dp).fillMaxWidth().padding(bottom = 24.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(CampusIcons.Inbox, contentDescription = null, tint = c.textMuted, modifier = Modifier.padding(top = 2.dp).size(16.dp))
@@ -294,7 +296,6 @@ fun OrderConfirmationScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                // With several items each exchange is closed from Profile > Purchases
                 if (exchangeProduct != null) {
                     SecondaryButton(
                         text = "Already met? Complete exchange",

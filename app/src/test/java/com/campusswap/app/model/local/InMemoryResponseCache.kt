@@ -3,8 +3,10 @@ package com.campusswap.app.model.local
 /** [ResponseCache] that lives in a map, like Room would between two app runs. */
 class InMemoryResponseCache(var now: Long = 1_000L) : ResponseCache {
     private val entries = mutableMapOf<Pair<String, String>, Saved<String>>()
+    var writes = 0
 
     override suspend fun put(ownerId: String, key: String, json: String) {
+        writes++
         entries[ownerId to key] = Saved(json, now)
     }
 

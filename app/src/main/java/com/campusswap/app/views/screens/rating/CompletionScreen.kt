@@ -1,5 +1,7 @@
 package com.campusswap.app.views.screens.rating
 
+import com.campusswap.app.model.domain.InputLimits
+import com.campusswap.app.model.domain.InputValidation
 import com.campusswap.app.viewmodel.CheckInState
 import com.campusswap.app.viewmodel.ExchangeCheckInViewModel
 import androidx.compose.foundation.background
@@ -97,8 +99,10 @@ fun CompletionScreen(
 
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
     var otherId by remember(productId) { mutableStateOf<String?>(null) }
+    var otherFullName by remember(productId) { mutableStateOf<String?>(null) }
     LaunchedEffect(productId) {
         otherId = container.chatRepository.counterpartId(productId)
+        otherFullName = container.chatRepository.counterpartName(productId)
         vm.loadExchangeRatings(container.ratingRepository, product, otherId)
     }
     val rated = otherId ?: product.seller.id
@@ -115,16 +119,30 @@ fun CompletionScreen(
     var tags by remember { mutableStateOf(setOf<FeedbackTag>()) }
     var review by remember { mutableStateOf("") }
 
+    val me = vm.currentUserId ?: vm.currentUser.id
+    // The seller confirms handing the item over; the buyer confirms receiving it. Both are needed.
+    val isSeller = product.seller.id == me
+    val sale = vm.sales.firstOrNull { it.product.id == productId && it.status == "PENDING" }
+    val otherFirstName = if (isSeller) {
+        (sale?.buyerName ?: otherFullName)?.substringBefore(' ') ?: "the buyer"
+    } else {
+        product.seller.name.substringBefore(' ')
+    }
+    val otherName = if (isSeller) "$otherFirstName (the buyer)" else "$otherFirstName (the seller)"
     val target = ExchangeTarget(
         productId = product.id,
-        buyerId = vm.currentUserId ?: vm.currentUser.id,
+        buyerId = if (isSeller) sale?.buyerId ?: otherId.orEmpty() else me,
         sellerId = product.seller.id,
         price = product.price,
         meetingPointId = proposal?.point?.id,
         meetingPoint = proposal?.point?.location,
+        asSeller = isSeller,
     )
     val checkIn: ExchangeCheckInViewModel = viewModel(factory = ExchangeCheckInViewModel.factory(container, target))
     val checkInState by checkIn.state.collectAsState()
+    LaunchedEffect(checkInState) {
+        if (checkInState is CheckInState.Confirmed) vm.onExchangeConfirmed(product.id)
+    }
 
     Column(
         modifier = Modifier
@@ -147,6 +165,7 @@ fun CompletionScreen(
             RatingSent(
                 rating = existing,
                 product = product,
+                otherName = if (isSeller) sale?.buyerName ?: otherFullName ?: "the buyer" else product.seller.name,
                 theirs = vm.receivedRatings[productId],
                 sync = vm.ratingSync[productId],
                 onRetry = { vm.sendRating(container.ratingRepository, rated, existing) },
@@ -196,11 +215,11 @@ fun CompletionScreen(
             }
 
             StepCard(number = 1, title = "Confirm you're at the meeting point") {
-                ExchangeCheckIn(viewModel = checkIn, pointName = proposal?.point?.name)
+                ExchangeCheckIn(viewModel = checkIn, pointName = proposal?.point?.name, otherName = otherName)
             }
 
-            // Step 2 — condition checklist
-            StepCard(number = 2, title = "Check the item before you pay") {
+            // Step 2 — condition checklist (the buyer's job: the seller already knows what they handed over)
+            if (!isSeller) StepCard(number = 2, title = "Check the item before you pay") {
                 CheckItem.entries.forEach { item ->
                     CheckRow(
                         label = if (item == CheckItem.CONDITION_OK) {
@@ -255,7 +274,7 @@ fun CompletionScreen(
             }
 
             // Step 3 — rating
-            StepCard(number = 3, title = "Rate ${product.seller.name.substringBefore(' ')}") {
+            StepCard(number = if (isSeller) 2 else 3, title = "Rate $otherFirstName") {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     (1..5).forEach { index ->
                         Icon(
@@ -295,13 +314,13 @@ fun CompletionScreen(
                 }
                 CampusTextField(
                     value = review,
-                    onValueChange = { if (it.length <= 200) review = it },
+                    onValueChange = { review = InputValidation.withoutPaste(review, InputValidation.sanitizeText(it, InputLimits.REVIEW_MAX)) },
                     placeholder = "Add a short review (optional)",
                     singleLine = false,
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 )
-                MonoText("${review.length}/200", modifier = Modifier.padding(top = 4.dp))
+                MonoText("${review.length}/${InputLimits.REVIEW_MAX}", modifier = Modifier.padding(top = 4.dp))
             }
 
             BodyText(
@@ -311,10 +330,10 @@ fun CompletionScreen(
             )
         }
 
-        // Queued counts: the rating waits in the outbox behind the check-in and is sent right after it.
-        val confirmed = checkInState is CheckInState.Confirmed || checkInState is CheckInState.Failed ||
-            checkInState is CheckInState.Queued
-        val ready = confirmed && checks.size == CheckItem.entries.size && stars > 0
+        // Only a sale both sides confirmed can be rated: the server refuses ratings before that.
+        val confirmed = checkInState is CheckInState.Confirmed
+        val checked = isSeller || checks.size == CheckItem.entries.size
+        val ready = confirmed && checked && stars > 0
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -324,6 +343,7 @@ fun CompletionScreen(
             PrimaryButton(
                 text = when {
                     ready -> "Send rating"
+                    checkInState is CheckInState.WaitingForOther -> "Waiting for $otherFirstName to confirm"
                     !confirmed -> "Confirm the exchange to continue"
                     else -> "Check the item to continue"
                 },
@@ -352,6 +372,7 @@ fun CompletionScreen(
 private fun RatingSent(
     rating: TransactionRating,
     product: Product,
+    otherName: String,
     theirs: RatingDto?,
     sync: RatingResult?,
     onRetry: () -> Unit,
@@ -378,7 +399,7 @@ private fun RatingSent(
             modifier = Modifier.padding(top = 20.dp, bottom = 6.dp),
         )
         BodyText(
-            "You rated ${product.seller.name} ${rating.stars}.0 — thanks for keeping the campus score honest.",
+            "You rated $otherName ${rating.stars}.0 — thanks for keeping the campus score honest.",
             color = c.textMuted,
             modifier = Modifier.padding(bottom = 20.dp),
         )
@@ -394,9 +415,9 @@ private fun RatingSent(
 
         Column(modifier = Modifier.fillMaxWidth().campusCard().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                InitialsAvatar(product.seller.name, size = 40.dp)
+                InitialsAvatar(otherName, size = 40.dp)
                 Column(modifier = Modifier.weight(1f)) {
-                    BodyText(product.seller.name, color = c.text, weight = FontWeight.SemiBold)
+                    BodyText(otherName, color = c.text, weight = FontWeight.SemiBold)
                     BodyText(
                         theirs?.let { "Rated you ${it.stars}.0" + (it.tags.orEmpty().firstOrNull()?.let { tag -> " · $tag" } ?: "") }
                             ?: "Hasn't rated you yet",                        size = CampusType.size2xs,

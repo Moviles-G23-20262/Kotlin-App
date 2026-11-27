@@ -125,7 +125,8 @@ fun SearchScreen(
                         vm.updateSearchFilters {
                             it.copy(query = InputValidation.withoutPaste(it.query, InputValidation.sanitizeText(text, InputLimits.SEARCH_MAX)))
                         }
-                    },                    placeholder = "Search course materials...",
+                    },
+                    placeholder = "Search course materials...",
                     leadingIcon = CampusIcons.Search,
                     modifier = Modifier.weight(1f),
                 )
