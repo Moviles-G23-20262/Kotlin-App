@@ -215,7 +215,7 @@ fun LoginScreen(
                 Text("Continue with demo access")
             }
 
-            Row(modifier = Modifier.padding(top = 24.dp)) {
+            Row(modifier = Modifier.padding(top = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("New to CampusSwap?", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextButton(onClick = onCreateAccount) {
                     Text("Create account", color = AccentBlue)

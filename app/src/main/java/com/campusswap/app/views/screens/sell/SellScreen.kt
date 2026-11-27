@@ -322,6 +322,7 @@ private fun ProductInfoStep(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
     ) {

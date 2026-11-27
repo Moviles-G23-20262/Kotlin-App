@@ -97,6 +97,7 @@ import com.campusswap.app.views.themes.AccentBlue
 import com.campusswap.app.views.themes.JetBrainsMonoFamily
 import com.campusswap.app.views.themes.SecondaryBlue
 import com.campusswap.app.views.themes.SuccessGreen
+import com.campusswap.app.views.themes.WarningAmber
 import kotlinx.coroutines.launch
 
 /**
@@ -571,8 +572,13 @@ private fun ProposalCard(
                 modifier = Modifier.padding(top = 2.dp),
             )
             Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Icon(Icons.Outlined.Shield, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(14.dp))
-                Text("Verified safe zone · monitored", style = MaterialTheme.typography.labelMedium, color = SuccessGreen)
+                val zoneColor = if (proposal.point.isMonitored) SuccessGreen else WarningAmber
+                Icon(Icons.Outlined.Shield, contentDescription = null, tint = zoneColor, modifier = Modifier.size(14.dp))
+                Text(
+                    if (proposal.point.isMonitored) "Verified safe zone · monitored" else "Public zone · not monitored",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = zoneColor,
+                )
             }
             if (canRespond) {
                 Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -622,7 +628,7 @@ private fun ProposeMeetingChip(proposal: MeetingProposal?, onClick: () -> Unit, 
             Text(
                 when {
                     confirmed -> "Meeting: ${proposal!!.point.name}"
-                    proposal != null -> "Proposal pending"
+                    proposal != null && proposal.status != ProposalStatus.DECLINED -> "Proposal pending"
                     else -> "Propose Meeting Point"
                 },
                 style = MaterialTheme.typography.labelLarge,

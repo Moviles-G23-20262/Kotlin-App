@@ -119,8 +119,12 @@ class ChatRepository(
         return name
     }
 
-    fun latestProposal(messages: List<ChatMessage>): MeetingProposal? =
-        messages.lastOrNull { it.proposal != null }?.proposal
+    fun latestProposal(messages: List<ChatMessage>): MeetingProposal? {
+        val newestFirst = messages.mapNotNull { it.proposal }.asReversed().filter { it.status != ProposalStatus.CANCELLED }
+        return newestFirst.firstOrNull { it.status == ProposalStatus.PENDING }
+            ?: newestFirst.firstOrNull { it.status == ProposalStatus.ACCEPTED }
+            ?: newestFirst.firstOrNull()
+    }
 
     private fun toChatMessage(dto: MessageDto): ChatMessage {
         val proposal = dto.meetingProposal?.let { MeetingProposalMapper.toProposal(it, zone) }
