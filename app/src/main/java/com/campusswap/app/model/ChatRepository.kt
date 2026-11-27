@@ -14,6 +14,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 sealed interface ChatLoad {
     /** [savedAtMillis] is set when the server couldn't be reached and this is the copy saved on the phone. */
@@ -37,6 +38,8 @@ class ChatRepository(
     private val cache: ResponseCache = ResponseCache.None,
 ) {
     private val timeFormat = DateTimeFormatter.ofPattern("HH:mm", Locale.US)
+    private val lastSaved = ConcurrentHashMap<String, List<MessageDto>>()
+    private val unread = ConcurrentHashMap<String, Boolean>()
 
     suspend fun messages(productId: String): ChatLoad = try {
         val room = rooms.roomFor(productId)
@@ -44,7 +47,9 @@ class ChatRepository(
             ChatLoad.NotSynced
         } else {
             val thread = remote.messages(room)
-            currentUserId()?.let { traceAsync("Chat.saveThread", 0) { cache.save(it, threadKey(productId), thread) } }
+            val me = currentUserId()
+            unread[threadKey(productId)] = thread.any { it.senderId != me && it.isRead != true }
+            me?.let { saveThread(it, productId, thread) }
             ChatLoad.Success(thread.map(::toChatMessage))
         }
     } catch (e: CancellationException) {
@@ -53,6 +58,13 @@ class ChatRepository(
         savedThread(productId) ?: ChatLoad.Offline
     } catch (e: HttpException) {
         savedThread(productId) ?: ChatLoad.Offline
+    }
+
+    private suspend fun saveThread(owner: String, productId: String, thread: List<MessageDto>) {
+        val key = "$owner|${threadKey(productId)}"
+        if (lastSaved[key] == thread) return
+        traceAsync("Chat.saveThread", 0) { cache.save(owner, threadKey(productId), thread) }
+        lastSaved[key] = thread
     }
 
     private suspend fun savedThread(productId: String): ChatLoad? {
@@ -74,7 +86,12 @@ class ChatRepository(
 
     fun select(productId: String, room: String) = rooms.select(productId, room)
 
-    suspend fun markRead(productId: String) = traceAsync("Chat.markRead", 0) { rooms.markRead(productId) }
+    suspend fun markRead(productId: String) {
+        val key = threadKey(productId)
+        if (unread[key] == false) return
+        traceAsync("Chat.markRead", 0) { rooms.markRead(productId) }
+        unread[key] = false
+    }
 
     /** The server's chat room for the listing, or null when it can't be reached. */
     suspend fun roomId(productId: String): String? = try {
