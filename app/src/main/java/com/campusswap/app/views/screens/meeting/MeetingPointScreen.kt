@@ -284,7 +284,7 @@ fun MeetingPointScreen(
                 ) {
                     Icon(Icons.Outlined.Shield, contentDescription = null, tint = SecondaryBlue, modifier = Modifier.size(14.dp))
                     Text(
-                        "Only public, monitored campus zones are suggested. Payment always happens in person.",
+                        "Only public campus zones are suggested, and only monitored ones after dark. Payment always happens in person.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
