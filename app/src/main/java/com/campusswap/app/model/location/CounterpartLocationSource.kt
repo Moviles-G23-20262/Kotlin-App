@@ -26,6 +26,6 @@ class ProposedMeetingLocation(
         ProposalStatus.ACCEPTED -> true
         ProposalStatus.PENDING, ProposalStatus.CHANGED ->
             proposal.proposerId != null && proposal.proposerId != currentUserId()
-        ProposalStatus.DECLINED -> false
+        ProposalStatus.DECLINED, ProposalStatus.CANCELLED -> false
     }
 }

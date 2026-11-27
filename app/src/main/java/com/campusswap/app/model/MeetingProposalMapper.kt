@@ -40,6 +40,7 @@ object MeetingProposalMapper {
     private fun toStatus(status: String?) = when (status) {
         "ACCEPTED" -> ProposalStatus.ACCEPTED
         "DECLINED" -> ProposalStatus.DECLINED
+        "CANCELLED" -> ProposalStatus.CANCELLED
         else -> ProposalStatus.PENDING
     }
 }
