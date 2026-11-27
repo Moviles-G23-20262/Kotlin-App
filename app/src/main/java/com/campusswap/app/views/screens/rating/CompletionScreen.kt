@@ -99,8 +99,10 @@ fun CompletionScreen(
 
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
     var otherId by remember(productId) { mutableStateOf<String?>(null) }
+    var otherFullName by remember(productId) { mutableStateOf<String?>(null) }
     LaunchedEffect(productId) {
         otherId = container.chatRepository.counterpartId(productId)
+        otherFullName = container.chatRepository.counterpartName(productId)
         vm.loadExchangeRatings(container.ratingRepository, product, otherId)
     }
     val rated = otherId ?: product.seller.id
@@ -122,7 +124,7 @@ fun CompletionScreen(
     val isSeller = product.seller.id == me
     val sale = vm.sales.firstOrNull { it.product.id == productId && it.status == "PENDING" }
     val otherFirstName = if (isSeller) {
-        sale?.buyerName?.substringBefore(' ') ?: "the buyer"
+        (sale?.buyerName ?: otherFullName)?.substringBefore(' ') ?: "the buyer"
     } else {
         product.seller.name.substringBefore(' ')
     }
@@ -163,6 +165,7 @@ fun CompletionScreen(
             RatingSent(
                 rating = existing,
                 product = product,
+                otherName = if (isSeller) sale?.buyerName ?: otherFullName ?: "the buyer" else product.seller.name,
                 theirs = vm.receivedRatings[productId],
                 sync = vm.ratingSync[productId],
                 onRetry = { vm.sendRating(container.ratingRepository, rated, existing) },
@@ -369,6 +372,7 @@ fun CompletionScreen(
 private fun RatingSent(
     rating: TransactionRating,
     product: Product,
+    otherName: String,
     theirs: RatingDto?,
     sync: RatingResult?,
     onRetry: () -> Unit,
@@ -395,7 +399,7 @@ private fun RatingSent(
             modifier = Modifier.padding(top = 20.dp, bottom = 6.dp),
         )
         BodyText(
-            "You rated ${product.seller.name} ${rating.stars}.0 — thanks for keeping the campus score honest.",
+            "You rated $otherName ${rating.stars}.0 — thanks for keeping the campus score honest.",
             color = c.textMuted,
             modifier = Modifier.padding(bottom = 20.dp),
         )
@@ -411,9 +415,9 @@ private fun RatingSent(
 
         Column(modifier = Modifier.fillMaxWidth().campusCard().padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                InitialsAvatar(product.seller.name, size = 40.dp)
+                InitialsAvatar(otherName, size = 40.dp)
                 Column(modifier = Modifier.weight(1f)) {
-                    BodyText(product.seller.name, color = c.text, weight = FontWeight.SemiBold)
+                    BodyText(otherName, color = c.text, weight = FontWeight.SemiBold)
                     BodyText(
                         theirs?.let { "Rated you ${it.stars}.0" + (it.tags.orEmpty().firstOrNull()?.let { tag -> " · $tag" } ?: "") }
                             ?: "Hasn't rated you yet",                        size = CampusType.size2xs,
