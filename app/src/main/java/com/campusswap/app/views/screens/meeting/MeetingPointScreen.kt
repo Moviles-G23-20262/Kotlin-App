@@ -61,6 +61,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -152,7 +153,13 @@ fun MeetingPointScreen(
     var proposalError by remember { mutableStateOf<String?>(null) }
     var showAlternatives by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val otherName = product.seller.name.substringBefore(' ')
+    val selling = product.seller.id == vm.currentUserId
+    var otherName by remember(product.id) {
+        mutableStateOf(if (selling) "the buyer" else product.seller.name.substringBefore(' '))
+    }
+    LaunchedEffect(product.id) {
+        if (selling) container.chatRepository.counterpartName(product.id)?.let { otherName = it.substringBefore(' ') }
+    }
 
     Scaffold(
         topBar = {
