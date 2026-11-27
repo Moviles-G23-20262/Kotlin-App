@@ -207,9 +207,11 @@ fun OrderConfirmationScreen(
     onKeepShopping: () -> Unit,
     onOpenChat: (String) -> Unit,
     onCompleteExchange: (String) -> Unit,
+    note: String? = null,
 ) {
     val c = CampusSwapTheme.colors
-    val exchangeProduct = order?.products?.firstOrNull()
+    val bySeller = order?.products.orEmpty().groupBy { it.seller.id }.values.toList()
+    val exchangeProduct = order?.products?.singleOrNull()
     // `animate-bounce-in`: 0.8 -> 1.04 -> 1.0 with a fade.
     val scale = remember { Animatable(0.8f) }
     val fade = remember { Animatable(0f) }
@@ -249,8 +251,10 @@ fun OrderConfirmationScreen(
             letterSpacing = (-0.02).em,
             modifier = Modifier.padding(bottom = 8.dp),
         )
-        BodyText("Your campus swap is confirmed.", color = c.textMuted, modifier = Modifier.padding(bottom = 28.dp))
-
+        BodyText("Your campus swap is confirmed.", color = c.textMuted, modifier = Modifier.padding(bottom = if (note != null) 12.dp else 28.dp))
+        if (note != null) {
+            BodyText(note, color = c.text, modifier = Modifier.widthIn(max = 340.dp).padding(bottom = 24.dp))
+        }
         StickyNote(modifier = Modifier.widthIn(max = 340.dp).fillMaxWidth().padding(bottom = 24.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(CampusIcons.Inbox, contentDescription = null, tint = c.textMuted, modifier = Modifier.padding(top = 2.dp).size(16.dp))
@@ -279,21 +283,27 @@ fun OrderConfirmationScreen(
             modifier = Modifier.widthIn(max = 340.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (exchangeProduct != null) {
-                PrimaryButton(
-                    text = "Arrange the meetup",
-                    onClick = { onOpenChat(exchangeProduct.id) },
-                    leadingIcon = CampusIcons.Message,
-                    contentPadding = PaddingValues(13.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                SecondaryButton(
-                    text = "Already met? Complete exchange",
-                    onClick = { onCompleteExchange(exchangeProduct.id) },
-                    leadingIcon = CampusIcons.CheckCircle,
-                    contentPadding = PaddingValues(13.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            if (bySeller.isNotEmpty()) {
+                bySeller.forEach { items ->
+                    val sellerName = items.first().seller.name.substringBefore(' ')
+                    PrimaryButton(
+                        text = if (bySeller.size == 1) "Arrange the meetup" else "Chat with $sellerName (${items.size} item${if (items.size == 1) "" else "s"})",
+                        onClick = { onOpenChat(items.first().id) },
+                        leadingIcon = CampusIcons.Message,
+                        contentPadding = PaddingValues(13.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                // With several items each exchange is closed from Profile > Purchases
+                if (exchangeProduct != null) {
+                    SecondaryButton(
+                        text = "Already met? Complete exchange",
+                        onClick = { onCompleteExchange(exchangeProduct.id) },
+                        leadingIcon = CampusIcons.CheckCircle,
+                        contentPadding = PaddingValues(13.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 SecondaryButton(
                     text = "Back to Home",
                     onClick = onBackToHome,

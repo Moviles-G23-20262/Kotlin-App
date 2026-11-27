@@ -327,9 +327,15 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
 
             composable(Routes.CONFIRMATION) { entry ->
                 val orderNumber = entry.arguments?.getString("orderNumber").orEmpty()
+                val order = appViewModel.orders.firstOrNull { it.number.toString() == orderNumber }
+                // Opens a chat with every seller of the order, not only the first one
+                LaunchedEffect(order) {
+                    order?.let { appViewModel.openSellerChats(container.chatRoomRepository, it) }
+                }
                 OrderConfirmationScreen(
                     orderNumber = orderNumber,
-                    order = appViewModel.orders.firstOrNull { it.number.toString() == orderNumber },
+                    order = order,
+                    note = appViewModel.confirmationNote,
                     onBackToHome = { navigateToTab(Routes.HOME) },
                     onKeepShopping = { navigateToTab(Routes.SEARCH) },
                     onOpenChat = { id -> navController.navigate(Routes.chat(id)) },

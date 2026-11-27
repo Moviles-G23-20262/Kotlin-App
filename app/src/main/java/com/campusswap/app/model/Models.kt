@@ -27,6 +27,20 @@ enum class SortOption(val label: String) {
     RATING("Rating"),
 }
 
+/** Highest price on the Search slider: with the slider at the end, price does not filter. */
+const val MAX_SEARCH_PRICE = 350000f
+
+data class SearchFilters(
+    val query: String = "",
+    val category: Category = Category.ALL,
+    val condition: Condition? = null,
+    val maxPrice: Float = MAX_SEARCH_PRICE,
+    val sort: SortOption = SortOption.RELEVANCE,
+) {
+    val hasFilters: Boolean
+        get() = category != Category.ALL || condition != null || maxPrice < MAX_SEARCH_PRICE || sort != SortOption.RELEVANCE
+}
+
 data class Course(
     val code: String,
     val name: String,

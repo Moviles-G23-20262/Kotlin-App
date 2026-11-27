@@ -94,7 +94,7 @@ fun HomeScreen(
             vm.loadNotifications(container.notificationRepository, markRead = false),
         ).joinAll()
     }
-    var selectedCategory by rememberSaveable { mutableStateOf(Category.ALL) }
+    val selectedCategory = vm.searchFilters.category
 
     // derivedStateOf reads vm.allProducts (a snapshot list) and selectedCategory, so the lists are rebuilt
     // only when one of them changes, including a queued listing replaced by the published one (same size).
@@ -105,7 +105,7 @@ fun HomeScreen(
         derivedStateOf {
             trace("Home.offers") {
                 vm.allProducts.asSequence()
-                    .filter { selectedCategory == Category.ALL || it.category == selectedCategory }
+                    .filter { vm.searchFilters.category.let { cat -> cat == Category.ALL || it.category == cat } }
                     .take(4)
                     .toList()
             }
@@ -232,7 +232,7 @@ fun HomeScreen(
                             Pill(
                                 label = category.label,
                                 selected = selectedCategory == category,
-                                onClick = { selectedCategory = category },
+                                onClick = { vm.updateSearchFilters { it.copy(category = category) } },
                             )
                         }
                     }

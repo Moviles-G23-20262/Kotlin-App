@@ -22,10 +22,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.tracing.trace
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,9 +49,8 @@ import com.campusswap.app.model.Category
 import com.campusswap.app.model.Condition
 import com.campusswap.app.model.Product
 import com.campusswap.app.model.SortOption
+import com.campusswap.app.model.MAX_SEARCH_PRICE
 import com.campusswap.app.views.themes.CampusSwapTheme
-
-private const val MAX_PRICE_LIMIT = 350000f
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -62,12 +61,16 @@ fun SearchScreen(
     onProductClick: (String) -> Unit,
 ) {
     val c = CampusSwapTheme.colors
-    var query by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(initialCategory ?: Category.ALL) }
-    var selectedCondition by remember { mutableStateOf<Condition?>(null) }
-    var maxPrice by remember { mutableFloatStateOf(MAX_PRICE_LIMIT) }
-    var sortOption by remember { mutableStateOf(SortOption.RELEVANCE) }
-    var filtersExpanded by remember { mutableStateOf(initialCategory != null && initialCategory != Category.ALL) }
+    LaunchedEffect(initialCategory) {
+        if (initialCategory != null) vm.updateSearchFilters { it.copy(category = initialCategory) }
+    }
+    val filters = vm.searchFilters
+    val query = filters.query
+    val selectedCategory = filters.category
+    val selectedCondition = filters.condition
+    val maxPrice = filters.maxPrice
+    val sortOption = filters.sort
+    var filtersExpanded by rememberSaveable { mutableStateOf(filters.hasFilters) }
 
     // One pass over the catalogue instead of four chained filters (four intermediate lists per
     // keystroke), inside derivedStateOf so it reruns only when a filter or the catalogue changes. It was
@@ -75,10 +78,11 @@ fun SearchScreen(
     val results: List<Product> by remember {
         derivedStateOf {
             trace("Search.results") {
-                val category = selectedCategory
-                val condition = selectedCondition
-                val max = maxPrice.toDouble()
-                val text = query
+                val current = vm.searchFilters
+                val category = current.category
+                val condition = current.condition
+                val max = current.maxPrice.toDouble()
+                val text = current.query
                 val matches = vm.allProducts.filter {
                     (category == Category.ALL || it.category == category) &&
                         (condition == null || it.condition == condition) &&
@@ -90,7 +94,7 @@ fun SearchScreen(
                                 (it.course?.code?.contains(text, ignoreCase = true) == true)
                             )
                 }
-                when (sortOption) {
+                when (current.sort) {
                     SortOption.RELEVANCE -> matches
                     SortOption.PRICE_LOW -> matches.sortedBy { it.price }
                     SortOption.PRICE_HIGH -> matches.sortedByDescending { it.price }
@@ -117,8 +121,11 @@ fun SearchScreen(
                 CampusIconButton(CampusIcons.Back, contentDescription = "Back", onClick = onBack)
                 CampusTextField(
                     value = query,
-                    onValueChange = { query = InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX) },
-                    placeholder = "Search course materials...",
+                    onValueChange = { text ->
+                        vm.updateSearchFilters {
+                            it.copy(query = InputValidation.withoutPaste(it.query, InputValidation.sanitizeText(text, InputLimits.SEARCH_MAX)))
+                        }
+                    },                    placeholder = "Search course materials...",
                     leadingIcon = CampusIcons.Search,
                     modifier = Modifier.weight(1f),
                 )
@@ -144,13 +151,13 @@ fun SearchScreen(
                 ) {
                     FilterGroup("Category") {
                         Category.entries.forEach { category ->
-                            Pill(category.label, selected = selectedCategory == category, onClick = { selectedCategory = category }, small = true)
+                            Pill(category.label, selected = selectedCategory == category, onClick = { vm.updateSearchFilters { it.copy(category = category) } }, small = true)
                         }
                     }
                     FilterGroup("Condition") {
-                        Pill("All", selected = selectedCondition == null, onClick = { selectedCondition = null }, small = true)
+                        Pill("All", selected = selectedCondition == null, onClick = { vm.updateSearchFilters { it.copy(condition = null) } }, small = true)
                         Condition.entries.forEach { condition ->
-                            Pill(condition.label, selected = selectedCondition == condition, onClick = { selectedCondition = condition }, small = true)
+                            Pill(condition.label, selected = selectedCondition == condition, onClick = { vm.updateSearchFilters { it.copy(condition = condition) } }, small = true)
                         }
                     }
                     Column {
@@ -161,14 +168,14 @@ fun SearchScreen(
                         )
                         CampusSlider(
                             value = maxPrice,
-                            onValueChange = { maxPrice = it },
-                            valueRange = 10000f..MAX_PRICE_LIMIT,
+                            onValueChange = { price -> vm.updateSearchFilters { it.copy(maxPrice = price) } },
+                            valueRange = 10000f..MAX_SEARCH_PRICE,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
                     FilterGroup("Sort by") {
                         SortOption.entries.forEach { option ->
-                            Pill(sortLabel(option), selected = sortOption == option, onClick = { sortOption = option }, small = true)
+                            Pill(sortLabel(option), selected = sortOption == option, onClick = { vm.updateSearchFilters { it.copy(sort = option) } }, small = true)
                         }
                     }
                 }

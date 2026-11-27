@@ -3,6 +3,7 @@ package com.campusswap.app.viewmodel
 import com.campusswap.app.model.AlertMatch
 import com.campusswap.app.model.AppNotification
 import com.campusswap.app.model.CartLine
+import com.campusswap.app.model.ChatRoomRepository
 import com.campusswap.app.model.Category
 import com.campusswap.app.model.Condition
 import com.campusswap.app.model.Course
@@ -15,6 +16,7 @@ import com.campusswap.app.model.PendingSync
 import com.campusswap.app.model.Product
 import com.campusswap.app.model.ProposalStatus
 import com.campusswap.app.model.SampleData
+import com.campusswap.app.model.SearchFilters
 import com.campusswap.app.model.SellDraft
 import com.campusswap.app.model.Seller
 import com.campusswap.app.model.SmartAlert
@@ -71,6 +73,7 @@ import kotlinx.coroutines.withContext
 import com.campusswap.app.model.local.CartStore
 import com.campusswap.app.model.local.ThemeStore
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
@@ -299,6 +302,14 @@ class AppViewModel : ViewModel() {
     /** Set by Home's "See all" before navigating to Search, then consumed once. */
     var pendingSearchCategory: Category? = null
 
+    
+    var searchFilters by mutableStateOf(SearchFilters())
+        private set
+
+    fun updateSearchFilters(change: (SearchFilters) -> SearchFilters) {
+        searchFilters = change(searchFilters)
+    }
+
     val myListings get() = allProducts.filter { it.seller.id == currentUser.id }
 
     val cartTotal get() = cart.sumOf { it.product.price * it.quantity }
@@ -408,6 +419,20 @@ class AppViewModel : ViewModel() {
             ?: wishlistProducts.find { it.id == id }
             ?: sales.firstNotNullOfOrNull { sale -> sale.product.takeIf { it.id == id } }
             ?: chatProducts.find { it.id == id }
+
+
+    suspend fun openSellerChats(rooms: ChatRoomRepository, order: Order) {
+        if (orderRepository == null) return // demo access: there is no server to open chats on
+        order.products.distinctBy { it.seller.id }.forEach { product ->
+            try {
+                rooms.roomFor(product.id)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Without a connection this seller's chat opens later, when the buyer taps their button.
+            }
+        }
+    }
 
     /** Pide al backend los productos del carrito; devuelve # de orden */
     suspend fun placeOrder(meetOnCampus: Boolean = true): Int? {
@@ -537,6 +562,7 @@ class AppViewModel : ViewModel() {
         reservedMatches.clear()
         shownMatches.clear()
         pendingSearchCategory = null
+        searchFilters = SearchFilters()
     }
 
     fun isWishlisted(productId: String) = wishlist.contains(productId)
