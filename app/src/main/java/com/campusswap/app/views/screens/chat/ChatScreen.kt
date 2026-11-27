@@ -628,7 +628,7 @@ private fun ProposeMeetingChip(proposal: MeetingProposal?, onClick: () -> Unit, 
             Text(
                 when {
                     confirmed -> "Meeting: ${proposal!!.point.name}"
-                    proposal != null -> "Proposal pending"
+                    proposal != null && proposal.status != ProposalStatus.DECLINED -> "Proposal pending"
                     else -> "Propose Meeting Point"
                 },
                 style = MaterialTheme.typography.labelLarge,
