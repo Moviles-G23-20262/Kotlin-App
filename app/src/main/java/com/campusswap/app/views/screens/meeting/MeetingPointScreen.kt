@@ -64,6 +64,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -321,18 +322,14 @@ fun MeetingPointScreen(
 @Composable
 private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherName: String, onPointTap: (RankedPoint) -> Unit) {
     val context = LocalContext.current
-    val campus = remember { CampusGeometry.load(context) }
-    val projection = remember { CampusMapProjection() }
-    val greens = remember(campus) { campus.greens.map { shape -> shape.map(projection::project) } }
-    val water = remember(campus) { campus.water.map { shape -> shape.map(projection::project) } }
-    val roads = remember(campus) { campus.roads.map { it.weight to it.line.map(projection::project) } }
-    val outlines = remember(campus) { campus.buildings.map { it to it.outline.map(projection::project) } }
+    val campus by produceState(CampusGeometry.loadedShapes()) { value = CampusGeometry.shapes(context) }
     val campusLayer = remember(campus) {
+        val shapes = campus ?: return@remember Modifier
         Modifier
             .fillMaxSize()
             .graphicsLayer()
             .drawWithCache {
-                val paths = trace("CampusMap.buildPaths") { campusPaths(size, greens, water, roads, outlines) }
+                val paths = trace("CampusMap.buildPaths") { campusPaths(size, shapes.greens, shapes.water, shapes.roads, shapes.buildings) }
                 onDrawBehind { trace("CampusMap.draw") { drawCampus(paths) } }
             }
     }
@@ -364,7 +361,7 @@ private fun CampusMap(state: MeetingPointUiState, selected: RankedPoint?, otherN
             }
         }
 
-        outlines.forEach { (building, projected) ->
+        campus?.buildings.orEmpty().forEach { (building, projected) ->
             val label = building.label ?: return@forEach
             val centre = projected.fold(MapPosition(0f, 0f)) { acc, position ->
                 MapPosition(acc.x + position.x / projected.size, acc.y + position.y / projected.size)

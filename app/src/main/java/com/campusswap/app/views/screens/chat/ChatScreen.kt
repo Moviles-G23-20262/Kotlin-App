@@ -87,6 +87,7 @@ import com.campusswap.app.model.MessageAuthor
 import com.campusswap.app.model.MessageStatus
 import com.campusswap.app.views.components.OfflineBanner
 import com.campusswap.app.views.components.timeAgo
+import com.campusswap.app.views.screens.meeting.CampusGeometry
 import com.campusswap.app.views.components.WhileVisible
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.ErrorOutline
@@ -130,6 +131,7 @@ fun ChatScreen(
         },
     )
     WhileVisible(chat) { chat.pollWhileVisible() }
+    LaunchedEffect(Unit) { CampusGeometry.shapes(context) }
     val state by chat.state.collectAsState()
     val messages = state.messages
     val counterpart = state.counterpartName ?: product.seller.name
@@ -146,7 +148,9 @@ fun ChatScreen(
         val path = cameraPath
         if (taken && path != null) scope.launch { photoStore.finishCameraPhoto(path)?.let(chat::sendPhoto) }
     }
-    var draft by remember { mutableStateOf("") }
+    var draft by rememberSaveable { mutableStateOf("") }
+    val selling = vm.isMine(product)
+    LaunchedEffect(chat) { chat.savedDraft(selling)?.let { if (draft.isEmpty()) draft = it } }
     val listState = rememberLazyListState()
     val newest = messages.lastOrNull()?.id
     LaunchedEffect(newest) {
@@ -268,7 +272,10 @@ fun ChatScreen(
                         }
                         OutlinedTextField(
                             value = draft,
-                            onValueChange = { draft = InputValidation.withoutPaste(draft, InputValidation.sanitizeText(it, InputLimits.MESSAGE_MAX)) },
+                            onValueChange = {
+                                draft = InputValidation.withoutPaste(draft, InputValidation.sanitizeText(it, InputLimits.MESSAGE_MAX))
+                                chat.keepDraft(selling, draft)
+                            },
                             modifier = Modifier.weight(1f),
                             placeholder = { Text("Message ${counterpart.substringBefore(' ')}…") },
                             maxLines = 4,
@@ -283,6 +290,7 @@ fun ChatScreen(
                             onClick = {
                                 chat.send(draft)
                                 draft = ""
+                                chat.keepDraft(selling, "")
                             },
                             enabled = canSend,
                             modifier = Modifier

@@ -72,6 +72,8 @@ import com.campusswap.app.model.local.ListingPhotoStore
 import com.campusswap.app.model.local.CartStore
 import com.campusswap.app.model.local.DataStoreCartStore
 import com.campusswap.app.model.local.RoomResponseCache
+import com.campusswap.app.model.local.ChatDraftStore
+import com.campusswap.app.model.local.DataStoreChatDraftStore
 import com.campusswap.app.model.local.DataStoreThemeStore
 import com.campusswap.app.model.local.ThemeStore
 import com.campusswap.app.model.sync.RemoteListingPhotoUploader
@@ -175,6 +177,8 @@ class AppContainer(context: Context) {
 
     val cartStore: CartStore = DataStoreCartStore(context)
     val themeStore: ThemeStore = DataStoreThemeStore(context)
+
+    val chatDrafts: ChatDraftStore = DataStoreChatDraftStore(context, CoroutineScope(SupervisorJob() + Dispatchers.IO))
 
     val ratingRepository = RatingRepository(RetrofitRatingRemoteDataSource(ratingsApi), responseCache)
 

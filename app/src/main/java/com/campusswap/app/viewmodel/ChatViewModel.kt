@@ -17,6 +17,7 @@ import com.campusswap.app.model.MessageStatus
 import com.campusswap.app.model.ProposalResult
 import com.campusswap.app.model.SendResult
 import com.campusswap.app.model.isPhotoUrl
+import com.campusswap.app.model.local.ChatDraftStore
 import com.campusswap.app.model.local.PendingActionEntity
 import com.campusswap.app.model.local.PendingMessageEntity
 import com.campusswap.app.model.sync.OutboxRepository
@@ -59,6 +60,7 @@ class ChatViewModel(
     /** Emits true while the phone has a network; polling waits on it instead of failing every 5 s. */
     private val connection: Flow<Boolean>,
     private val onProposalChanged: (String, MeetingProposal) -> Unit,
+    private val drafts: ChatDraftStore = ChatDraftStore.None,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ChatUiState())
     val state: StateFlow<ChatUiState> = _state.asStateFlow()
@@ -69,9 +71,17 @@ class ChatViewModel(
     private var firstContact = true
     private var counterpart: String? = null
     private var savedAt: Long? = null
+    private var fromServer = false
 
     init {
         room?.let { chat.select(productId, it) }
+        viewModelScope.launch {
+            val saved = chat.saved(productId) ?: return@launch
+            if (!fromServer && delivered.isEmpty()) {
+                delivered = saved
+                republish()
+            }
+        }
         viewModelScope.launch {
             outbox.pendingMessages.collect { rows ->
                 queued = rows.filter {
@@ -120,6 +130,7 @@ class ChatViewModel(
     }
 
     private fun publish(messages: List<ChatMessage>) {
+        fromServer = true
         delivered = messages
         if (messages.any { it.author == MessageAuthor.ME }) firstContact = false
         republish()
@@ -197,6 +208,18 @@ class ChatViewModel(
         return stamps.last().toEpochMilli() - stamps.first().toEpochMilli()
     }
 
+    suspend fun savedDraft(selling: Boolean): String? {
+        val owner = currentUserId() ?: return null
+        return drafts.read(owner, draftKey(selling))
+    }
+
+    fun keepDraft(selling: Boolean, text: String) {
+        val owner = currentUserId() ?: return
+        drafts.save(owner, draftKey(selling), text)
+    }
+
+    private fun draftKey(selling: Boolean) = if (selling) room ?: productId else productId
+
     fun sendPhoto(path: String) {
         val userId = currentUserId() ?: return
         if (_state.value.availability != ChatAvailability.READY) return
@@ -269,6 +292,7 @@ class ChatViewModel(
                     isOnline = isOnline,
                     connection = container.connectivity.isOnline,
                     onProposalChanged = onProposalChanged,
+                    drafts = container.chatDrafts,
                 )
             }
         }
