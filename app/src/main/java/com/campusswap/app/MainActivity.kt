@@ -1,5 +1,6 @@
 package com.campusswap.app
 
+import com.campusswap.app.views.components.NoClipboard
 import android.Manifest
 import android.graphics.Color
 import android.os.Build
@@ -38,7 +39,8 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
             CampusSwapTheme(darkTheme = dark) {
-                CampusSwapApp(appViewModel = appViewModel)
+                // No Copy, Cut or Paste menu in any text field of the app.
+                NoClipboard { CampusSwapApp(appViewModel = appViewModel) }
             }
         }
     }

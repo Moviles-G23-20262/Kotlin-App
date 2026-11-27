@@ -23,7 +23,7 @@ enum class PendingActionKind { CHECK_IN, RATING, PROPOSAL, WISHLIST_ADD, WISHLIS
 /** Wishlist changes carry no payload: the listing id is the action's productId. */
 val WISHLIST_KINDS = setOf(PendingActionKind.WISHLIST_ADD.name, PendingActionKind.WISHLIST_REMOVE.name)
 
-/** "I'm at the meeting point and got the item": completes the exchange on the server. */
+/** "I'm at the meeting point": records this side's confirmation; the sale closes when both sides confirmed. */
 data class CheckInPayload(
     val buyerId: String,
     val sellerId: String,
@@ -31,8 +31,11 @@ data class CheckInPayload(
     val meetingPointId: String?,
     val lat: Double?,
     val lng: Double?,
+    /** Saved by the seller handing the item over (missing in check-ins saved by older versions: buyer). */
+    val asSeller: Boolean = false,
 ) {
-    fun target(productId: String) = ExchangeTarget(productId, buyerId, sellerId, price, meetingPointId, meetingPoint = null)
+    fun target(productId: String) =
+        ExchangeTarget(productId, buyerId, sellerId, price, meetingPointId, meetingPoint = null, asSeller = asSeller)
     fun location(): GeoPoint? = if (lat != null && lng != null) GeoPoint(lat, lng) else null
 }
 
@@ -105,9 +108,10 @@ class RepositoryActionSender(
 
     private suspend fun checkIn(productId: String, payload: CheckInPayload): ActionOutcome =
         when (val result = exchanges.confirm(payload.target(productId), payload.location())) {
-            ConfirmResult.Success -> ActionOutcome.Sent
+            ConfirmResult.Completed, ConfirmResult.WaitingForOther -> ActionOutcome.Sent
             ConfirmResult.Offline -> ActionOutcome.Retry
             ConfirmResult.NotSynced -> ActionOutcome.Refused("This listing isn't on the server, so the exchange can't be recorded.")
+            ConfirmResult.NoOrder -> ActionOutcome.Refused("The buyer hasn't ordered this listing yet, so there is nothing to confirm.")
             is ConfirmResult.Rejected ->
                 if (isRetryable(result.httpCode)) ActionOutcome.Retry
                 else ActionOutcome.Refused("The server couldn't record this exchange (${result.httpCode}).")

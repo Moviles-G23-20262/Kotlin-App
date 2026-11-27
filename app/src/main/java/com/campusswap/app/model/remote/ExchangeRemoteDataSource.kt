@@ -31,6 +31,9 @@ data class ExchangeDto(
     val seller: MaterialSellerDto? = null,
     val buyer: MaterialSellerDto? = null,
     val completedAt: String? = null,
+    /** Each side confirms the meetup; the exchange is COMPLETED once both have. */
+    val buyerConfirmedAt: String? = null,
+    val sellerConfirmedAt: String? = null,
 )
 
 data class PlaceOrderRequest(val materialId: String)

@@ -216,7 +216,7 @@ fun ChatScreen(
             Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface, modifier = Modifier.imePadding()) {
                 Column {
                     // The change can be closed once a meeting is agreed (Views 9/10) or once the item was paid for at checkout and is still waiting to be finish (View 12)
-                    if (state.proposal?.status == ProposalStatus.ACCEPTED || vm.hasPendingExchange(product.id)) {
+                    if (state.proposal?.status == ProposalStatus.ACCEPTED || vm.hasPendingExchange(product.id) || vm.hasPendingSale(product.id)) {
                         Surface(
                             onClick = onCompleteExchange,
                             color = AccentBlue.copy(alpha = 0.12f),
@@ -268,7 +268,7 @@ fun ChatScreen(
                         }
                         OutlinedTextField(
                             value = draft,
-                            onValueChange = { draft = InputValidation.sanitizeText(it, InputLimits.MESSAGE_MAX) },
+                            onValueChange = { draft = InputValidation.withoutPaste(draft, InputValidation.sanitizeText(it, InputLimits.MESSAGE_MAX)) },
                             modifier = Modifier.weight(1f),
                             placeholder = { Text("Message ${counterpart.substringBefore(' ')}…") },
                             maxLines = 4,

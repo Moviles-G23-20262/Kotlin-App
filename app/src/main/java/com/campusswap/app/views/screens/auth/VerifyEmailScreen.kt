@@ -44,6 +44,7 @@ fun VerifyEmailScreen(email: String?, onDone: () -> Unit) {
     var codeSentAt by rememberSaveable { mutableLongStateOf(System.currentTimeMillis()) }
     var codeError by remember { mutableStateOf<String?>(null) }
     var infoMessage by remember { mutableStateOf<String?>(null) }
+    var infoIsError by remember { mutableStateOf(false) }
 
     val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
     val authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.factory(container))
@@ -58,7 +59,7 @@ fun VerifyEmailScreen(email: String?, onDone: () -> Unit) {
                 EmailCodeResult.Done -> onDone()
                 EmailCodeResult.TooSoon -> codeError = "Wait a minute and try again."
                 is EmailCodeResult.Rejected -> codeError = result.message
-                EmailCodeResult.Offline -> codeError = OFFLINE_MESSAGE
+                EmailCodeResult.Offline -> codeError = authViewModel.connectionProblem
             }
         }
     }
@@ -66,6 +67,7 @@ fun VerifyEmailScreen(email: String?, onDone: () -> Unit) {
     fun resend() {
         codeError = null
         authViewModel.sendVerificationCode { result ->
+            infoIsError = result == EmailCodeResult.Offline
             when (result) {
                 EmailCodeResult.Done -> {
                     codeSentAt = System.currentTimeMillis()
@@ -74,7 +76,7 @@ fun VerifyEmailScreen(email: String?, onDone: () -> Unit) {
                 }
                 EmailCodeResult.TooSoon -> infoMessage = "We just sent you a code. Wait a minute before asking for another one."
                 is EmailCodeResult.Rejected -> infoMessage = result.message
-                EmailCodeResult.Offline -> infoMessage = OFFLINE_MESSAGE
+                EmailCodeResult.Offline -> infoMessage = authViewModel.connectionProblem
             }
         }
     }
@@ -125,7 +127,7 @@ fun VerifyEmailScreen(email: String?, onDone: () -> Unit) {
                 Text(
                     infoMessage!!,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (infoMessage == OFFLINE_MESSAGE) ErrorRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (infoIsError) ErrorRed else MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )

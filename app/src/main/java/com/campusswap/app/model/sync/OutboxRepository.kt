@@ -51,7 +51,7 @@ class OutboxRepository(
 
     suspend fun queueCheckIn(ownerId: String, target: ExchangeTarget, location: GeoPoint?) = queueAction(
         ownerId, PendingActionKind.CHECK_IN, target.productId,
-        CheckInPayload(target.buyerId, target.sellerId, target.price, target.meetingPointId, location?.lat, location?.lng),
+        CheckInPayload(target.buyerId, target.sellerId, target.price, target.meetingPointId, location?.lat, location?.lng, target.asSeller),
     )
 
     suspend fun queueRating(ownerId: String, ratedId: String, rating: TransactionRating) = queueAction(

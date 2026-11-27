@@ -18,6 +18,9 @@ import com.campusswap.app.model.sync.payloadAs
 import com.campusswap.app.model.domain.ExchangeTarget
 import com.campusswap.app.model.domain.GeoPoint
 import com.campusswap.app.model.domain.Proximity
+import com.campusswap.app.model.ExchangeProgress
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,7 +32,7 @@ import kotlin.math.roundToInt
 
 enum class ManualReason { PERMISSION_DENIED, LOCATION_OFF, NO_FIX, POINT_NOT_MAPPED }
 
-enum class FailReason { OFFLINE, NOT_SYNCED, REJECTED }
+enum class FailReason { OFFLINE, NOT_SYNCED, REJECTED, NO_ORDER }
 
 sealed interface CheckInState {
     data object Idle : CheckInState
@@ -37,6 +40,9 @@ sealed interface CheckInState {
     data class TooFar(val distanceMeters: Int) : CheckInState
     data class Manual(val reason: ManualReason) : CheckInState
     data object Sending : CheckInState
+    /** This side confirmed; the sale closes once the other side (seller or buyer) confirms too. */
+    data class WaitingForOther(val verifiedByGps: Boolean?) : CheckInState
+    /** Both sides confirmed: the exchange is completed and the listing sold. */
     data class Confirmed(val verifiedByGps: Boolean?) : CheckInState
     /** No connection: saved on the phone and sent by the outbox when the signal comes back. */
     data class Queued(val verifiedByGps: Boolean) : CheckInState
@@ -62,6 +68,8 @@ class ExchangeCheckInViewModel(
     private val location: LocationDataSource,
     private val exchanges: ExchangeRepository,
     private val queue: CheckInQueue = CheckInQueue.None,
+    /** How often to ask whether the other side confirmed, while this side waits. */
+    private val pollMillis: Long = POLL_MILLIS,
     private val logEvent: (name: String, properties: Map<String, Any?>) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(initialState())
@@ -71,13 +79,22 @@ class ExchangeCheckInViewModel(
     private var lastDistanceMeters: Int? = null
     private var manualReason: ManualReason? = null
 
+    private var polling: Job? = null
+
     init {
+        // The other side may have confirmed already, or this side in an earlier visit.
+        if (_state.value == CheckInState.Idle || _state.value is CheckInState.Manual) {
+            viewModelScope.launch { applyProgress(exchanges.progress(target), verifiedByGps = null) }
+        }
         viewModelScope.launch {
             queue.pending.collect { row ->
                 val current = _state.value
                 when {
-                    // Left the outbox without failing: the background sync delivered it.
-                    row == null -> if (current is CheckInState.Queued) _state.value = CheckInState.Confirmed(current.verifiedByGps)
+                    // Left the outbox without failing: the background sync delivered it; ask how far it got.
+                    row == null -> if (current is CheckInState.Queued) {
+                        _state.value = CheckInState.WaitingForOther(current.verifiedByGps)
+                        applyProgress(exchanges.progress(target), current.verifiedByGps)
+                    }
                     row.failedReason != null -> {
                         // Shown once; trying again starts a fresh check-in.
                         queue.discard(row.localId)
@@ -129,10 +146,16 @@ class ExchangeCheckInViewModel(
         viewModelScope.launch {
             _state.value = CheckInState.Sending
             _state.value = when (exchanges.confirm(target, location)) {
-                ConfirmResult.Success -> {
+                ConfirmResult.Completed -> {
                     logConfirmed(location)
                     CheckInState.Confirmed(verifiedByGps = location != null)
                 }
+                ConfirmResult.WaitingForOther -> {
+                    logConfirmed(location)
+                    waitForOther()
+                    CheckInState.WaitingForOther(verifiedByGps = location != null)
+                }
+                ConfirmResult.NoOrder -> CheckInState.Failed(FailReason.NO_ORDER)
                 ConfirmResult.Offline ->
                     if (queue.queue(location)) {
                         logConfirmed(location, queued = true)
@@ -142,6 +165,32 @@ class ExchangeCheckInViewModel(
                     }
                 ConfirmResult.NotSynced -> CheckInState.Failed(FailReason.NOT_SYNCED)
                 is ConfirmResult.Rejected -> CheckInState.Failed(FailReason.REJECTED)
+            }
+        }
+    }
+
+    private fun applyProgress(progress: ExchangeProgress, verifiedByGps: Boolean?) {
+        when (progress) {
+            ExchangeProgress.COMPLETED -> _state.value = CheckInState.Confirmed(verifiedByGps)
+            ExchangeProgress.WAITING_FOR_OTHER -> {
+                if (_state.value !is CheckInState.WaitingForOther) _state.value = CheckInState.WaitingForOther(verifiedByGps)
+                waitForOther()
+            }
+            ExchangeProgress.NOT_CONFIRMED, ExchangeProgress.UNKNOWN -> Unit
+        }
+    }
+
+    /** While this screen is open, asks every [pollMillis] whether the other side confirmed. */
+    private fun waitForOther() {
+        if (polling?.isActive == true) return
+        polling = viewModelScope.launch {
+            while (true) {
+                delay(pollMillis)
+                val waiting = _state.value as? CheckInState.WaitingForOther ?: break
+                if (exchanges.progress(target) == ExchangeProgress.COMPLETED) {
+                    _state.value = CheckInState.Confirmed(waiting.verifiedByGps)
+                    break
+                }
             }
         }
     }
@@ -170,6 +219,8 @@ class ExchangeCheckInViewModel(
     }
 
     companion object {
+        const val POLL_MILLIS = 10_000L
+
         fun factory(container: AppContainer, target: ExchangeTarget) = viewModelFactory {
             initializer {
                 ExchangeCheckInViewModel(
@@ -177,6 +228,7 @@ class ExchangeCheckInViewModel(
                     container.locationDataSource,
                     container.exchangeRepository,
                     OutboxCheckInQueue(container, target),
+                    POLL_MILLIS,
                 ) { name, properties ->
                     Analytics.log(name, *properties.toList().toTypedArray())
                 }

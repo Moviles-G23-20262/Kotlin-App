@@ -402,7 +402,7 @@ private fun ProductInfoStep(
             OutlinedTextField(
                 value = draft.title,
                 onValueChange = {
-                    onDraftChange(draft.copy(title = InputValidation.sanitizeText(it, InputLimits.TITLE_MAX).replace('\n', ' ')))
+                    onDraftChange(draft.copy(title = InputValidation.withoutPaste(draft.title, InputValidation.sanitizeText(it, InputLimits.TITLE_MAX).replace('\n', ' '))))
                 },
                 label = { Text("Title") },
                 singleLine = true,
@@ -418,7 +418,7 @@ private fun ProductInfoStep(
             )
             OutlinedTextField(
                 value = draft.description,
-                onValueChange = { onDraftChange(draft.copy(description = InputValidation.sanitizeText(it, InputLimits.DESCRIPTION_MAX))) },
+                onValueChange = { onDraftChange(draft.copy(description = InputValidation.withoutPaste(draft.description, InputValidation.sanitizeText(it, InputLimits.DESCRIPTION_MAX)))) },
                 label = { Text("Description") },
                 minLines = 3,
                 maxLines = 8,
@@ -451,7 +451,7 @@ private fun ProductInfoStep(
         NoClipboard {
             OutlinedTextField(
                 value = draft.price,
-                onValueChange = { onDraftChange(draft.copy(price = InputValidation.sanitizePrice(it))) },
+                onValueChange = { onDraftChange(draft.copy(price = InputValidation.withoutPaste(draft.price, InputValidation.sanitizePrice(it)))) },
                 label = { Text("Price") },
                 singleLine = true,
                 leadingIcon = { Text("$", modifier = Modifier.padding(start = 12.dp)) },
@@ -507,7 +507,7 @@ private fun CourseConditionStep(
         OutlinedTextField(
             value = courseQuery,
             onValueChange = {
-                courseQuery = InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX)
+                courseQuery = InputValidation.withoutPaste(courseQuery, InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX))
                 // Typing a course means the listing is about one, so the "not associated" box clears itself.
                 if (draft.course != null || (draft.notAssociatedWithCourse && courseQuery.isNotBlank())) {
                     onDraftChange(draft.copy(course = null, notAssociatedWithCourse = false))

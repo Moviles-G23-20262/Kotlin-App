@@ -1,5 +1,7 @@
 package com.campusswap.app.views.screens.rating
 
+import com.campusswap.app.model.domain.InputLimits
+import com.campusswap.app.model.domain.InputValidation
 import com.campusswap.app.viewmodel.CheckInState
 import com.campusswap.app.viewmodel.ExchangeCheckInViewModel
 import androidx.compose.foundation.background
@@ -115,16 +117,30 @@ fun CompletionScreen(
     var tags by remember { mutableStateOf(setOf<FeedbackTag>()) }
     var review by remember { mutableStateOf("") }
 
+    val me = vm.currentUserId ?: vm.currentUser.id
+    // The seller confirms handing the item over; the buyer confirms receiving it. Both are needed.
+    val isSeller = product.seller.id == me
+    val sale = vm.sales.firstOrNull { it.product.id == productId && it.status == "PENDING" }
+    val otherFirstName = if (isSeller) {
+        sale?.buyerName?.substringBefore(' ') ?: "the buyer"
+    } else {
+        product.seller.name.substringBefore(' ')
+    }
+    val otherName = if (isSeller) "$otherFirstName (the buyer)" else "$otherFirstName (the seller)"
     val target = ExchangeTarget(
         productId = product.id,
-        buyerId = vm.currentUserId ?: vm.currentUser.id,
+        buyerId = if (isSeller) sale?.buyerId ?: otherId.orEmpty() else me,
         sellerId = product.seller.id,
         price = product.price,
         meetingPointId = proposal?.point?.id,
         meetingPoint = proposal?.point?.location,
+        asSeller = isSeller,
     )
     val checkIn: ExchangeCheckInViewModel = viewModel(factory = ExchangeCheckInViewModel.factory(container, target))
     val checkInState by checkIn.state.collectAsState()
+    LaunchedEffect(checkInState) {
+        if (checkInState is CheckInState.Confirmed) vm.onExchangeConfirmed(product.id)
+    }
 
     Column(
         modifier = Modifier
@@ -196,11 +212,11 @@ fun CompletionScreen(
             }
 
             StepCard(number = 1, title = "Confirm you're at the meeting point") {
-                ExchangeCheckIn(viewModel = checkIn, pointName = proposal?.point?.name)
+                ExchangeCheckIn(viewModel = checkIn, pointName = proposal?.point?.name, otherName = otherName)
             }
 
-            // Step 2 — condition checklist
-            StepCard(number = 2, title = "Check the item before you pay") {
+            // Step 2 — condition checklist (the buyer's job: the seller already knows what they handed over)
+            if (!isSeller) StepCard(number = 2, title = "Check the item before you pay") {
                 CheckItem.entries.forEach { item ->
                     CheckRow(
                         label = if (item == CheckItem.CONDITION_OK) {
@@ -255,7 +271,7 @@ fun CompletionScreen(
             }
 
             // Step 3 — rating
-            StepCard(number = 3, title = "Rate ${product.seller.name.substringBefore(' ')}") {
+            StepCard(number = if (isSeller) 2 else 3, title = "Rate $otherFirstName") {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     (1..5).forEach { index ->
                         Icon(
@@ -295,13 +311,13 @@ fun CompletionScreen(
                 }
                 CampusTextField(
                     value = review,
-                    onValueChange = { if (it.length <= 200) review = it },
+                    onValueChange = { review = InputValidation.withoutPaste(review, InputValidation.sanitizeText(it, InputLimits.REVIEW_MAX)) },
                     placeholder = "Add a short review (optional)",
                     singleLine = false,
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                 )
-                MonoText("${review.length}/200", modifier = Modifier.padding(top = 4.dp))
+                MonoText("${review.length}/${InputLimits.REVIEW_MAX}", modifier = Modifier.padding(top = 4.dp))
             }
 
             BodyText(
@@ -311,10 +327,10 @@ fun CompletionScreen(
             )
         }
 
-        // Queued counts: the rating waits in the outbox behind the check-in and is sent right after it.
-        val confirmed = checkInState is CheckInState.Confirmed || checkInState is CheckInState.Failed ||
-            checkInState is CheckInState.Queued
-        val ready = confirmed && checks.size == CheckItem.entries.size && stars > 0
+        // Only a sale both sides confirmed can be rated: the server refuses ratings before that.
+        val confirmed = checkInState is CheckInState.Confirmed
+        val checked = isSeller || checks.size == CheckItem.entries.size
+        val ready = confirmed && checked && stars > 0
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -324,6 +340,7 @@ fun CompletionScreen(
             PrimaryButton(
                 text = when {
                     ready -> "Send rating"
+                    checkInState is CheckInState.WaitingForOther -> "Waiting for $otherFirstName to confirm"
                     !confirmed -> "Confirm the exchange to continue"
                     else -> "Check the item to continue"
                 },
