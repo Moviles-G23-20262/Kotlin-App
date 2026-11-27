@@ -3,7 +3,11 @@ package com.campusswap.app.views.screens.meeting
 import android.content.Context
 import androidx.tracing.trace
 import com.campusswap.app.R
+import com.campusswap.app.model.domain.CampusMapProjection
 import com.campusswap.app.model.domain.GeoPoint
+import com.campusswap.app.model.domain.MapPosition
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -20,6 +24,13 @@ data class CampusMapData(
     val buildings: List<CampusBuilding> = emptyList(),
 )
 
+data class CampusShapes(
+    val greens: List<List<MapPosition>>,
+    val water: List<List<MapPosition>>,
+    val roads: List<Pair<RoadWeight, List<MapPosition>>>,
+    val buildings: List<Pair<CampusBuilding, List<MapPosition>>>,
+)
+
 /**
  * The Universidad de los Andes campus as OpenStreetMap has it: green areas, water, streets and
  * paths, and the building footprints with the block letters. It ships with the app, so the map
@@ -28,6 +39,24 @@ data class CampusMapData(
 object CampusGeometry {
     @Volatile
     private var cached: CampusMapData? = null
+
+    @Volatile
+    private var shapes: CampusShapes? = null
+
+    fun loadedShapes(): CampusShapes? = shapes
+
+    suspend fun shapes(context: Context): CampusShapes = shapes ?: withContext(Dispatchers.Default) {
+        val campus = load(context.applicationContext)
+        val projection = CampusMapProjection()
+        trace("CampusGeometry.project") {
+            CampusShapes(
+                greens = campus.greens.map { shape -> shape.map(projection::project) },
+                water = campus.water.map { shape -> shape.map(projection::project) },
+                roads = campus.roads.map { it.weight to it.line.map(projection::project) },
+                buildings = campus.buildings.map { it to it.outline.map(projection::project) },
+            )
+        }.also { shapes = it }
+    }
 
     fun load(context: Context): CampusMapData =
         cached ?: synchronized(this) { cached ?: read(context).also { cached = it } }
