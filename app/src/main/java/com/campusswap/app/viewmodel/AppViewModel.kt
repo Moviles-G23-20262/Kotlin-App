@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.campusswap.app.model.analytics.Analytics
@@ -64,6 +65,9 @@ import java.time.YearMonth
 import java.time.ZoneId
 import androidx.compose.runtime.snapshotFlow
 import androidx.tracing.trace
+import com.campusswap.app.model.domain.findAlertMatches
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.campusswap.app.model.local.CartStore
 import com.campusswap.app.model.local.ThemeStore
 import kotlinx.coroutines.FlowPreview
@@ -364,6 +368,16 @@ class AppViewModel : ViewModel() {
     var checkoutMessage by mutableStateOf<String?>(null)
         private set
 
+    private fun <T> SnapshotStateList<T>.replaceIfChanged(new: List<T>) {
+        if (size == new.size && indices.all { this[it] == new[it] }) return
+        trace("SellerHub.replaceLists") {
+            Snapshot.withMutableSnapshot {
+                clear()
+                addAll(new)
+            }
+        }
+    }
+
     /** Cache then network: la copia guardada sale al instante y se reemplaza cuando responde el servidor. */
     fun loadOrders(repository: OrderRepository): Job? {
         orderRepository = repository
@@ -376,10 +390,8 @@ class AppViewModel : ViewModel() {
             var live = true
             var savedAt: Long? = null
             repository.stream(userId, showSaved).collect { loaded ->
-                orders.clear()
-                orders.addAll(loaded.purchases)
-                sales.clear()
-                sales.addAll(loaded.sales)
+                orders.replaceIfChanged(loaded.purchases)
+                sales.replaceIfChanged(loaded.sales)
                 live = loaded.isLive
                 savedAt = loaded.savedAtMillis
             }
@@ -596,19 +608,37 @@ class AppViewModel : ViewModel() {
 
     private val reservedMatches = mutableStateListOf<String>()
 
-    val alertMatches: List<AlertMatch>
-        get() = alerts.filter { it.enabled }.flatMap { alert ->
-            allProducts
-                .filter { it.seller.id != currentUser.id }
-                .filter { product -> alert.matches(product) }
-                .map { product ->
-                    AlertMatch(
-                        alert = alert,
-                        product = product,
-                        postedMinutesAgo = product.createdAtMillis?.let { ((System.currentTimeMillis() - it) / 60_000).toInt() } ?: 0,                        reserved = reservedMatches.contains(product.id),
-                    )
+    var alertMatches by mutableStateOf<List<AlertMatch>>(emptyList())
+        private set
+
+    /** How many matches each alert has (Alerts screen cards), counted once together with the matches. */
+    var matchCountByAlert by mutableStateOf<Map<String, Int>>(emptyMap())
+        private set
+
+    private data class MatchInputs(
+        val alerts: List<SmartAlert>,
+        val products: List<Product>,
+        val userId: String,
+        val reserved: Set<String>,
+    )
+
+    private fun watchAlertMatches() {
+        viewModelScope.launch {
+            snapshotFlow { MatchInputs(alerts.toList(), allProducts.toList(), currentUser.id, reservedMatches.toSet()) }
+                .collectLatest { inputs ->
+                    val (matches, counts) = withContext(Dispatchers.Default) {
+                        trace("Alerts.match") {
+                            val found = findAlertMatches(
+                                inputs.alerts, inputs.products, inputs.userId, inputs.reserved, System.currentTimeMillis(),
+                            )
+                            found to found.groupingBy { it.alert.id }.eachCount()
+                        }
+                    }
+                    alertMatches = matches
+                    matchCountByAlert = counts
                 }
-        }.distinctBy { it.product.id }.sortedBy { it.postedMinutesAgo }
+        }
+    }
 
     val unseenMatchCount: Int
         get() = notifications.count { it.kind == NotificationKind.ALERT_MATCH && !it.isRead }
@@ -645,7 +675,7 @@ class AppViewModel : ViewModel() {
 
     fun publishMatchNotifications() {
         if (smartAlertRepository != null) return
-        alertMatches.forEach { match ->
+        findAlertMatches(alerts, allProducts, currentUser.id, reservedMatches.toSet(), System.currentTimeMillis()).forEach { match ->
             val isNew = notify(
                 id = "$LOCAL_MATCH_PREFIX${match.product.id}",
                 title = "Alert match · ${match.alert.keyword.ifBlank { match.alert.course?.code ?: match.alert.category.label }}",
@@ -749,8 +779,7 @@ class AppViewModel : ViewModel() {
         val userId = currentUserId ?: return null
         return viewModelScope.launch {
             val reviews = repository.received(userId) ?: return@launch
-            myReviews.clear()
-            myReviews.addAll(reviews)
+            myReviews.replaceIfChanged(reviews)
         }
     }
 
@@ -960,6 +989,7 @@ class AppViewModel : ViewModel() {
     }
 
     init {
+        watchAlertMatches()
         publishMatchNotifications()
     }
 
