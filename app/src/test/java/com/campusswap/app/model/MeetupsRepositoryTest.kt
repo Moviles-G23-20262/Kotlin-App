@@ -1,6 +1,7 @@
 package com.campusswap.app.model
 
 import com.campusswap.app.model.local.FakeMeetupDao
+import com.campusswap.app.model.materials.MaterialDto
 import com.campusswap.app.model.remote.ChatPartyDto
 import com.campusswap.app.model.remote.ChatRoomSummaryDto
 import com.campusswap.app.model.remote.CreateMeetingProposalRequest
@@ -50,12 +51,12 @@ class MeetupsRepositoryTest {
         override suspend fun respond(proposalId: String, accept: Boolean): MeetingProposalDto = error("not used")
     }
 
-    private fun room(id: String, seller: String = "ana", buyer: String = ME) = ChatRoomSummaryDto(
+    private fun room(id: String, seller: String = "ana", buyer: String = ME, status: String = "AVAILABLE") = ChatRoomSummaryDto(
         id = id,
         materialId = "material-$id",
         buyerId = buyer,
         sellerId = seller,
-        material = null,
+        material = MaterialDto("material-$id", "Calculus book", "", null, "20000", "GOOD", status, "BOOKS", seller),
         buyer = ChatPartyDto(buyer, "Buyer $buyer"),
         seller = ChatPartyDto(seller, "Ana Ruiz"),
         messages = null,
@@ -94,6 +95,18 @@ class MeetupsRepositoryTest {
         assertEquals(listOf("Buyer luis", "Ana Ruiz"), meetups.map { it.counterpartName })
         assertEquals("Central Library lobby", meetups.first().pointName)
         assertEquals("13:00 – 14:00", meetups.first().slot.label)
+    }
+
+    @Test
+    fun `a meetup for a listing that was already sold is not on the agenda`() = runTest {
+        rooms.summaries += room("room-1", status = "SOLD")
+        rooms.summaries += room("room-2")
+        proposals.byRoom["room-1"] = listOf(proposal("sold", "ACCEPTED", "2026-11-14T15:00:00Z"))
+        proposals.byRoom["room-2"] = listOf(proposal("open", "ACCEPTED", "2026-11-14T16:00:00Z"))
+
+        val meetups = (repository().load() as MeetupsLoad.Success).meetups
+
+        assertEquals(listOf("open"), meetups.map { it.proposalId })
     }
 
     @Test
