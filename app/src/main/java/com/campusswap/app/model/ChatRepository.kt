@@ -6,6 +6,7 @@ import com.campusswap.app.model.local.save
 import com.campusswap.app.model.remote.ApiErrors
 import com.campusswap.app.model.remote.MessageDto
 import com.campusswap.app.model.remote.MessageRemoteDataSource
+import androidx.tracing.traceAsync
 import kotlinx.coroutines.CancellationException
 import retrofit2.HttpException
 import java.io.IOException
@@ -43,7 +44,7 @@ class ChatRepository(
             ChatLoad.NotSynced
         } else {
             val thread = remote.messages(room)
-            currentUserId()?.let { cache.save(it, threadKey(productId), thread) }
+            currentUserId()?.let { traceAsync("Chat.saveThread", 0) { cache.save(it, threadKey(productId), thread) } }
             ChatLoad.Success(thread.map(::toChatMessage))
         }
     } catch (e: CancellationException) {
@@ -73,7 +74,7 @@ class ChatRepository(
 
     fun select(productId: String, room: String) = rooms.select(productId, room)
 
-    suspend fun markRead(productId: String) = rooms.markRead(productId)
+    suspend fun markRead(productId: String) = traceAsync("Chat.markRead", 0) { rooms.markRead(productId) }
 
     /** The server's chat room for the listing, or null when it can't be reached. */
     suspend fun roomId(productId: String): String? = try {

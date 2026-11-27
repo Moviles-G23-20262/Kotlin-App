@@ -1,6 +1,7 @@
 package com.campusswap.app.views.screens.meeting
 
 import android.content.Context
+import androidx.tracing.trace
 import com.campusswap.app.R
 import com.campusswap.app.model.domain.GeoPoint
 import org.json.JSONArray
@@ -31,7 +32,9 @@ object CampusGeometry {
     fun load(context: Context): CampusMapData =
         cached ?: synchronized(this) { cached ?: read(context).also { cached = it } }
 
-    private fun read(context: Context): CampusMapData = runCatching {
+    private fun read(context: Context): CampusMapData = trace("CampusGeometry.read") { parse(context) }
+
+    private fun parse(context: Context): CampusMapData = runCatching {
         val raw = context.resources.openRawResource(R.raw.campus_buildings).bufferedReader().use { it.readText() }
         val root = JSONObject(raw)
         CampusMapData(
