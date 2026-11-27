@@ -1,6 +1,7 @@
 package com.campusswap.app.viewmodel
 
 import com.campusswap.app.model.ExchangeRepository
+import com.campusswap.app.model.remote.ExchangeDto
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.campusswap.app.model.local.PendingActionEntity
 import com.campusswap.app.model.FakeExchangeRemoteDataSource
@@ -34,7 +35,14 @@ class ExchangeCheckInViewModelTest {
         override suspend fun currentLocation() = result
     }
 
-    @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
+    private val dispatcher = UnconfinedTestDispatcher()
+
+    @Before fun setUp() {
+        Dispatchers.setMain(dispatcher)
+        // Most tests are about how the check-in is measured: the other side has confirmed already,
+        // so this side's confirmation closes the sale. The two-sided tests below turn this off.
+        remote.otherSideConfirmed = true
+    }
 
     @After fun tearDown() = Dispatchers.resetMain()
 
@@ -174,9 +182,52 @@ class ExchangeCheckInViewModelTest {
         assertEquals(north(meetingPoint, 10.0).lat, queue.queued.single()!!.lat, 1e-9)
         assertEquals(true, events.single().second["queued_offline"])
 
-        queue.pending.value = null // the background sync delivered it
+        // The background sync delivered it, and with the seller's confirmation the sale closed.
+        remote.failure = null
+        remote.exchanges += ExchangeDto("done-1", remote.buyerId, "COMPLETED")
+        queue.pending.value = null
 
         assertEquals(CheckInState.Confirmed(verifiedByGps = true), vm.state.value)
+    }
+
+    // --- Both sides have to confirm ---
+
+    @Test fun theBuyerConfirmingFirstWaitsForTheSellerUntilTheyConfirm() {
+        remote.otherSideConfirmed = false
+        remote.exchanges += ExchangeDto("pending-1", remote.buyerId, "PENDING")
+        val vm = viewModel(fixAt(10.0))
+
+        vm.checkIn()
+        assertEquals(CheckInState.WaitingForOther(verifiedByGps = true), vm.state.value)
+
+        // Nothing changes on the server: still waiting after the next check.
+        dispatcher.scheduler.advanceTimeBy(ExchangeCheckInViewModel.POLL_MILLIS + 1)
+        assertEquals(CheckInState.WaitingForOther(verifiedByGps = true), vm.state.value)
+
+        // The seller confirms from their phone: the next check closes it here too.
+        remote.otherSideConfirmsNow()
+        dispatcher.scheduler.advanceTimeBy(ExchangeCheckInViewModel.POLL_MILLIS + 1)
+        assertEquals(CheckInState.Confirmed(verifiedByGps = true), vm.state.value)
+    }
+
+    @Test fun reopeningTheScreenAfterConfirmingShowsItIsStillWaiting() {
+        remote.otherSideConfirmed = false
+        remote.exchanges += ExchangeDto("pending-1", remote.buyerId, "PENDING", buyerConfirmedAt = "2026-11-22T15:00:00Z")
+
+        val vm = viewModel(fixAt(10.0))
+
+        assertEquals(CheckInState.WaitingForOther(verifiedByGps = null), vm.state.value)
+    }
+
+    @Test fun aSellerWithoutAnOrderToConfirmIsToldWhy() {
+        remote.otherSideConfirmed = false
+        remote.callerIsSeller = true
+        val vm = viewModel(fixAt(10.0), target.copy(asSeller = true))
+
+        vm.checkIn()
+
+        assertEquals(CheckInState.Failed(FailReason.NO_ORDER), vm.state.value)
+        assertTrue(remote.orders.isEmpty())
     }
 
     @Test fun aCheckInTheServerRefusedIsShownOnceWithItsReason() {

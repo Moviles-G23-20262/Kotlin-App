@@ -15,7 +15,11 @@ import com.campusswap.app.model.auth.RegisterResult
 import com.campusswap.app.model.auth.ResetPasswordResult
 import kotlinx.coroutines.launch
 
-class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
+class AuthViewModel(
+    private val repository: AuthRepository,
+    /** Whether the phone has a working internet connection right now. */
+    private val isDeviceOnline: () -> Boolean = { true },
+) : ViewModel() {
 
     var isLoading by mutableStateOf(false)
         private set
@@ -38,6 +42,13 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     fun verifyEmail(code: String, onResult: (EmailCodeResult) -> Unit) =
         run(onResult) { repository.verifyEmail(code) }
 
+    /**
+     * What to tell the user when a request didn't go through: the phone has no internet, or it has
+     * internet but CampusSwap didn't answer. Read it when the result arrives.
+     */
+    val connectionProblem: String
+        get() = if (isDeviceOnline()) SERVER_UNREACHABLE else NO_INTERNET
+
     /** One request at a time: taps while one is in flight are ignored. */
     private fun <T> run(onResult: (T) -> Unit, call: suspend () -> T) {
         if (isLoading) return
@@ -50,8 +61,11 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     }
 
     companion object {
+        const val NO_INTERNET = "You don't have an internet connection. Connect to Wi-Fi or mobile data and try again."
+        const val SERVER_UNREACHABLE = "CampusSwap isn't responding right now. Try again in a few minutes."
+
         fun factory(container: AppContainer) = viewModelFactory {
-            initializer { AuthViewModel(container.authRepository) }
+            initializer { AuthViewModel(container.authRepository) { container.connectivity.isOnline.value } }
         }
     }
 }

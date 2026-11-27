@@ -163,7 +163,7 @@ fun AlertsScreen(
             items(vm.alerts, key = { "alert-${it.id}" }) { alert ->
                 AlertCard(
                     alert = alert,
-                    matchCount = matches.count { it.alert.id == alert.id },
+                    matchCount = vm.matchCountByAlert[alert.id] ?: 0,
                     onToggle = { vm.toggleAlert(alert.id) },
                     onRemove = { vm.removeAlert(alert.id) },
                 )
@@ -328,7 +328,7 @@ private fun NewAlertForm(onCancel: () -> Unit, onCreate: (SmartAlert) -> Unit) {
         HeadingText("New alert", size = CampusType.sizeSm)
         CampusTextField(
             value = keyword,
-            onValueChange = { keyword = InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX) },
+            onValueChange = { keyword = InputValidation.withoutPaste(keyword, InputValidation.sanitizeText(it, InputLimits.SEARCH_MAX)) },
             placeholder = "Item or course code",
             leadingIcon = CampusIcons.Search,
             modifier = Modifier.fillMaxWidth(),

@@ -8,6 +8,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
+import java.net.SocketTimeoutException
+import okhttp3.ResponseBody
+import retrofit2.HttpException
+import retrofit2.Response
 import com.campusswap.app.model.local.InMemoryResponseCache
 import com.campusswap.app.model.local.save
 import com.campusswap.app.model.materials.MaterialDto
@@ -54,6 +58,139 @@ class OrderRepositoryTest {
         assertEquals(ids, result.order.products.map { it.id })
         assertTrue(result.notSent.isEmpty())
     }
+    // --- A busy server, a lost answer or someone else first: what the buyer is told must be true ---
+
+    private val buyer = "b0000000-0000-4000-8000-000000000000"
+
+    /** Answers each POST /exchanges/orders from a script per material; GET /exchanges lists what was reserved. */
+    private class ScriptedServer(
+        private val buyer: String,
+        private val script: Map<String, MutableList<Any>> = emptyMap(),
+        private val takenByOthers: Set<String> = emptySet(),
+        private val mineFails: Boolean = false,
+    ) : OrdersRemoteDataSource {
+        val reserved = linkedMapOf<String, ExchangeDto>()
+        val calls = mutableListOf<String>()
+
+        override suspend fun mine(): List<ExchangeDto> {
+            if (mineFails) throw IOException("no connection")
+            return reserved.values.toList()
+        }
+
+        override suspend fun place(materialId: String): ExchangeDto {
+            calls += materialId
+            if (materialId in takenByOthers || materialId in reserved) throw http(409)
+            when (val next = script[materialId]?.removeFirstOrNull()) {
+                null, "ok" -> Unit
+                // The server reserves the listing but the answer never reaches the phone
+                "lost" -> { reserve(materialId); throw SocketTimeoutException("timeout") }
+                is Throwable -> throw next
+            }
+            return reserve(materialId)
+        }
+
+        private fun reserve(materialId: String) = ExchangeDto(
+            id = "e-$materialId", buyerId = buyer, status = "PENDING",
+            orderNumber = 2000 + reserved.size, materialId = materialId,
+        ).also { reserved[materialId] = it }
+    }
+
+    private fun bigCart(n: Int) = (1..n).map { i ->
+        CartLine(SampleData.products[i % SampleData.products.size].copy(id = "d0000000-0000-4000-8000-%012d".format(i), title = "Item $i"), 1)
+    }
+
+    @Test fun retriesWhenTheServerFailsForAMomentInsteadOfCallingTheItemUnavailable() = runBlocking {
+        val server = ScriptedServer(buyer, mapOf(ids[1] to mutableListOf<Any>(http(500), http(503))))
+
+        val result = OrderRepository(server).place(cart, meetOnCampus = true, buyerId = buyer, retryDelayMs = 0) as PlaceOrderResult.Placed
+
+        assertEquals(ids, result.order.products.map { it.id })
+        assertTrue(result.unavailable.isEmpty())
+        assertTrue(result.notSent.isEmpty())
+    }
+
+    @Test fun keepsTheItemInTheCartWhenTheServerKeepsFailing() = runBlocking {
+        val server = ScriptedServer(buyer, mapOf(ids[0] to mutableListOf<Any>(http(500), http(500), http(500))))
+
+        val result = OrderRepository(server).place(cart.take(1), meetOnCampus = true, buyerId = buyer, retryDelayMs = 0)
+
+        assertEquals(PlaceOrderResult.Rejected(unavailable = emptyList(), notSent = listOf(cart[0].product)), result)
+        assertEquals(3, server.calls.size)
+    }
+
+    @Test fun anOrderWhoseAnswerWasLostCountsAsPlacedInsteadOfUnavailable() = runBlocking {
+        val server = ScriptedServer(buyer, mapOf(ids[1] to mutableListOf<Any>("lost")))
+
+        val result = OrderRepository(server).place(cart, meetOnCampus = true, buyerId = buyer, retryDelayMs = 0) as PlaceOrderResult.Placed
+
+        // The second listing was reserved even though the phone got no answer
+        assertTrue(ids[1] in result.order.products.map { it.id })
+        assertTrue(result.unavailable.isEmpty())
+        // The third one wasn't sent after the connection failed: it stays in the cart
+        assertEquals(listOf(ids[2]), result.notSent.map { it.id })
+    }
+
+    @Test fun retryingAfterALostAnswerDoesNotCallYourOwnReservationUnavailable() = runBlocking {
+        val server = ScriptedServer(buyer)
+        server.place(ids[0]) // first try went through, the phone never heard back
+
+        val result = OrderRepository(server).place(cart, meetOnCampus = true, buyerId = buyer, retryDelayMs = 0) as PlaceOrderResult.Placed
+
+        assertEquals(ids, result.order.products.map { it.id })
+        assertTrue(result.unavailable.isEmpty())
+    }
+
+    @Test fun aListingSomeoneElseReservedLeavesTheCart() = runBlocking {
+        val server = ScriptedServer(buyer, takenByOthers = setOf(ids[2]))
+
+        val result = OrderRepository(server).place(cart, meetOnCampus = true, buyerId = buyer, retryDelayMs = 0) as PlaceOrderResult.Placed
+
+        assertEquals(listOf(ids[0], ids[1]), result.order.products.map { it.id })
+        assertEquals(listOf(ids[2]), result.unavailable.map { it.id })
+        assertTrue(result.notSent.isEmpty())
+    }
+
+    @Test fun whenTheBuyerCannotBeCheckedATakenListingStaysInTheCart() = runBlocking {
+        val server = ScriptedServer(buyer, takenByOthers = setOf(ids[0]), mineFails = true)
+
+        val result = OrderRepository(server).place(cart.take(1), meetOnCampus = true, buyerId = buyer, retryDelayMs = 0)
+
+        assertEquals(PlaceOrderResult.Rejected(unavailable = emptyList(), notSent = listOf(cart[0].product)), result)
+    }
+
+    @Test fun anExpiredSessionStopsTheOrderAndKeepsTheRestInTheCart() = runBlocking {
+        val server = ScriptedServer(buyer, mapOf(ids[1] to mutableListOf<Any>(http(401))))
+
+        val result = OrderRepository(server).place(cart, meetOnCampus = true, buyerId = buyer, retryDelayMs = 0) as PlaceOrderResult.Placed
+
+        assertEquals(listOf(ids[0]), result.order.products.map { it.id })
+        assertEquals(listOf(ids[1], ids[2]), result.notSent.map { it.id })
+        assertEquals(listOf(ids[0], ids[1]), server.calls)
+    }
+
+    @Test fun aBigCartWithAFlakyServerIsOrderedCompletely() = runBlocking {
+        val lines = bigCart(15)
+        // Every third listing gets one 503 before going through
+        val script = lines.withIndex().filter { it.index % 3 == 0 }.associate { it.value.product.id to mutableListOf<Any>(http(503)) }
+        val server = ScriptedServer(buyer, script)
+
+        val result = OrderRepository(server).place(lines, meetOnCampus = true, buyerId = buyer, retryDelayMs = 0) as PlaceOrderResult.Placed
+
+        assertEquals(lines.map { it.product.id }, result.order.products.map { it.id })
+        assertEquals(15, server.reserved.size)
+        assertTrue(result.unavailable.isEmpty() && result.notSent.isEmpty())
+    }
+
+    @Test fun ownListingsAndDeletedListingsAreUnavailableWithoutRetrying() = runBlocking {
+        val server = ScriptedServer(buyer, mapOf(ids[0] to mutableListOf<Any>(http(400)), ids[1] to mutableListOf<Any>(http(404))))
+
+        val result = OrderRepository(server).place(cart, meetOnCampus = true, buyerId = buyer, retryDelayMs = 0) as PlaceOrderResult.Placed
+
+        assertEquals(listOf(ids[2]), result.order.products.map { it.id })
+        assertEquals(listOf(ids[0], ids[1]), result.unavailable.map { it.id })
+        assertEquals(listOf(ids[0], ids[1], ids[2]), server.calls)
+    }
+
         private class ExchangesServer(private val answer: List<ExchangeDto>?) : OrdersRemoteDataSource {
         override suspend fun mine(): List<ExchangeDto> = answer ?: throw IOException("no connection")
         override suspend fun place(materialId: String): ExchangeDto = throw IOException("no connection")
@@ -92,4 +229,7 @@ class OrderRepositoryTest {
 
         assertEquals(listOf("New"), shown.map { it.purchases.single().products.single().title })
     }
+
 }
+
+private fun http(code: Int) = HttpException(Response.error<Any>(code, ResponseBody.create(null, "")))

@@ -13,6 +13,7 @@ import com.campusswap.app.model.Order
 import com.campusswap.app.model.PendingExchange
 import com.campusswap.app.model.PendingSync
 import com.campusswap.app.model.Product
+import com.campusswap.app.model.SeedIds
 import com.campusswap.app.model.ProposalStatus
 import com.campusswap.app.model.SampleData
 import com.campusswap.app.model.SellDraft
@@ -29,6 +30,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.campusswap.app.model.analytics.Analytics
@@ -64,10 +66,15 @@ import java.time.YearMonth
 import java.time.ZoneId
 import androidx.compose.runtime.snapshotFlow
 import androidx.tracing.trace
+import com.campusswap.app.model.domain.findAlertMatches
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.campusswap.app.model.local.CartStore
 import com.campusswap.app.model.local.ThemeStore
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
@@ -364,6 +371,16 @@ class AppViewModel : ViewModel() {
     var checkoutMessage by mutableStateOf<String?>(null)
         private set
 
+    private fun <T> SnapshotStateList<T>.replaceIfChanged(new: List<T>) {
+        if (size == new.size && indices.all { this[it] == new[it] }) return
+        trace("SellerHub.replaceLists") {
+            Snapshot.withMutableSnapshot {
+                clear()
+                addAll(new)
+            }
+        }
+    }
+
     /** Cache then network: la copia guardada sale al instante y se reemplaza cuando responde el servidor. */
     fun loadOrders(repository: OrderRepository): Job? {
         orderRepository = repository
@@ -376,10 +393,8 @@ class AppViewModel : ViewModel() {
             var live = true
             var savedAt: Long? = null
             repository.stream(userId, showSaved).collect { loaded ->
-                orders.clear()
-                orders.addAll(loaded.purchases)
-                sales.clear()
-                sales.addAll(loaded.sales)
+                orders.replaceIfChanged(loaded.purchases)
+                sales.replaceIfChanged(loaded.sales)
                 live = loaded.isLive
                 savedAt = loaded.savedAtMillis
             }
@@ -397,32 +412,61 @@ class AppViewModel : ViewModel() {
             ?: sales.firstNotNullOfOrNull { sale -> sale.product.takeIf { it.id == id } }
             ?: chatProducts.find { it.id == id }
 
-    /** Pide al backend los productos del carrito; devuelve # de orden */
+    /** Note for the confirmation screen when part of the cart could not be ordered (null = everything went through). */
+    var confirmationNote by mutableStateOf<String?>(null)
+        private set
+
+    private var placingOrder: Deferred<Int?>? = null
+
+    /**
+     * Pide al backend los productos del carrito; devuelve # de orden, o null si hay que quedarse en el
+     * checkout (ver [checkoutMessage]). Corre en el viewModelScope: si el comprador sale de la pantalla a
+     * mitad del pedido, los pedidos que faltan no se cortan y el carrito queda al día. Un segundo toque
+     * mientras corre espera el mismo pedido en vez de lanzar otro.
+     */
     suspend fun placeOrder(meetOnCampus: Boolean = true): Int? {
+        val running = placingOrder?.takeIf { it.isActive }
+            ?: viewModelScope.async { placeOrderNow(meetOnCampus) }.also { placingOrder = it }
+        return running.await()
+    }
+
+    private suspend fun placeOrderNow(meetOnCampus: Boolean): Int? {
         checkoutMessage = null
+        confirmationNote = null
         val repository = orderRepository
+        var unavailable: List<Product> = emptyList()
         var notSent: List<Product> = emptyList()
         val order = if (repository == null) {
             // Acceso demo (sin sesión): la orden solo existe en el teléfono, como antes
             Order(number = (1000..9999).random(), lines = cart.toList(), meetOnCampus = meetOnCampus)
         } else {
-            when (val result = repository.place(cart.toList(), meetOnCampus)) {
+            when (val result = repository.place(cart.toList(), meetOnCampus, buyerId = currentUserId)) {
                 PlaceOrderResult.Offline -> {
-                    checkoutMessage = "You're offline. Your cart is saved: place the order when you're back online."
+                    checkoutMessage = if (isOnline) {
+                        "Can't reach CampusSwap right now. Your cart is saved: try again in a moment."
+                    } else {
+                        "You're offline. Your cart is saved: place the order when you're back online."
+                    }
                     return null
                 }
                 is PlaceOrderResult.Rejected -> {
                     cart.removeAll { line -> result.unavailable.any { it.id == line.product.id } }
-                    checkoutMessage = "No longer available: ${result.unavailable.joinToString { it.title }}"
+                    markListing(result.unavailable.filter { SeedIds.isBackendId(it.id) }.map { it.id }, "RESERVED")
+                    checkoutMessage = orderProblems(null, result.unavailable, result.notSent)
                     return null
                 }
                 is PlaceOrderResult.Placed -> {
+                    unavailable = result.unavailable
+                    markListing(result.unavailable.filter { SeedIds.isBackendId(it.id) }.map { it.id }, "RESERVED")
                     notSent = result.notSent
                     result.order
                 }
             }
         }
+        orders.removeAll { it.number == order.number }
         orders.add(0, order)
+        markListing(order.products.map { it.id }, "RESERVED")
+        // Sale del carrito lo pedido y lo que ya no está disponible; se queda lo que no se pudo enviar
         cart.removeAll { line -> notSent.none { it.id == line.product.id } }
         order.products.forEach { product ->
             Analytics.log(
@@ -443,11 +487,48 @@ class AppViewModel : ViewModel() {
         }
         if (repository != null) loadOrders(repository)
         if (notSent.isNotEmpty()) {
-            checkoutMessage = "Connection lost. Order #CSW-${order.number} has ${order.products.joinToString { it.title }}. Still in your cart: ${notSent.joinToString { it.title }}."
+            // Queda algo en el carrito: el comprador sigue en el checkout para reintentarlo
+            checkoutMessage = orderProblems(order, unavailable, notSent)
             return null
         }
+        if (unavailable.isNotEmpty()) confirmationNote = orderProblems(null, unavailable, emptyList())
         return order.number
     }
+
+    /**
+     * The listing left the market (RESERVED once ordered, SOLD once the exchange is closed). It leaves
+     * Home and Search right away, as the server feed (AVAILABLE only) will on its next load, and the
+     * wishlist and chats show its new status. It stays reachable by id for the order and the chat.
+     */
+    fun markListing(productIds: Collection<String>, status: String) {
+        if (productIds.isEmpty()) return
+        fun MutableList<Product>.mark() {
+            for (i in indices) if (this[i].id in productIds && this[i].status != status) this[i] = this[i].copy(status = status)
+        }
+        val leaving = allProducts.filter { it.id in productIds && it.pendingSync == null }
+        allProducts.removeAll(leaving)
+        leaving.forEach { rememberChatProduct(it.copy(status = status)) }
+        wishlistProducts.mark()
+        chatProducts.mark()
+    }
+
+    /** The buyer confirmed the exchange at the meetup and the server closed it: the listing is sold. */
+    fun onExchangeConfirmed(productId: String) {
+        markListing(listOf(productId), "SOLD")
+        orderRepository?.let(::loadOrders)
+    }
+
+    /** One message for everything that didn't go as planned at checkout. */
+    private fun orderProblems(order: Order?, unavailable: List<Product>, notSent: List<Product>): String = buildList {
+        if (order != null) add("Order #CSW-${order.number} placed for ${order.products.joinToString { it.title }}.")
+        if (unavailable.isNotEmpty()) {
+            add("No longer available, removed from your cart: ${unavailable.joinToString { it.title }}.")
+        }
+        if (notSent.isNotEmpty()) {
+            val why = if (isOnline) "CampusSwap didn't answer in time" else "you went offline"
+            add("Not ordered yet because $why: ${notSent.joinToString { it.title }}. It's still in your cart, tap Place Order to try again.")
+        }
+    }.joinToString(" ")
 
     val pendingExchanges: List<PendingExchange>
         get() = orders.flatMap { order ->
@@ -466,6 +547,10 @@ class AppViewModel : ViewModel() {
 
     fun hasPendingExchange(productId: String): Boolean =
         orderFor(productId) != null && ratings[productId] == null
+
+    /** The signed-in seller's listing is reserved and the handover still has to be confirmed. */
+    fun hasPendingSale(productId: String): Boolean =
+        sales.any { it.product.id == productId && it.status == "PENDING" }
 
     fun restoreSession(userId: String) {
         currentUserId = userId
@@ -518,6 +603,7 @@ class AppViewModel : ViewModel() {
         loadedNotificationIds = emptySet()
         notificationsLive = true
         checkoutMessage = null
+        confirmationNote = null
         alertError = null
         wishlistMessage = null
         chatProducts.clear()
@@ -596,19 +682,37 @@ class AppViewModel : ViewModel() {
 
     private val reservedMatches = mutableStateListOf<String>()
 
-    val alertMatches: List<AlertMatch>
-        get() = alerts.filter { it.enabled }.flatMap { alert ->
-            allProducts
-                .filter { it.seller.id != currentUser.id }
-                .filter { product -> alert.matches(product) }
-                .map { product ->
-                    AlertMatch(
-                        alert = alert,
-                        product = product,
-                        postedMinutesAgo = product.createdAtMillis?.let { ((System.currentTimeMillis() - it) / 60_000).toInt() } ?: 0,                        reserved = reservedMatches.contains(product.id),
-                    )
+    var alertMatches by mutableStateOf<List<AlertMatch>>(emptyList())
+        private set
+
+    /** How many matches each alert has (Alerts screen cards), counted once together with the matches. */
+    var matchCountByAlert by mutableStateOf<Map<String, Int>>(emptyMap())
+        private set
+
+    private data class MatchInputs(
+        val alerts: List<SmartAlert>,
+        val products: List<Product>,
+        val userId: String,
+        val reserved: Set<String>,
+    )
+
+    private fun watchAlertMatches() {
+        viewModelScope.launch {
+            snapshotFlow { MatchInputs(alerts.toList(), allProducts.toList(), currentUser.id, reservedMatches.toSet()) }
+                .collectLatest { inputs ->
+                    val (matches, counts) = withContext(Dispatchers.Default) {
+                        trace("Alerts.match") {
+                            val found = findAlertMatches(
+                                inputs.alerts, inputs.products, inputs.userId, inputs.reserved, System.currentTimeMillis(),
+                            )
+                            found to found.groupingBy { it.alert.id }.eachCount()
+                        }
+                    }
+                    alertMatches = matches
+                    matchCountByAlert = counts
                 }
-        }.distinctBy { it.product.id }.sortedBy { it.postedMinutesAgo }
+        }
+    }
 
     val unseenMatchCount: Int
         get() = notifications.count { it.kind == NotificationKind.ALERT_MATCH && !it.isRead }
@@ -645,7 +749,7 @@ class AppViewModel : ViewModel() {
 
     fun publishMatchNotifications() {
         if (smartAlertRepository != null) return
-        alertMatches.forEach { match ->
+        findAlertMatches(alerts, allProducts, currentUser.id, reservedMatches.toSet(), System.currentTimeMillis()).forEach { match ->
             val isNew = notify(
                 id = "$LOCAL_MATCH_PREFIX${match.product.id}",
                 title = "Alert match · ${match.alert.keyword.ifBlank { match.alert.course?.code ?: match.alert.category.label }}",
@@ -749,8 +853,7 @@ class AppViewModel : ViewModel() {
         val userId = currentUserId ?: return null
         return viewModelScope.launch {
             val reviews = repository.received(userId) ?: return@launch
-            myReviews.clear()
-            myReviews.addAll(reviews)
+            myReviews.replaceIfChanged(reviews)
         }
     }
 
@@ -960,6 +1063,7 @@ class AppViewModel : ViewModel() {
     }
 
     init {
+        watchAlertMatches()
         publishMatchNotifications()
     }
 
