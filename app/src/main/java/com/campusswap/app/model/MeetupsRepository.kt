@@ -79,6 +79,7 @@ class MeetupsRepository(
 
     private fun toEntity(owner: String, room: ChatRoomSummaryDto, dto: MeetingProposalDto, now: Long): MeetupEntity? {
         if (dto.status != ACCEPTED && dto.status != PENDING) return null
+        if (room.material?.status == SOLD) return null
         val endsAt = Instant.parse(dto.endsAt).toEpochMilli()
         if (endsAt <= now) return null
         val selling = room.sellerId == owner
@@ -122,5 +123,6 @@ class MeetupsRepository(
         const val MAX_PARALLEL = 4
         const val ACCEPTED = "ACCEPTED"
         const val PENDING = "PENDING"
+        const val SOLD = "SOLD"
     }
 }

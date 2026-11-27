@@ -239,4 +239,35 @@ class ChatRepositoryTest {
 
         assertEquals(listOf("Is it still available?"), repository.saved(seededProduct)?.map { it.text })
     }
+
+    private fun proposalAt(id: String, status: String, point: String) = MeetingProposalDto(
+        id, OTHER, "2026-11-30T17:00:00Z", "2026-11-30T18:00:00Z", status, null,
+        MeetingPointDto("c0000000-0000-4000-8000-00000000000$id", point, null, "PLAZA", false, 4.6, -74.06),
+    )
+
+    @Test
+    fun `a declined proposal after an agreed one keeps the agreed meetup`() = runTest {
+        messages.stored += message("m1", OTHER, "Meeting point proposed", proposalAt("1", "ACCEPTED", "Plazoleta Lleras"))
+        messages.stored += message("m2", OTHER, "Meeting point proposed", proposalAt("2", "DECLINED", "Student Center plaza"))
+
+        val loaded = repository.messages(seededProduct) as ChatLoad.Success
+        val card = repository.latestProposal(loaded.messages)
+
+        assertEquals("Plazoleta Lleras", card?.point?.name)
+        assertEquals(ProposalStatus.ACCEPTED, card?.status)
+    }
+
+    @Test
+    fun `a pending proposal is the one to answer, and a cancelled one is ignored`() = runTest {
+        messages.stored += message("m1", OTHER, "Meeting point proposed", proposalAt("1", "ACCEPTED", "Plazoleta Lleras"))
+        messages.stored += message("m2", OTHER, "Meeting point proposed", proposalAt("2", "PENDING", "Mario Laserna lobby"))
+        messages.stored += message("m3", OTHER, "Meeting point proposed", proposalAt("3", "CANCELLED", "Student Center plaza"))
+
+        val loaded = repository.messages(seededProduct) as ChatLoad.Success
+        val card = repository.latestProposal(loaded.messages)
+
+        assertEquals("Mario Laserna lobby", card?.point?.name)
+        assertEquals(ProposalStatus.PENDING, card?.status)
+        assertEquals(ProposalStatus.CANCELLED, loaded.messages.last().proposal?.status)
+    }
 }

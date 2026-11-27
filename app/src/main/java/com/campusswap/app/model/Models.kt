@@ -170,6 +170,7 @@ enum class ProposalStatus(val label: String) {
     ACCEPTED("Confirmed by both"),
     CHANGED("Alternative proposed"),
     DECLINED("Declined"),
+    CANCELLED("No longer valid"),
 }
 
 data class MeetingProposal(
