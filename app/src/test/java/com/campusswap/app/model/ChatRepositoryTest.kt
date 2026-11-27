@@ -227,4 +227,16 @@ class ChatRepositoryTest {
         repository.markRead(seededProduct)
         assertEquals(listOf("room-1"), rooms.readRooms)
     }
+
+    @Test
+    fun `the saved thread can be shown while the network answers`() = runTest {
+        val cache = InMemoryResponseCache()
+        val repository = ChatRepository(ChatRoomRepository(rooms), messages, currentUserId = { ME }, cache = cache)
+        assertNull(repository.saved(seededProduct))
+
+        messages.stored += message("m1", OTHER, "Is it still available?")
+        repository.messages(seededProduct)
+
+        assertEquals(listOf("Is it still available?"), repository.saved(seededProduct)?.map { it.text })
+    }
 }

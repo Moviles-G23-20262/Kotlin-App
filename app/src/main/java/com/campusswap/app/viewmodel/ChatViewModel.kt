@@ -71,9 +71,17 @@ class ChatViewModel(
     private var firstContact = true
     private var counterpart: String? = null
     private var savedAt: Long? = null
+    private var fromServer = false
 
     init {
         room?.let { chat.select(productId, it) }
+        viewModelScope.launch {
+            val saved = chat.saved(productId) ?: return@launch
+            if (!fromServer && delivered.isEmpty()) {
+                delivered = saved
+                republish()
+            }
+        }
         viewModelScope.launch {
             outbox.pendingMessages.collect { rows ->
                 queued = rows.filter {
@@ -122,6 +130,7 @@ class ChatViewModel(
     }
 
     private fun publish(messages: List<ChatMessage>) {
+        fromServer = true
         delivered = messages
         if (messages.any { it.author == MessageAuthor.ME }) firstContact = false
         republish()

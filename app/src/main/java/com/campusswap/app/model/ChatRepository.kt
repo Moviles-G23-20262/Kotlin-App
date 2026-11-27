@@ -67,6 +67,9 @@ class ChatRepository(
         lastSaved[key] = thread
     }
 
+    suspend fun saved(productId: String): List<ChatMessage>? =
+        (savedThread(productId) as? ChatLoad.Success)?.messages?.takeIf { it.isNotEmpty() }
+
     private suspend fun savedThread(productId: String): ChatLoad? {
         val owner = currentUserId() ?: return null
         val saved = cache.load<List<MessageDto>>(owner, threadKey(productId)) ?: return null
