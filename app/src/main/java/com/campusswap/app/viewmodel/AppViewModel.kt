@@ -3,7 +3,6 @@ package com.campusswap.app.viewmodel
 import com.campusswap.app.model.AlertMatch
 import com.campusswap.app.model.AppNotification
 import com.campusswap.app.model.CartLine
-import com.campusswap.app.model.ChatRoomRepository
 import com.campusswap.app.model.Category
 import com.campusswap.app.model.Condition
 import com.campusswap.app.model.Course
@@ -18,6 +17,8 @@ import com.campusswap.app.model.SeedIds
 import com.campusswap.app.model.ProposalStatus
 import com.campusswap.app.model.SampleData
 import com.campusswap.app.model.SearchFilters
+import com.campusswap.app.model.orders.MeetupArranger
+import com.campusswap.app.model.orders.MeetupPlan
 import com.campusswap.app.model.SellDraft
 import com.campusswap.app.model.Seller
 import com.campusswap.app.model.SmartAlert
@@ -74,7 +75,6 @@ import kotlinx.coroutines.withContext
 import com.campusswap.app.model.local.CartStore
 import com.campusswap.app.model.local.ThemeStore
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -422,17 +422,13 @@ class AppViewModel : ViewModel() {
             ?: sales.firstNotNullOfOrNull { sale -> sale.product.takeIf { it.id == id } }
             ?: chatProducts.find { it.id == id }
 
-    suspend fun openSellerChats(rooms: ChatRoomRepository, order: Order) {
+    fun arrangeMeetups(arranger: MeetupArranger, order: Order, plans: Map<String, MeetupPlan>) {
         if (orderRepository == null) return
-        order.products.distinctBy { it.seller.id }.forEach { product ->
-            try {
-                rooms.roomFor(product.id)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-            }
-        }
+        viewModelScope.launch { arranger.arrange(order, plans) }
     }
+
+    var lastPlacedOrder by mutableStateOf<Order?>(null)
+        private set
 
     /** Note for the confirmation screen when part of the cart could not be ordered (null = everything went through). */
     var confirmationNote by mutableStateOf<String?>(null)
@@ -487,6 +483,7 @@ class AppViewModel : ViewModel() {
         }
         orders.removeAll { it.number == order.number }
         orders.add(0, order)
+        lastPlacedOrder = order
         markListing(order.products.map { it.id }, "RESERVED")
         // Sale del carrito lo pedido y lo que ya no está disponible; se queda lo que no se pudo enviar
         cart.removeAll { line -> notSent.none { it.id == line.product.id } }
@@ -634,6 +631,7 @@ class AppViewModel : ViewModel() {
         shownMatches.clear()
         pendingSearchCategory = null
         searchFilters = SearchFilters()
+        lastPlacedOrder = null
     }
 
     fun isWishlisted(productId: String) = wishlist.contains(productId)

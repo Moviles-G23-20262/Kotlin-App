@@ -7,6 +7,7 @@ import com.campusswap.app.model.ConversationsRepository
 import com.campusswap.app.model.ExchangeRepository
 import com.campusswap.app.model.MeetingPointPopularityRepository
 import com.campusswap.app.model.MeetingPointRepository
+import com.campusswap.app.model.orders.MeetupArranger
 import com.campusswap.app.model.MeetingProposalRepository
 import com.campusswap.app.model.MeetupsRepository
 import com.campusswap.app.model.auth.AuthRepository
@@ -155,6 +156,8 @@ class AppContainer(context: Context) {
         currentUserId = signedInUserId,
         clock = clock,
     )
+
+    val meetupArranger = MeetupArranger(chatRoomRepository, meetingProposalRepository, chatRepository)
 
     val meetupsRepository = MeetupsRepository(chatRoomRemote, proposalRemote, database.meetups(), signedInUserId, clock)
 

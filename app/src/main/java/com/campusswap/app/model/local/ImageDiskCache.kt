@@ -1,6 +1,8 @@
 package com.campusswap.app.model.local
 
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 /**
@@ -29,7 +31,7 @@ class ImageDiskCache(
         val target = fileFor(url)
         // Se escribe aparte y se renombra: si la app muere a mitad, no queda una imagen corrupta
         val tmp = File(folder, "${target.name}.tmp")
-        val saved = runCatching { tmp.writeBytes(bytes); tmp.renameTo(target) }.getOrDefault(false)
+        val saved = runCatching { tmp.writeBytes(bytes); Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); true }.getOrDefault(false)
         if (!saved) {
             tmp.delete()
             return

@@ -327,10 +327,8 @@ fun CampusSwapApp(appViewModel: AppViewModel) {
 
             composable(Routes.CONFIRMATION) { entry ->
                 val orderNumber = entry.arguments?.getString("orderNumber").orEmpty()
-                val order = appViewModel.orders.firstOrNull { it.number.toString() == orderNumber }
-                LaunchedEffect(order) {
-                    order?.let { appViewModel.openSellerChats(container.chatRoomRepository, it) }
-                }
+                val order = appViewModel.lastPlacedOrder?.takeIf { it.number.toString() == orderNumber }
+                    ?: appViewModel.orders.firstOrNull { it.number.toString() == orderNumber }
                 OrderConfirmationScreen(
                     orderNumber = orderNumber,
                     order = order,

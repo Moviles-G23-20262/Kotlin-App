@@ -51,6 +51,17 @@ import com.campusswap.app.views.components.campusCard
 import com.campusswap.app.views.components.formatPrice
 import com.campusswap.app.viewmodel.AppViewModel
 import com.campusswap.app.model.Order
+import com.campusswap.app.CampusSwapApplication
+import com.campusswap.app.model.MeetingPoint
+import com.campusswap.app.model.TimeSlot
+import com.campusswap.app.model.orders.PaymentMethod
+import com.campusswap.app.viewmodel.CheckoutUiState
+import com.campusswap.app.viewmodel.CheckoutViewModel
+import com.campusswap.app.views.components.Pill
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.campusswap.app.views.themes.CampusSwapTheme
 import com.campusswap.app.views.themes.CampusType
 import kotlinx.coroutines.delay
@@ -64,6 +75,12 @@ fun CheckoutScreen(
     onOrderPlaced: (Int) -> Unit,
 ) {
     val c = CampusSwapTheme.colors
+    val container = (LocalContext.current.applicationContext as CampusSwapApplication).container
+    val checkout: CheckoutViewModel = viewModel(factory = CheckoutViewModel.factory(container))
+    val state by checkout.state.collectAsState()
+    val productIds = vm.cart.map { it.product.id }
+    val ready = state.isComplete(productIds)
+    val missingItems = state.incompleteCount(productIds)
     var placing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -83,22 +100,20 @@ fun CheckoutScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            // Every exchange happens in person at a monitored campus point: the app never ships items or
-            // takes payments, so the screen says so instead of offering options the order never used.
-            CheckoutCard(title = "Meetup", icon = CampusIcons.MapPin) {
-                CheckoutNote(
-                    CampusIcons.Location,
-                    "You'll agree on a safe, monitored campus point with the seller in the chat. " +
-                        "The Campus Guardian suggests the best one for both of you.",
+            vm.cart.forEach { line ->
+                val product = line.product
+                MeetupCard(
+                    title = "${product.title} · ${product.seller.name.substringBefore(' ')}",
+                    state = state,
+                    productId = product.id,
+                    onPoint = { checkout.choosePoint(product.id, it) },
+                    onDay = { checkout.chooseDay(product.id, it) },
+                    onSlot = { checkout.chooseSlot(product.id, it) },
+                    onPayment = { checkout.choosePayment(product.id, it) },
                 )
             }
 
-            CheckoutCard(title = "Payment", icon = CampusIcons.Wallet) {
-                CheckoutNote(
-                    CampusIcons.Wallet,
-                    "Pay the seller in person when you meet, in cash, Nequi or Daviplata, after checking the item.",
-                )
-            }
+            CheckoutNote(CampusIcons.Wallet, "You pay each seller in person when you meet, after checking the item.")
 
             CheckoutCard(title = "Items", icon = CampusIcons.Package, titleBottomPadding = 10) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -135,6 +150,7 @@ fun CheckoutScreen(
                 text = when {
                     placing -> "Placing Order..."
                     vm.needsConnectionToOrder -> "Waiting for connection"
+                    !ready -> if (missingItems == 1) "Complete 1 more item" else "Complete $missingItems more items"
                     else -> "Place Order"
                 },
                 onClick = {
@@ -142,14 +158,89 @@ fun CheckoutScreen(
                     scope.launch {
                         val number = vm.placeOrder()
                         placing = false
-                        if (number != null) onOrderPlaced(number)
+                        if (number != null) {
+                            vm.lastPlacedOrder?.let { vm.arrangeMeetups(container.meetupArranger, it, state.plans()) }
+                            onOrderPlaced(number)
+                        }
                     }
                 },
-                enabled = !placing && vm.cart.isNotEmpty() && !vm.needsConnectionToOrder,
+                enabled = !placing && ready && vm.cart.isNotEmpty() && !vm.needsConnectionToOrder,
                 leadingIcon = CampusIcons.Send,
                 contentPadding = PaddingValues(13.dp),
                 modifier = Modifier.fillMaxWidth(),
             )
+        }
+    }
+}
+
+@Composable
+private fun MeetupCard(
+    title: String,
+    state: CheckoutUiState,
+    productId: String,
+    onPoint: (MeetingPoint) -> Unit,
+    onDay: (Int) -> Unit,
+    onSlot: (TimeSlot) -> Unit,
+    onPayment: (PaymentMethod) -> Unit,
+) {
+    val c = CampusSwapTheme.colors
+    val choice = state.choiceFor(productId)
+    val taken = state.takenByOthers(productId)
+    CheckoutCard(title = title, icon = CampusIcons.MapPin) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            BodyText("Where", color = c.textMuted)
+            if (state.points.isEmpty()) {
+                BodyText("Loading campus points...", color = c.textMuted)
+            } else {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    state.points.forEach { point ->
+                        Pill(point.name, selected = choice.point?.id == point.id, onClick = { onPoint(point) }, small = true)
+                    }
+                }
+                choice.point?.let { point ->
+                    BodyText(
+                        if (point.isMonitored) "Monitored point" else "Not monitored: prefer a monitored point after dark",
+                        color = if (point.isMonitored) c.textMuted else c.error,
+                    )
+                }
+            }
+            BodyText("When", color = c.textMuted, modifier = Modifier.padding(top = 4.dp))
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                state.days.forEachIndexed { index, day ->
+                    Pill(day.label, selected = choice.dayIndex == index, onClick = { onDay(index) }, small = true)
+                }
+            }
+            val free = state.days.getOrNull(choice.dayIndex)?.slots.orEmpty().filter { it.id !in taken }
+            if (free.isEmpty()) {
+                BodyText("No free hours left this day", color = c.textMuted)
+            } else {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    free.forEach { slot ->
+                        Pill(slot.label, selected = choice.slot?.id == slot.id, onClick = { onSlot(slot) }, small = true)
+                    }
+                }
+            }
+            BodyText("Payment", color = c.textMuted, modifier = Modifier.padding(top = 4.dp))
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                PaymentMethod.entries.forEach { method ->
+                    Pill(method.label, selected = choice.payment == method, onClick = { onPayment(method) }, small = true)
+                }
+            }
+            if (choice.missing.isNotEmpty()) {
+                BodyText("Missing: ${choice.missing.joinToString(", ")}", color = c.error, modifier = Modifier.padding(top = 4.dp))
+            }
         }
     }
 }
@@ -211,7 +302,7 @@ fun OrderConfirmationScreen(
     onCompleteExchange: (String) -> Unit,
 ) {
     val c = CampusSwapTheme.colors
-    val bySeller = order?.products.orEmpty().groupBy { it.seller.id }.values.toList()
+    val products = order?.products.orEmpty()
     val exchangeProduct = order?.products?.singleOrNull()
     // `animate-bounce-in`: 0.8 -> 1.04 -> 1.0 with a fade.
     val scale = remember { Animatable(0.8f) }
@@ -264,7 +355,7 @@ fun OrderConfirmationScreen(
                     BodyText("What happens next", color = c.text, weight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         NextStep(CampusIcons.CheckCircle, "Seller has been notified")
-                        NextStep(CampusIcons.Message, "1 · Agree on the meetup in chat")
+                        NextStep(CampusIcons.Message, "1 · The seller confirms the meetup in chat")
                         NextStep(CampusIcons.MapPin, "2 · Meet at a monitored campus point")
                         NextStep(CampusIcons.Star, "3 · Check the item and rate each other")
                     }
@@ -285,12 +376,11 @@ fun OrderConfirmationScreen(
             modifier = Modifier.widthIn(max = 340.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (bySeller.isNotEmpty()) {
-                bySeller.forEach { items ->
-                    val sellerName = items.first().seller.name.substringBefore(' ')
+            if (products.isNotEmpty()) {
+                products.forEach { product ->
                     PrimaryButton(
-                        text = if (bySeller.size == 1) "Arrange the meetup" else "Chat with $sellerName (${items.size} item${if (items.size == 1) "" else "s"})",
-                        onClick = { onOpenChat(items.first().id) },
+                        text = if (products.size == 1) "Open the chat" else "Chat about ${product.title} · ${product.seller.name.substringBefore(' ')}",
+                        onClick = { onOpenChat(product.id) },
                         leadingIcon = CampusIcons.Message,
                         contentPadding = PaddingValues(13.dp),
                         modifier = Modifier.fillMaxWidth(),
